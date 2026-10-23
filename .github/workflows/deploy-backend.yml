@@ -1,4 +1,4 @@
-name: Build & Deploy Backend to Botkeep
+name: Build & Release Backend
 
 on:
   push:
@@ -10,8 +10,11 @@ on:
       - '.github/workflows/deploy-backend.yml'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
-  build-and-deploy:
+  build-and-release:
     runs-on: ubuntu-latest
 
     steps:
@@ -30,19 +33,13 @@ jobs:
           cd erp-backend
           mvn clean package -DskipTests
 
-      - name: 🚀 Upload JAR to Botkeep via SFTP
+      - name: 🚀 Publish Latest Release to GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest Backend Build
+          body: Automated Spring Boot build from GitHub Actions
+          files: erp-backend/target/erp-backend-0.0.1-SNAPSHOT.jar
+          prerelease: false
         env:
-          SFTP_HOST: ${{ secrets.BOTKEEP_SFTP_HOST }}
-          SFTP_PORT: ${{ secrets.BOTKEEP_SFTP_PORT }}
-          SFTP_USER: ${{ secrets.BOTKEEP_SFTP_USER }}
-          SFTP_PASS: ${{ secrets.BOTKEEP_SFTP_PASS }}
-        run: |
-          sudo apt-get update && sudo apt-get install -y sshpass
-          sshpass -p "$SFTP_PASS" sftp -o StrictHostKeyChecking=no -P "$SFTP_PORT" "$SFTP_USER@$SFTP_HOST" <<EOF
-          put erp-backend/target/erp-backend-0.0.1-SNAPSHOT.jar erp-backend-0.0.1-SNAPSHOT.jar
-          bye
-          EOF
-
-      - name: ✅ Deployment Completed
-        run: echo "Successfully built and deployed erp-backend JAR to Botkeep!"
-
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
