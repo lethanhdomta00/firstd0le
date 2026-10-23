@@ -1,0 +1,48 @@
+name: Build & Deploy Backend to Botkeep
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+    paths:
+      - 'erp-backend/**'
+      - '.github/workflows/deploy-backend.yml'
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: ☕ Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: 🔨 Build with Maven
+        run: |
+          cd erp-backend
+          mvn clean package -DskipTests
+
+      - name: 🚀 Upload JAR to Botkeep via SFTP
+        env:
+          SFTP_HOST: ${{ secrets.BOTKEEP_SFTP_HOST }}
+          SFTP_PORT: ${{ secrets.BOTKEEP_SFTP_PORT }}
+          SFTP_USER: ${{ secrets.BOTKEEP_SFTP_USER }}
+          SFTP_PASS: ${{ secrets.BOTKEEP_SFTP_PASS }}
+        run: |
+          sudo apt-get update && sudo apt-get install -y sshpass
+          sshpass -p "$SFTP_PASS" sftp -o StrictHostKeyChecking=no -P "$SFTP_PORT" "$SFTP_USER@$SFTP_HOST" <<EOF
+          put erp-backend/target/erp-backend-0.0.1-SNAPSHOT.jar erp-backend-0.0.1-SNAPSHOT.jar
+          bye
+          EOF
+
+      - name: ✅ Deployment Completed
+        run: echo "Successfully built and deployed erp-backend JAR to Botkeep!"
+
