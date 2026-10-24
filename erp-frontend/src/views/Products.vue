@@ -1,7 +1,7 @@
 <template>
   <div class="products-container">
     <div class="page-header">
-      <div>
+      <div class="header-text">
         <h2 class="page-title">Quản lý Sản phẩm</h2>
         <p class="page-subtitle">Danh sách hàng hóa, giá niêm yết, tồn kho và hình ảnh sản phẩm</p>
       </div>
@@ -12,71 +12,74 @@
 
     <!-- Product Table Card -->
     <el-card shadow="never" class="table-card">
-      <el-table :data="products" v-loading="loading" style="width: 100%">
-        <el-table-column prop="id" label="ID" width="70" align="center" />
-        
-        <!-- Product Image Column -->
-        <el-table-column label="Hình ảnh" width="110" align="center">
-          <template #default="{ row }">
-            <el-image
-              v-if="row.imageUrl"
-              :src="row.imageUrl"
-              :preview-src-list="[row.imageUrl]"
-              preview-teleported
-              fit="cover"
-              class="product-thumb"
-            >
-              <template #error>
-                <div class="image-placeholder"><el-icon><Picture /></el-icon></div>
-              </template>
-            </el-image>
-            <div v-else class="image-placeholder">
-              <el-icon><Picture /></el-icon>
-            </div>
-          </template>
-        </el-table-column>
+      <div class="table-responsive-wrapper">
+        <el-table :data="products" v-loading="loading" style="width: 100%; min-width: 700px;">
+          <el-table-column prop="id" label="ID" width="70" align="center" />
+          
+          <!-- Product Image Column -->
+          <el-table-column label="Hình ảnh" width="100" align="center">
+            <template #default="{ row }">
+              <el-image
+                v-if="row.imageUrl"
+                :src="row.imageUrl"
+                :preview-src-list="[row.imageUrl]"
+                preview-teleported
+                fit="cover"
+                class="product-thumb"
+              >
+                <template #error>
+                  <div class="image-placeholder"><el-icon><Picture /></el-icon></div>
+                </template>
+              </el-image>
+              <div v-else class="image-placeholder">
+                <el-icon><Picture /></el-icon>
+              </div>
+            </template>
+          </el-table-column>
 
-        <el-table-column prop="name" label="Tên sản phẩm" min-width="180">
-          <template #default="{ row }">
-            <span class="product-name">{{ row.name }}</span>
-          </template>
-        </el-table-column>
+          <el-table-column prop="name" label="Tên sản phẩm" min-width="180">
+            <template #default="{ row }">
+              <span class="product-name">{{ row.name }}</span>
+            </template>
+          </el-table-column>
 
-        <el-table-column prop="sku" label="Mã SKU" width="140">
-          <template #default="{ row }">
-            <el-tag size="small" type="info">{{ row.sku }}</el-tag>
-          </template>
-        </el-table-column>
+          <el-table-column prop="sku" label="Mã SKU" width="130">
+            <template #default="{ row }">
+              <el-tag size="small" type="info">{{ row.sku }}</el-tag>
+            </template>
+          </el-table-column>
 
-        <el-table-column prop="price" label="Giá bán" width="140">
-          <template #default="{ row }">
-            <span class="price-tag">{{ formatCurrency(row.price) }}</span>
-          </template>
-        </el-table-column>
+          <el-table-column prop="price" label="Giá bán" width="140">
+            <template #default="{ row }">
+              <span class="price-tag">{{ formatCurrency(row.price) }}</span>
+            </template>
+          </el-table-column>
 
-        <el-table-column prop="stock" label="Tồn kho" width="120" align="center">
-          <template #default="{ row }">
-            <el-tag :type="row.stock > 10 ? 'success' : (row.stock > 0 ? 'warning' : 'danger')">
-              {{ row.stock }} cái
-            </el-tag>
-          </template>
-        </el-table-column>
+          <el-table-column prop="stock" label="Tồn kho" width="110" align="center">
+            <template #default="{ row }">
+              <el-tag :type="row.stock > 10 ? 'success' : (row.stock > 0 ? 'warning' : 'danger')">
+                {{ row.stock }} cái
+              </el-tag>
+            </template>
+          </el-table-column>
 
-        <el-table-column label="Thao tác" width="160" align="center">
-          <template #default="{ row }">
-            <el-button size="small" @click="openDialog(row)">Sửa</el-button>
-            <el-button size="small" type="danger" @click="deleteProduct(row.id)">Xóa</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+          <el-table-column label="Thao tác" width="150" align="center" fixed="right">
+            <template #default="{ row }">
+              <el-button size="small" @click="openDialog(row)">Sửa</el-button>
+              <el-button size="small" type="danger" @click="deleteProduct(row.id)">Xóa</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
     </el-card>
 
-    <!-- Dialog Add / Edit Product -->
+    <!-- Dialog Add / Edit Product (Responsive Width) -->
     <el-dialog 
       :title="form.id ? 'Cập nhật Sản phẩm' : 'Thêm Sản phẩm Mới'" 
       v-model="dialogVisible" 
-      width="540px"
+      :width="isMobile ? '92%' : '560px'"
       destroy-on-close
+      class="responsive-dialog"
     >
       <el-form :model="form" label-position="top" class="product-form">
         <!-- Image Upload Section -->
@@ -103,7 +106,7 @@
               <div v-if="!uploading" class="upload-prompt">
                 <el-icon class="upload-icon"><UploadFilled /></el-icon>
                 <div class="el-upload__text">Kéo thả ảnh vào đây hoặc <em>chọn file</em></div>
-                <div class="upload-tip">JPG, PNG, WEBP tối đa 5MB (Lưu trữ trên Cloudinary)</div>
+                <div class="upload-tip">JPG, PNG, WEBP tối đa 5MB (Lưu trữ Cloudinary)</div>
               </div>
               <div v-else class="upload-loading">
                 <el-icon class="is-loading" style="font-size: 24px;"><Loading /></el-icon>
@@ -114,12 +117,12 @@
         </el-form-item>
 
         <el-row :gutter="16">
-          <el-col :span="16">
+          <el-col :xs="24" :sm="15">
             <el-form-item label="Tên sản phẩm *" required>
               <el-input v-model="form.name" placeholder="Ví dụ: Laptop Dell XPS 15" />
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+          <el-col :xs="24" :sm="9">
             <el-form-item label="Mã SKU *" required>
               <el-input v-model="form.sku" placeholder="SKU-001" />
             </el-form-item>
@@ -127,7 +130,7 @@
         </el-row>
 
         <el-row :gutter="16">
-          <el-col :span="12">
+          <el-col :xs="24" :sm="12">
             <el-form-item label="Đơn giá (VNĐ) *" required>
               <el-input-number 
                 v-model="form.price" 
@@ -137,7 +140,7 @@
               />
             </el-form-item>
           </el-col>
-          <el-col :span="12">
+          <el-col :xs="24" :sm="12">
             <el-form-item label="Số lượng tồn kho *" required>
               <el-input-number 
                 v-model="form.stock" 
@@ -150,8 +153,10 @@
       </el-form>
 
       <template #footer>
-        <el-button @click="dialogVisible = false">Hủy</el-button>
-        <el-button type="primary" :loading="saving" @click="saveProduct">Lưu sản phẩm</el-button>
+        <div class="dialog-footer">
+          <el-button @click="dialogVisible = false">Hủy</el-button>
+          <el-button type="primary" :loading="saving" @click="saveProduct">Lưu sản phẩm</el-button>
+        </div>
       </template>
     </el-dialog>
   </div>
@@ -161,7 +166,10 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Picture, Delete, UploadFilled, Loading } from '@element-plus/icons-vue'
+import { useResponsive } from '../composables/useResponsive'
 import api from '../api'
+
+const { isMobile } = useResponsive()
 
 const products = ref([])
 const loading = ref(false)
@@ -258,12 +266,12 @@ const saveProduct = async () => {
 const deleteProduct = async (id) => {
   try {
     await ElMessageBox.confirm('Bạn có chắc chắn muốn xóa sản phẩm này?', 'Xác nhận xóa', {
-      type: 'warning',
-      confirmButtonText: 'Xóa',
-      cancelButtonText: 'Hủy'
+      confirmButtonText: 'Xóa ngay',
+      cancelButtonText: 'Hủy',
+      type: 'warning'
     })
     await api.delete(`/products/${id}`)
-    ElMessage.success('Đã xóa sản phẩm!')
+    ElMessage.success('Đã xóa sản phẩm thành công!')
     fetchProducts()
   } catch (e) {
     if (e !== 'cancel') ElMessage.error('Lỗi khi xóa sản phẩm!')
@@ -277,21 +285,29 @@ onMounted(() => {
 
 <style scoped>
 .products-container {
-  padding: 8px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.header-text {
+  flex: 1;
+  min-width: 240px;
 }
 
 .page-title {
   margin: 0;
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 700;
-  color: #1e293b;
+  color: #0f172a;
 }
 
 .page-subtitle {
@@ -301,13 +317,19 @@ onMounted(() => {
 }
 
 .table-card {
-  border-radius: 12px;
+  border-radius: 14px;
   border: 1px solid #e2e8f0;
 }
 
+.table-responsive-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .product-thumb {
-  width: 52px;
-  height: 52px;
+  width: 48px;
+  height: 48px;
   border-radius: 8px;
   border: 1px solid #e2e8f0;
   display: inline-block;
@@ -315,8 +337,8 @@ onMounted(() => {
 }
 
 .image-placeholder {
-  width: 52px;
-  height: 52px;
+  width: 48px;
+  height: 48px;
   border-radius: 8px;
   background-color: #f1f5f9;
   display: inline-flex;
@@ -334,7 +356,7 @@ onMounted(() => {
 
 .price-tag {
   font-weight: 700;
-  color: #2563eb;
+  color: #0284c7;
 }
 
 /* Upload Styling */
@@ -344,8 +366,8 @@ onMounted(() => {
 
 .image-preview-box {
   position: relative;
-  width: 160px;
-  height: 160px;
+  width: 150px;
+  height: 150px;
   border-radius: 12px;
   overflow: hidden;
   border: 2px solid #e2e8f0;
@@ -364,7 +386,7 @@ onMounted(() => {
 }
 
 :deep(.image-uploader .el-upload-dragger) {
-  padding: 20px;
+  padding: 18px;
   border-radius: 12px;
   border: 2px dashed #cbd5e1;
   background-color: #f8fafc;
@@ -372,25 +394,57 @@ onMounted(() => {
 }
 
 :deep(.image-uploader .el-upload-dragger:hover) {
-  border-color: #3b82f6;
-  background-color: #eff6ff;
+  border-color: #0284c7;
+  background-color: #f0f9ff;
 }
 
 .upload-icon {
-  font-size: 36px;
-  color: #3b82f6;
-  margin-bottom: 8px;
+  font-size: 32px;
+  color: #0284c7;
+  margin-bottom: 6px;
 }
 
 .upload-tip {
   font-size: 11px;
   color: #94a3b8;
-  margin-top: 6px;
+  margin-top: 4px;
 }
 
 .upload-loading {
-  padding: 24px;
+  padding: 20px;
   text-align: center;
-  color: #3b82f6;
+  color: #0284c7;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .page-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .btn-add {
+    width: 100%;
+  }
+
+  .page-title {
+    font-size: 18px;
+  }
+
+  .dialog-footer {
+    flex-direction: column;
+  }
+
+  .dialog-footer .el-button {
+    width: 100%;
+    margin-left: 0 !important;
+  }
 }
 </style>

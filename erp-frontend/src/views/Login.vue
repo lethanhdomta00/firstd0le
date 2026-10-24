@@ -641,4 +641,29 @@ const handleForgot = async () => {
   opacity: 0;
   transform: translateY(-8px);
 }
+
+/* Responsive Media Queries */
+@media (max-width: 480px) {
+  .auth-wrapper {
+    padding: 16px 12px;
+  }
+  .glass-card {
+    padding: 22px 16px;
+    border-radius: 18px;
+  }
+  .brand-title {
+    font-size: 22px;
+  }
+  .brand-subtitle {
+    font-size: 12px;
+  }
+  .demo-credential-pill {
+    padding: 8px 10px;
+    font-size: 11px;
+    line-height: 1.4;
+  }
+  .form-title {
+    font-size: 20px;
+  }
+}
 </style>
