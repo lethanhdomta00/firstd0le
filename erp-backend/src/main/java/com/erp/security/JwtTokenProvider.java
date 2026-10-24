@@ -1,6 +1,7 @@
 package com.erp.security;
 
 import io.jsonwebtoken.*;
+import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
@@ -8,15 +9,29 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
 @Component
 public class JwtTokenProvider {
 
-    private final SecretKey key = Keys.secretKeyFor(SignatureAlgorithm.HS512);
+    @Value("${jwt.secret:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}")
+    private String jwtSecret;
 
     @Value("${app.jwtExpirationInMs:86400000}")
     private int jwtExpirationInMs;
+
+    private SecretKey getSigningKey() {
+        try {
+            // Thử giải mã BASE64 nếu secret được mã hóa
+            byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
+            return Keys.hmacShaKeyFor(keyBytes);
+        } catch (Exception e) {
+            // Fallback sang UTF-8 bytes nếu không phải BASE64
+            byte[] keyBytes = jwtSecret.getBytes(StandardCharsets.UTF_8);
+            return Keys.hmacShaKeyFor(keyBytes);
+        }
+    }
 
     public String generateToken(Authentication authentication) {
         UserDetails userPrincipal = (UserDetails) authentication.getPrincipal();
@@ -28,13 +43,13 @@ public class JwtTokenProvider {
                 .setSubject(userPrincipal.getUsername())
                 .setIssuedAt(new Date())
                 .setExpiration(expiryDate)
-                .signWith(key)
+                .signWith(getSigningKey(), SignatureAlgorithm.HS512)
                 .compact();
     }
 
     public String getUsernameFromJWT(String token) {
         Claims claims = Jwts.parserBuilder()
-                .setSigningKey(key)
+                .setSigningKey(getSigningKey())
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
@@ -44,10 +59,10 @@ public class JwtTokenProvider {
 
     public boolean validateToken(String authToken) {
         try {
-            Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(authToken);
+            Jwts.parserBuilder().setSigningKey(getSigningKey()).build().parseClaimsJws(authToken);
             return true;
         } catch (JwtException | IllegalArgumentException ex) {
-            // Log exception here
+            // Token không hợp lệ hoặc đã hết hạn
         }
         return false;
     }

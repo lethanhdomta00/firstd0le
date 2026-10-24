@@ -1,53 +1,57 @@
 <template>
   <div class="users-container">
-    <div class="page-header">
-      <div class="header-text">
-        <h2 class="page-title">Quản lý Tài khoản (Users)</h2>
-        <p class="page-subtitle">Danh sách người dùng và phân quyền truy cập hệ thống</p>
-      </div>
-      <el-button type="primary" size="large" @click="openDialog()" class="btn-add">
-        <el-icon style="margin-right: 6px;"><Plus /></el-icon> Thêm tài khoản mới
-      </el-button>
-    </div>
+    <!-- Reusable Base Page Header -->
+    <BasePageHeader
+      title="Quản lý Tài khoản (Users)"
+      subtitle="Danh sách người dùng và phân quyền truy cập hệ thống"
+      :icon="User"
+    >
+      <BaseButton type="gradient" size="large" :icon="Plus" @click="openDialog()" class="btn-add">
+        Thêm tài khoản mới
+      </BaseButton>
+    </BasePageHeader>
 
-    <el-card shadow="never" class="table-card">
-      <div class="table-responsive-wrapper">
-        <el-table :data="users" v-loading="loading" style="width: 100%; min-width: 550px;">
-          <el-table-column prop="id" label="ID" width="70" align="center" />
-          <el-table-column prop="username" label="Tên đăng nhập" min-width="160">
-            <template #default="{ row }">
-              <span class="user-name">{{ row.username }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column prop="role" label="Phân quyền (Role)" width="150" align="center">
-            <template #default="{ row }">
-              <el-tag :type="row.role === 'ADMIN' ? 'danger' : 'success'" effect="light">
-                {{ row.role }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="Hành động" width="130" align="center" fixed="right">
-            <template #default="{ row }">
-              <el-button size="small" type="danger" plain @click="deleteUser(row.id)">Xóa</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-      </div>
-    </el-card>
+    <!-- Reusable Base Table -->
+    <BaseTable :data="users" :loading="loading" min-width="560px">
+      <el-table-column prop="id" label="ID" width="70" align="center" />
+      <el-table-column prop="username" label="Tên đăng nhập" min-width="160">
+        <template #default="{ row }">
+          <span class="user-name">{{ row.username }}</span>
+        </template>
+      </el-table-column>
 
-    <!-- Dialog Add User (Responsive Width) -->
-    <el-dialog 
+      <!-- Reusable Base Status Badge for Role -->
+      <el-table-column prop="role" label="Phân quyền (Role)" width="160" align="center">
+        <template #default="{ row }">
+          <BaseStatusBadge
+            :type="row.role === 'ADMIN' ? 'danger' : 'info'"
+            :text="row.role === 'ADMIN' ? 'Quản trị viên (ADMIN)' : 'Nhân viên (USER)'"
+          />
+        </template>
+      </el-table-column>
+
+      <el-table-column label="Hành động" width="130" align="center" fixed="right">
+        <template #default="{ row }">
+          <el-button size="small" type="danger" plain @click="deleteUser(row.id)">Xóa</el-button>
+        </template>
+      </el-table-column>
+    </BaseTable>
+
+    <!-- Reusable Base Dialog -->
+    <BaseDialog 
+      v-model="dialogVisible"
       title="Thêm tài khoản mới" 
-      v-model="dialogVisible" 
-      :width="isMobile ? '92%' : '440px'"
-      destroy-on-close
+      subtitle="Tạo tài khoản người dùng mới và chỉ định phân quyền truy cập"
+      width="440px"
+      confirm-text="Tạo tài khoản"
+      @confirm="saveUser"
     >
       <el-form :model="form" label-position="top">
         <el-form-item label="Tên đăng nhập *" required>
           <el-input v-model="form.username" placeholder="Nhập tên đăng nhập" />
         </el-form-item>
         <el-form-item label="Mật khẩu *" required>
-          <el-input v-model="form.password" type="password" show-password placeholder="Nhập mật khẩu" />
+          <el-input v-model="form.password" type="password" show-password placeholder="Nhập mật khẩu (tối thiểu 6 ký tự)" />
         </el-form-item>
         <el-form-item label="Phân quyền *" required>
           <el-select v-model="form.role" style="width: 100%">
@@ -56,24 +60,15 @@
           </el-select>
         </el-form-item>
       </el-form>
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="dialogVisible = false">Hủy</el-button>
-          <el-button type="primary" @click="saveUser">Tạo tài khoản</el-button>
-        </div>
-      </template>
-    </el-dialog>
+    </BaseDialog>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus } from '@element-plus/icons-vue'
-import { useResponsive } from '../composables/useResponsive'
+import { Plus, User } from '@element-plus/icons-vue'
 import api from '../api'
-
-const { isMobile } = useResponsive()
 
 const users = ref([])
 const loading = ref(false)
@@ -109,7 +104,7 @@ const saveUser = async () => {
     dialogVisible.value = false
     fetchUsers()
   } catch (e) {
-    ElMessage.error(e.response?.data || 'Lỗi khi tạo tài khoản!')
+    ElMessage.error(e.response?.data?.message || e.response?.data || 'Lỗi khi tạo tài khoản!')
   }
 }
 
@@ -137,44 +132,6 @@ onMounted(() => {
 .users-container {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 16px;
-}
-
-.header-text {
-  flex: 1;
-  min-width: 240px;
-}
-
-.page-title {
-  margin: 0;
-  font-size: 22px;
-  font-weight: 700;
-  color: #0f172a;
-}
-
-.page-subtitle {
-  margin: 4px 0 0 0;
-  font-size: 13px;
-  color: #64748b;
-}
-
-.table-card {
-  border-radius: 14px;
-  border: 1px solid #e2e8f0;
-}
-
-.table-responsive-wrapper {
-  width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
 }
 
 .user-name {
@@ -182,35 +139,9 @@ onMounted(() => {
   color: #0f172a;
 }
 
-.dialog-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
-/* Mobile Responsive */
 @media (max-width: 768px) {
-  .page-header {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-  }
-
   .btn-add {
     width: 100%;
-  }
-
-  .page-title {
-    font-size: 18px;
-  }
-
-  .dialog-footer {
-    flex-direction: column;
-  }
-
-  .dialog-footer .el-button {
-    width: 100%;
-    margin-left: 0 !important;
   }
 }
 </style>

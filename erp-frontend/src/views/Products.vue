@@ -1,85 +1,104 @@
 <template>
   <div class="products-container">
-    <div class="page-header">
-      <div class="header-text">
-        <h2 class="page-title">Quản lý Sản phẩm</h2>
-        <p class="page-subtitle">Danh sách hàng hóa, giá niêm yết, tồn kho và hình ảnh sản phẩm</p>
-      </div>
-      <el-button type="primary" size="large" @click="openDialog()" class="btn-add">
-        <el-icon style="margin-right: 6px;"><Plus /></el-icon> Thêm sản phẩm mới
-      </el-button>
-    </div>
+    <!-- Reusable Base Page Header -->
+    <BasePageHeader
+      title="Quản lý Sản phẩm"
+      subtitle="Danh sách hàng hóa, giá niêm yết, tồn kho và hình ảnh sản phẩm"
+      :icon="Goods"
+    >
+      <BaseButton type="gradient" size="large" :icon="Plus" @click="openDialog()" class="btn-add">
+        Thêm sản phẩm mới
+      </BaseButton>
+    </BasePageHeader>
 
-    <!-- Product Table Card -->
-    <el-card shadow="never" class="table-card">
-      <div class="table-responsive-wrapper">
-        <el-table :data="products" v-loading="loading" style="width: 100%; min-width: 700px;">
-          <el-table-column prop="id" label="ID" width="70" align="center" />
-          
-          <!-- Product Image Column -->
-          <el-table-column label="Hình ảnh" width="100" align="center">
-            <template #default="{ row }">
-              <el-image
-                v-if="row.imageUrl"
-                :src="row.imageUrl"
-                :preview-src-list="[row.imageUrl]"
-                preview-teleported
-                fit="cover"
-                class="product-thumb"
-              >
-                <template #error>
-                  <div class="image-placeholder"><el-icon><Picture /></el-icon></div>
-                </template>
-              </el-image>
-              <div v-else class="image-placeholder">
-                <el-icon><Picture /></el-icon>
-              </div>
+    <!-- Reusable Base Table with Built-in Responsive Scroll & Toolbar -->
+    <BaseTable :data="filteredProducts" :loading="loading" min-width="720px">
+      <!-- Search Toolbar -->
+      <template #toolbar>
+        <div class="toolbar-wrap">
+          <el-input 
+            v-model="searchQuery" 
+            placeholder="Tìm theo tên sản phẩm hoặc mã SKU..." 
+            clearable
+            class="search-input"
+          >
+            <template #prefix><el-icon><Search /></el-icon></template>
+          </el-input>
+          <div class="count-tag">
+            <span>Hiển thị <strong>{{ filteredProducts.length }}</strong> sản phẩm</span>
+          </div>
+        </div>
+      </template>
+
+      <!-- Table Columns -->
+      <el-table-column prop="id" label="ID" width="70" align="center" />
+      
+      <!-- Product Image Column -->
+      <el-table-column label="Hình ảnh" width="100" align="center">
+        <template #default="{ row }">
+          <el-image
+            v-if="row.imageUrl"
+            :src="row.imageUrl"
+            :preview-src-list="[row.imageUrl]"
+            preview-teleported
+            fit="cover"
+            class="product-thumb"
+          >
+            <template #error>
+              <div class="image-placeholder"><el-icon><Picture /></el-icon></div>
             </template>
-          </el-table-column>
+          </el-image>
+          <div v-else class="image-placeholder">
+            <el-icon><Picture /></el-icon>
+          </div>
+        </template>
+      </el-table-column>
 
-          <el-table-column prop="name" label="Tên sản phẩm" min-width="180">
-            <template #default="{ row }">
-              <span class="product-name">{{ row.name }}</span>
-            </template>
-          </el-table-column>
+      <el-table-column prop="name" label="Tên sản phẩm" min-width="180">
+        <template #default="{ row }">
+          <span class="product-name">{{ row.name }}</span>
+        </template>
+      </el-table-column>
 
-          <el-table-column prop="sku" label="Mã SKU" width="130">
-            <template #default="{ row }">
-              <el-tag size="small" type="info">{{ row.sku }}</el-tag>
-            </template>
-          </el-table-column>
+      <el-table-column prop="sku" label="Mã SKU" width="130">
+        <template #default="{ row }">
+          <el-tag size="small" type="info">{{ row.sku }}</el-tag>
+        </template>
+      </el-table-column>
 
-          <el-table-column prop="price" label="Giá bán" width="140">
-            <template #default="{ row }">
-              <span class="price-tag">{{ formatCurrency(row.price) }}</span>
-            </template>
-          </el-table-column>
+      <el-table-column prop="price" label="Giá bán" width="140">
+        <template #default="{ row }">
+          <span class="price-tag">{{ formatCurrency(row.price) }}</span>
+        </template>
+      </el-table-column>
 
-          <el-table-column prop="stock" label="Tồn kho" width="110" align="center">
-            <template #default="{ row }">
-              <el-tag :type="row.stock > 10 ? 'success' : (row.stock > 0 ? 'warning' : 'danger')">
-                {{ row.stock }} cái
-              </el-tag>
-            </template>
-          </el-table-column>
+      <!-- Reusable Status Badge for Stock -->
+      <el-table-column prop="stock" label="Tồn kho" width="130" align="center">
+        <template #default="{ row }">
+          <BaseStatusBadge
+            :type="row.stock > 10 ? 'success' : (row.stock > 0 ? 'warning' : 'danger')"
+            :text="row.stock + ' cái'"
+          />
+        </template>
+      </el-table-column>
 
-          <el-table-column label="Thao tác" width="150" align="center" fixed="right">
-            <template #default="{ row }">
-              <el-button size="small" @click="openDialog(row)">Sửa</el-button>
-              <el-button size="small" type="danger" @click="deleteProduct(row.id)">Xóa</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-      </div>
-    </el-card>
+      <el-table-column label="Thao tác" width="150" align="center" fixed="right">
+        <template #default="{ row }">
+          <el-button size="small" @click="openDialog(row)">Sửa</el-button>
+          <el-button size="small" type="danger" @click="deleteProduct(row.id)">Xóa</el-button>
+        </template>
+      </el-table-column>
+    </BaseTable>
 
-    <!-- Dialog Add / Edit Product (Responsive Width) -->
-    <el-dialog 
-      :title="form.id ? 'Cập nhật Sản phẩm' : 'Thêm Sản phẩm Mới'" 
+    <!-- Reusable Base Dialog (Auto Responsive Width) -->
+    <BaseDialog 
       v-model="dialogVisible" 
-      :width="isMobile ? '92%' : '560px'"
-      destroy-on-close
-      class="responsive-dialog"
+      :title="form.id ? 'Cập nhật Sản phẩm' : 'Thêm Sản phẩm Mới'" 
+      :subtitle="form.id ? 'Cập nhật giá bán, số lượng tồn kho và hình ảnh sản phẩm' : 'Nhập thông tin sản phẩm mới để lưu trữ vào cơ sở dữ liệu'"
+      width="560px"
+      :loading="saving"
+      confirm-text="Lưu sản phẩm"
+      @confirm="saveProduct"
     >
       <el-form :model="form" label-position="top" class="product-form">
         <!-- Image Upload Section -->
@@ -151,31 +170,22 @@
           </el-col>
         </el-row>
       </el-form>
-
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="dialogVisible = false">Hủy</el-button>
-          <el-button type="primary" :loading="saving" @click="saveProduct">Lưu sản phẩm</el-button>
-        </div>
-      </template>
-    </el-dialog>
+    </BaseDialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Picture, Delete, UploadFilled, Loading } from '@element-plus/icons-vue'
-import { useResponsive } from '../composables/useResponsive'
+import { Plus, Picture, Delete, UploadFilled, Loading, Search, Goods } from '@element-plus/icons-vue'
 import api from '../api'
-
-const { isMobile } = useResponsive()
 
 const products = ref([])
 const loading = ref(false)
 const saving = ref(false)
 const uploading = ref(false)
 const dialogVisible = ref(false)
+const searchQuery = ref('')
 
 const form = ref({
   id: null,
@@ -184,6 +194,15 @@ const form = ref({
   price: 0,
   stock: 0,
   imageUrl: ''
+})
+
+const filteredProducts = computed(() => {
+  if (!searchQuery.value || !searchQuery.value.trim()) return products.value
+  const query = searchQuery.value.toLowerCase().trim()
+  return products.value.filter(p => 
+    (p.name && p.name.toLowerCase().includes(query)) ||
+    (p.sku && p.sku.toLowerCase().includes(query))
+  )
 })
 
 const formatCurrency = (val) => {
@@ -287,44 +306,24 @@ onMounted(() => {
 .products-container {
   display: flex;
   flex-direction: column;
-  gap: 16px;
 }
 
-.page-header {
+.toolbar-wrap {
+  width: 100%;
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 12px;
 }
 
-.header-text {
-  flex: 1;
-  min-width: 240px;
+.search-input {
+  max-width: 320px;
 }
 
-.page-title {
-  margin: 0;
-  font-size: 22px;
-  font-weight: 700;
-  color: #0f172a;
-}
-
-.page-subtitle {
-  margin: 4px 0 0 0;
+.count-tag {
   font-size: 13px;
   color: #64748b;
-}
-
-.table-card {
-  border-radius: 14px;
-  border: 1px solid #e2e8f0;
-}
-
-.table-responsive-wrapper {
-  width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
 }
 
 .product-thumb {
@@ -416,35 +415,14 @@ onMounted(() => {
   color: #0284c7;
 }
 
-.dialog-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
-/* Mobile Responsive */
 @media (max-width: 768px) {
-  .page-header {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
+  .search-input {
+    max-width: 100%;
+    width: 100%;
   }
 
   .btn-add {
     width: 100%;
-  }
-
-  .page-title {
-    font-size: 18px;
-  }
-
-  .dialog-footer {
-    flex-direction: column;
-  }
-
-  .dialog-footer .el-button {
-    width: 100%;
-    margin-left: 0 !important;
   }
 }
 </style>

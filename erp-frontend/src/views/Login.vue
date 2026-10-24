@@ -99,7 +99,7 @@
                 <label class="form-label">Tên đăng nhập mong muốn</label>
                 <el-input 
                   v-model="regForm.username" 
-                  placeholder="Ví dụ: nhanvien01" 
+                  placeholder="Ví dụ: nva_manager" 
                   size="large"
                   class="modern-input"
                 >
@@ -117,7 +117,7 @@
                   size="large"
                   class="modern-input"
                 >
-                  <template #prefix><el-icon><Key /></el-icon></template>
+                  <template #prefix><el-icon><Lock /></el-icon></template>
                 </el-input>
               </div>
 
@@ -131,7 +131,7 @@
                   size="large"
                   class="modern-input"
                 >
-                  <template #prefix><el-icon><Lock /></el-icon></template>
+                  <template #prefix><el-icon><Key /></el-icon></template>
                 </el-input>
               </div>
 
@@ -155,43 +155,176 @@
             </div>
           </div>
 
-          <!-- MODE 3: FORGOT PASSWORD -->
+          <!-- MODE 3: FORGOT PASSWORD (HOÀN CHỈNH 3 BƯỚC + OTP) -->
           <div v-else-if="mode === 'forgot'" key="forgot" class="form-section">
             <div class="form-title-wrap">
               <h2 class="form-title">Khôi phục mật khẩu</h2>
-              <p class="form-desc">Nhập tên đăng nhập để nhận liên kết đặt lại mật khẩu bảo mật.</p>
+              <p class="form-desc">Quy trình đặt lại mật khẩu bảo mật qua mã xác thực OTP.</p>
             </div>
 
-            <el-form :model="forgotForm" @keyup.enter="handleForgot" class="custom-form">
-              <div class="form-group">
-                <label class="form-label">Tên đăng nhập hoặc Email</label>
-                <el-input 
-                  v-model="forgotForm.identifier" 
-                  placeholder="Nhập username của bạn" 
-                  size="large"
-                  class="modern-input"
+            <!-- Step Wizard Indicator -->
+            <div class="wizard-steps">
+              <div :class="['step-item', { active: forgotStep >= 1, current: forgotStep === 1 }]">
+                <div class="step-circle">1</div>
+                <span class="step-label">Tài khoản</span>
+              </div>
+              <div class="step-line" :class="{ filled: forgotStep >= 2 }"></div>
+              <div :class="['step-item', { active: forgotStep >= 2, current: forgotStep === 2 }]">
+                <div class="step-circle">2</div>
+                <span class="step-label">Nhập OTP</span>
+              </div>
+              <div class="step-line" :class="{ filled: forgotStep >= 3 }"></div>
+              <div :class="['step-item', { active: forgotStep >= 3, current: forgotStep === 3 }]">
+                <div class="step-circle">3</div>
+                <span class="step-label">Mật khẩu mới</span>
+              </div>
+            </div>
+
+            <!-- BƯỚC 1: NHẬP TÀI KHOẢN -->
+            <div v-if="forgotStep === 1" class="step-content">
+              <el-form :model="forgotForm" @keyup.enter="handleSendOtp" class="custom-form">
+                <div class="form-group">
+                  <label class="form-label">Tên đăng nhập hoặc Email</label>
+                  <el-input 
+                    v-model="forgotForm.identifier" 
+                    placeholder="Nhập username (ví dụ: admin)" 
+                    size="large"
+                    class="modern-input"
+                  >
+                    <template #prefix><el-icon><User /></el-icon></template>
+                  </el-input>
+                </div>
+
+                <div class="security-info-box">
+                  <p>💡 Hệ thống sẽ kiểm tra tài khoản trong cơ sở dữ liệu và cấp mã OTP gồm 6 chữ số có hiệu lực trong 15 phút.</p>
+                </div>
+
+                <button 
+                  type="button" 
+                  class="btn-gradient" 
+                  :disabled="loading" 
+                  @click="handleSendOtp"
                 >
-                  <template #prefix><el-icon><Message /></el-icon></template>
-                </el-input>
+                  <span v-if="!loading" class="btn-content">
+                    Gửi mã xác thực OTP
+                    <el-icon class="btn-icon"><ArrowRight /></el-icon>
+                  </span>
+                  <span v-else class="btn-content">Đang gửi yêu cầu...</span>
+                </button>
+              </el-form>
+            </div>
+
+            <!-- BƯỚC 2: NHẬP MÃ OTP -->
+            <div v-else-if="forgotStep === 2" class="step-content">
+              <!-- OTP Notification Banner -->
+              <div v-if="serverGeneratedOtp" class="otp-notice-pill">
+                <el-icon style="font-size: 18px; color: #10b981;"><Key /></el-icon>
+                <div class="otp-text-wrap">
+                  <span class="otp-label-text">Mã xác thực OTP của bạn là:</span>
+                  <strong class="otp-highlight-number">{{ serverGeneratedOtp }}</strong>
+                </div>
               </div>
 
-              <div class="security-info-box">
-                <p>💡 <strong>Gợi ý:</strong> Vì đây là hệ thống ERP nội bộ, nếu bạn quên mật khẩu quản trị cao nhất, bạn cũng có thể liên hệ trực tiếp Quản trị viên hệ thống (Super Admin) để được cấp lại trong 30 giây.</p>
-              </div>
+              <el-form :model="forgotForm" @keyup.enter="handleVerifyOtp" class="custom-form">
+                <div class="form-group">
+                  <label class="form-label">Nhập mã OTP 6 chữ số</label>
+                  <el-input 
+                    v-model="forgotForm.otp" 
+                    placeholder="Nhập 6 số (VD: 123456)" 
+                    maxlength="6"
+                    size="large"
+                    class="modern-input otp-input-field"
+                  >
+                    <template #prefix><el-icon><Key /></el-icon></template>
+                  </el-input>
+                </div>
 
+                <button 
+                  type="button" 
+                  class="btn-gradient" 
+                  :disabled="loading" 
+                  @click="handleVerifyOtp"
+                >
+                  <span v-if="!loading" class="btn-content">
+                    Xác nhận mã OTP
+                    <el-icon class="btn-icon"><ArrowRight /></el-icon>
+                  </span>
+                  <span v-else class="btn-content">Đang kiểm tra...</span>
+                </button>
+
+                <div class="resend-row">
+                  <a href="javascript:void(0)" class="resend-link" @click="handleSendOtp">Chưa nhận được? Gửi lại mã OTP</a>
+                </div>
+              </el-form>
+            </div>
+
+            <!-- BƯỚC 3: THIẾT LẬP MẬT KHẨU MỚI -->
+            <div v-else-if="forgotStep === 3" class="step-content">
+              <el-form :model="forgotForm" @keyup.enter="handleResetPassword" class="custom-form">
+                <div class="form-group">
+                  <label class="form-label">Mật khẩu mới</label>
+                  <el-input 
+                    v-model="forgotForm.newPassword" 
+                    type="password" 
+                    placeholder="Tối thiểu 6 ký tự" 
+                    show-password
+                    size="large"
+                    class="modern-input"
+                  >
+                    <template #prefix><el-icon><Lock /></el-icon></template>
+                  </el-input>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Xác nhận mật khẩu mới</label>
+                  <el-input 
+                    v-model="forgotForm.confirmPassword" 
+                    type="password" 
+                    placeholder="Nhập lại mật khẩu mới" 
+                    show-password
+                    size="large"
+                    class="modern-input"
+                  >
+                    <template #prefix><el-icon><Key /></el-icon></template>
+                  </el-input>
+                </div>
+
+                <button 
+                  type="button" 
+                  class="btn-gradient btn-gradient-emerald" 
+                  :disabled="loading" 
+                  @click="handleResetPassword"
+                >
+                  <span v-if="!loading" class="btn-content">
+                    Cập nhật mật khẩu mới
+                    <el-icon class="btn-icon"><ArrowRight /></el-icon>
+                  </span>
+                  <span v-else class="btn-content">Đang lưu mật khẩu...</span>
+                </button>
+              </el-form>
+            </div>
+
+            <!-- BƯỚC 4: THÀNH CÔNG -->
+            <div v-else-if="forgotStep === 4" class="step-content text-center">
+              <div class="success-icon-badge">
+                <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="#10b981" stroke-width="2.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 class="success-title">Đổi mật khẩu thành công!</h3>
+              <p class="success-desc">Mật khẩu tài khoản của bạn đã được cập nhật vào cơ sở dữ liệu.</p>
+              
               <button 
                 type="button" 
                 class="btn-gradient" 
-                :disabled="loading" 
-                @click="handleForgot"
+                @click="goToLoginAfterReset"
               >
-                <span v-if="!loading" class="btn-content">
-                  Gửi yêu cầu khôi phục
+                <span class="btn-content">
+                  Đăng nhập ngay
                   <el-icon class="btn-icon"><ArrowRight /></el-icon>
                 </span>
-                <span v-else class="btn-content">Đang gửi yêu cầu...</span>
               </button>
-            </el-form>
+            </div>
 
             <div class="switch-mode-text">
               <a href="javascript:void(0)" class="highlight-link back-link" @click="switchMode('login')">
@@ -215,7 +348,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../store/auth'
 import { ElMessage } from 'element-plus'
-import { User, Lock, Key, Message, ArrowRight, Back } from '@element-plus/icons-vue'
+import { User, Lock, Key, ArrowRight, Back } from '@element-plus/icons-vue'
 import api from '../api'
 
 const router = useRouter()
@@ -228,10 +361,24 @@ const rememberMe = ref(true)
 
 const loginForm = ref({ username: 'admin', password: 'password' })
 const regForm = ref({ username: '', password: '', confirmPassword: '' })
-const forgotForm = ref({ identifier: '' })
+
+// Forgot password state
+const forgotStep = ref(1) // 1: request, 2: otp, 3: new pass, 4: done
+const serverGeneratedOtp = ref('')
+const forgotForm = ref({
+  identifier: '',
+  otp: '',
+  newPassword: '',
+  confirmPassword: ''
+})
 
 const switchMode = (newMode) => {
   mode.value = newMode
+  if (newMode === 'forgot') {
+    forgotStep.value = 1
+    serverGeneratedOtp.value = ''
+    forgotForm.value = { identifier: '', otp: '', newPassword: '', confirmPassword: '' }
+  }
 }
 
 const fillDemoAccount = () => {
@@ -249,24 +396,24 @@ const handleLogin = async () => {
   const success = await authStore.login(loginForm.value.username, loginForm.value.password)
   loading.value = false
   if (success) {
-    ElMessage.success('Đăng nhập thành công! Đang chuyển hướng...')
+    ElMessage.success('Đăng nhập thành công!')
     router.push('/')
   } else {
-    ElMessage.error('Tài khoản hoặc mật khẩu không chính xác!')
+    ElMessage.error('Tên đăng nhập hoặc mật khẩu không chính xác!')
   }
 }
 
 const handleRegister = async () => {
   if (!regForm.value.username || !regForm.value.password) {
-    ElMessage.warning('Vui lòng nhập tên đăng nhập và mật khẩu!')
-    return
-  }
-  if (regForm.value.password.length < 6) {
-    ElMessage.warning('Mật khẩu phải chứa ít nhất 6 ký tự!')
+    ElMessage.warning('Vui lòng điền đầy đủ thông tin!')
     return
   }
   if (regForm.value.password !== regForm.value.confirmPassword) {
     ElMessage.error('Mật khẩu xác nhận không trùng khớp!')
+    return
+  }
+  if (regForm.value.password.length < 6) {
+    ElMessage.warning('Mật khẩu phải có ít nhất 6 ký tự!')
     return
   }
 
@@ -276,29 +423,91 @@ const handleRegister = async () => {
       username: regForm.value.username,
       password: regForm.value.password
     })
-    ElMessage.success('Đăng ký tài khoản thành công! Bạn có thể đăng nhập ngay.')
+    ElMessage.success('Tạo tài khoản thành công! Bạn có thể đăng nhập ngay.')
     loginForm.value.username = regForm.value.username
     loginForm.value.password = regForm.value.password
     regForm.value = { username: '', password: '', confirmPassword: '' }
     mode.value = 'login'
   } catch (err) {
-    ElMessage.error(err.response?.data || 'Không thể tạo tài khoản, có thể username đã tồn tại!')
+    ElMessage.error(err.response?.data?.message || err.response?.data || 'Không thể tạo tài khoản!')
   } finally {
     loading.value = false
   }
 }
 
-const handleForgot = async () => {
-  if (!forgotForm.value.identifier) {
+// BƯỚC 1: GỬI YÊU CẦU MÃ OTP
+const handleSendOtp = async () => {
+  if (!forgotForm.value.identifier || !forgotForm.value.identifier.trim()) {
     ElMessage.warning('Vui lòng nhập tên đăng nhập hoặc email!')
     return
   }
+
   loading.value = true
-  setTimeout(() => {
+  try {
+    const res = await api.post('/auth/forgot-password', {
+      identifier: forgotForm.value.identifier.trim()
+    })
+    serverGeneratedOtp.value = res.data.otp || ''
+    forgotStep.value = 2
+    ElMessage.success(res.data.message || 'Mã xác thực OTP đã được gửi thành công!')
+  } catch (err) {
+    ElMessage.error(err.response?.data?.message || 'Không tìm thấy tài khoản trong hệ thống!')
+  } finally {
     loading.value = false
-    ElMessage.success('Yêu cầu đã được ghi nhận! Hệ thống đã gửi hướng dẫn tới quản trị viên.')
-    mode.value = 'login'
-  }, 1000)
+  }
+}
+
+// BƯỚC 2: XÁC NHẬN MÃ OTP
+const handleVerifyOtp = async () => {
+  if (!forgotForm.value.otp || forgotForm.value.otp.trim().length !== 6) {
+    ElMessage.warning('Vui lòng nhập đầy đủ mã OTP 6 chữ số!')
+    return
+  }
+
+  loading.value = true
+  try {
+    await api.post('/auth/verify-otp', {
+      otp: forgotForm.value.otp.trim()
+    })
+    forgotStep.value = 3
+    ElMessage.success('Xác thực OTP thành công! Vui lòng tạo mật khẩu mới.')
+  } catch (err) {
+    ElMessage.error(err.response?.data?.message || 'Mã OTP không chính xác hoặc đã hết hạn!')
+  } finally {
+    loading.value = false
+  }
+}
+
+// BƯỚC 3: ĐẶT MẬT KHẨU MỚI
+const handleResetPassword = async () => {
+  if (!forgotForm.value.newPassword || forgotForm.value.newPassword.length < 6) {
+    ElMessage.warning('Mật khẩu mới phải có ít nhất 6 ký tự!')
+    return
+  }
+  if (forgotForm.value.newPassword !== forgotForm.value.confirmPassword) {
+    ElMessage.error('Mật khẩu xác nhận không trùng khớp!')
+    return
+  }
+
+  loading.value = true
+  try {
+    await api.post('/auth/reset-password', {
+      token: forgotForm.value.otp.trim(),
+      newPassword: forgotForm.value.newPassword
+    })
+    forgotStep.value = 4
+    ElMessage.success('Đặt lại mật khẩu thành công!')
+  } catch (err) {
+    ElMessage.error(err.response?.data?.message || 'Lỗi khi đặt lại mật khẩu!')
+  } finally {
+    loading.value = false
+  }
+}
+
+const goToLoginAfterReset = () => {
+  loginForm.value.username = forgotForm.value.identifier
+  loginForm.value.password = forgotForm.value.newPassword
+  mode.value = 'login'
 }
 </script>
 
@@ -423,6 +632,63 @@ const handleForgot = async () => {
   color: #94a3b8;
 }
 
+/* Wizard Steps */
+.wizard-steps {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  padding: 0 8px;
+}
+
+.step-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  opacity: 0.45;
+  transition: all 0.3s ease;
+}
+
+.step-item.active {
+  opacity: 1;
+}
+
+.step-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.step-item.current .step-circle {
+  background: #6366f1;
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.8);
+}
+
+.step-label {
+  font-size: 11px;
+  color: #cbd5e1;
+}
+
+.step-line {
+  flex: 1;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 0 6px 16px 6px;
+  transition: all 0.3s ease;
+}
+
+.step-line.filled {
+  background: #6366f1;
+}
+
 /* Demo Credential Pill */
 .demo-credential-pill {
   display: flex;
@@ -450,6 +716,53 @@ const handleForgot = async () => {
   border-radius: 50%;
   box-shadow: 0 0 8px #10b981;
   flex-shrink: 0;
+}
+
+/* OTP Notification Banner */
+.otp-notice-pill {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.otp-text-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.otp-label-text {
+  font-size: 12px;
+  color: #a7f3d0;
+}
+.otp-highlight-number {
+  font-size: 20px;
+  letter-spacing: 4px;
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.otp-input-field :deep(input) {
+  letter-spacing: 4px;
+  font-size: 18px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.resend-row {
+  text-align: center;
+  margin-top: 10px;
+}
+.resend-link {
+  font-size: 12px;
+  color: #818cf8;
+  text-decoration: none;
+}
+.resend-link:hover {
+  text-decoration: underline;
 }
 
 /* Form Elements */
@@ -498,54 +811,41 @@ const handleForgot = async () => {
 }
 :deep(.modern-input .el-input__wrapper.is-focus) {
   border-color: #6366f1 !important;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25) !important;
-  background-color: rgba(15, 23, 42, 0.85) !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2) !important;
 }
 :deep(.modern-input input) {
-  color: #f8fafc !important;
+  color: #ffffff !important;
   font-size: 14px;
 }
-:deep(.modern-input input::placeholder) {
-  color: #64748b;
-}
-:deep(.modern-input .el-input__prefix) {
+:deep(.modern-input .el-input__prefix-inner) {
   color: #94a3b8;
-  margin-right: 8px;
+  font-size: 16px;
 }
 
 /* Checkbox */
 .remember-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
 }
 :deep(.custom-checkbox .el-checkbox__label) {
-  color: #94a3b8 !important;
+  color: #cbd5e1 !important;
   font-size: 13px;
 }
-:deep(.custom-checkbox.is-checked .el-checkbox__inner) {
-  background-color: #6366f1;
-  border-color: #6366f1;
-}
 
-/* Modern Gradient CTA Button */
+/* Action Button */
 .btn-gradient {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   width: 100%;
-  padding: 14px;
-  border: none;
+  padding: 13px 20px;
   border-radius: 14px;
+  border: none;
   background: linear-gradient(135deg, #6366f1 0%, #4f46e5 50%, #3b82f6 100%);
   color: #ffffff;
   font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
+  font-weight: 600;
   cursor: pointer;
   box-shadow: 0 8px 24px -4px rgba(99, 102, 241, 0.5);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  overflow: hidden;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   margin-top: 6px;
 }
 .btn-gradient:hover:not(:disabled) {
@@ -595,6 +895,33 @@ const handleForgot = async () => {
 }
 .security-info-box p {
   margin: 0;
+}
+
+/* Success Card */
+.text-center {
+  text-align: center;
+}
+.success-icon-badge {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: rgba(16, 185, 129, 0.15);
+  border: 2px solid rgba(16, 185, 129, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px auto;
+}
+.success-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0 0 8px 0;
+}
+.success-desc {
+  font-size: 13px;
+  color: #94a3b8;
+  margin: 0 0 24px 0;
 }
 
 /* Switch Link */
