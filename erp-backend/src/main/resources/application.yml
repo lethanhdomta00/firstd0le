@@ -15,10 +15,10 @@ spring:
       hibernate:
         format_sql: true
   mail:
-    host: smtp.gmail.com
-    port: 587
-    username: ${MAIL_USERNAME:dolemta090899@gmail.com}
-    password: ${MAIL_PASSWORD:ejnptwyajyhprfjp}
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
     properties:
       mail:
         smtp:
@@ -44,5 +44,5 @@ cloudinary:
   api-secret: ${CLOUDINARY_API_SECRET:KjR_XssmdSoq59O_Poa9WlUgnCw}
 
 telegram:
-  bot-token: ${TELEGRAM_BOT_TOKEN:8247650585:AAH0c3-MeWs5ibIWLemoMr0kfef56Zli4BQ}
-  default-chat-id: ${TELEGRAM_DEFAULT_CHAT_ID:8813999524}
+  bot-token: ${TELEGRAM_BOT_TOKEN:}
+  default-chat-id: ${TELEGRAM_DEFAULT_CHAT_ID:}

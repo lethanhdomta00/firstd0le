@@ -16,10 +16,15 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
 
-    @Value("${spring.mail.username:dolemta090899@gmail.com}")
-    private String senderEmail = "dolemta090899@gmail.com";
+    @Value("${spring.mail.username:}")
+    private String senderEmail;
 
     public void sendOtpEmail(String toEmail, String username, String otpCode) throws MessagingException {
+        if (senderEmail == null || senderEmail.trim().isEmpty()) {
+            log.warn("Chưa cấu hình tài khoản gửi email (MAIL_USERNAME)! Bỏ qua gửi email.");
+            return;
+        }
+
         log.info("Bắt đầu gửi email OTP tới: {} cho user: {}", toEmail, username);
 
         MimeMessage message = mailSender.createMimeMessage();

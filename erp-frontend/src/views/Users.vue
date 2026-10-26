@@ -11,8 +11,14 @@
       </BaseButton>
     </BasePageHeader>
 
-    <!-- Reusable Base Table -->
-    <BaseTable :data="users" :loading="loading" min-width="560px">
+    <!-- Reusable Base Table with Built-in Skeleton Loading -->
+    <BaseTable 
+      :data="users" 
+      :loading="loading" 
+      :skeleton-columns="4" 
+      :skeleton-rows="4"
+      min-width="560px"
+    >
       <el-table-column prop="id" label="ID" width="70" align="center" />
       <el-table-column prop="username" label="Tên đăng nhập" min-width="160">
         <template #default="{ row }">

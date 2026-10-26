@@ -11,8 +11,15 @@
       </BaseButton>
     </BasePageHeader>
 
-    <!-- Reusable Base Table with Built-in Responsive Scroll & Toolbar -->
-    <BaseTable :data="filteredProducts" :loading="loading" min-width="720px">
+    <!-- Reusable Base Table with Built-in Skeleton Loading, Responsive Scroll & Toolbar -->
+    <BaseTable 
+      :data="filteredProducts" 
+      :loading="loading" 
+      :has-thumbnail="true" 
+      :skeleton-columns="6" 
+      :skeleton-rows="5"
+      min-width="720px"
+    >
       <!-- Search Toolbar -->
       <template #toolbar>
         <div class="toolbar-wrap">

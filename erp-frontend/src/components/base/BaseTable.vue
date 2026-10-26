@@ -5,11 +5,21 @@
       <slot name="toolbar"></slot>
     </div>
 
+    <!-- Skeleton Loading State -->
+    <div v-if="loading && useSkeleton" class="table-skeleton-wrap">
+      <BaseSkeleton 
+        type="table" 
+        :rows="skeletonRows" 
+        :columns="skeletonColumns" 
+        :has-thumbnail="hasThumbnail"
+      />
+    </div>
+
     <!-- Responsive Table Container -->
-    <div class="table-responsive-wrapper">
+    <div v-else class="table-responsive-wrapper">
       <el-table
         :data="data"
-        v-loading="loading"
+        v-loading="loading && !useSkeleton"
         :style="{ width: '100%', minWidth: minWidth }"
         stripe
         class="custom-el-table"
@@ -42,12 +52,30 @@
 </template>
 
 <script setup>
+import BaseSkeleton from './BaseSkeleton.vue'
+
 defineProps({
   data: {
     type: Array,
     default: () => []
   },
   loading: {
+    type: Boolean,
+    default: false
+  },
+  useSkeleton: {
+    type: Boolean,
+    default: true
+  },
+  skeletonRows: {
+    type: Number,
+    default: 5
+  },
+  skeletonColumns: {
+    type: Number,
+    default: 5
+  },
+  hasThumbnail: {
     type: Boolean,
     default: false
   },

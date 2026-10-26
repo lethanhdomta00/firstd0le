@@ -4,6 +4,9 @@ import BaseTable from './BaseTable.vue'
 import BaseDialog from './BaseDialog.vue'
 import BaseStatCard from './BaseStatCard.vue'
 import BaseStatusBadge from './BaseStatusBadge.vue'
+import BaseLoading from './BaseLoading.vue'
+import BaseMathCaptcha from './BaseMathCaptcha.vue'
+import BaseSkeleton from './BaseSkeleton.vue'
 
 export {
   BaseButton,
@@ -11,7 +14,10 @@ export {
   BaseTable,
   BaseDialog,
   BaseStatCard,
-  BaseStatusBadge
+  BaseStatusBadge,
+  BaseLoading,
+  BaseMathCaptcha,
+  BaseSkeleton
 }
 
 export default {
@@ -22,6 +28,9 @@ export default {
     app.component('BaseDialog', BaseDialog)
     app.component('BaseStatCard', BaseStatCard)
     app.component('BaseStatusBadge', BaseStatusBadge)
+    app.component('BaseLoading', BaseLoading)
+    app.component('BaseMathCaptcha', BaseMathCaptcha)
+    app.component('BaseSkeleton', BaseSkeleton)
   }
 }
 

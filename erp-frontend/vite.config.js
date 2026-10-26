@@ -14,7 +14,7 @@ export default defineConfig({
     host: '0.0.0.0', // Listen on all IPs
     proxy: {
       '/api': {
-        target: 'https://erp-backend-dev.bot-keep.xyz',
+        target: process.env.VITE_BACKEND_TARGET || 'http://localhost:8080',
         changeOrigin: true,
         secure: false
       }

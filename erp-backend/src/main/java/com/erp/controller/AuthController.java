@@ -128,24 +128,26 @@ public class AuthController {
                     targetEmail = user.getEmail();
                 } else if (identifier.contains("@")) {
                     targetEmail = identifier;
-                } else {
-                    targetEmail = "dolemta090899@gmail.com";
                 }
             }
-            targetEmail = targetEmail.trim();
 
-            if (user.getEmail() == null || user.getEmail().trim().isEmpty()) {
-                user.setEmail(targetEmail);
-            }
+            if (targetEmail != null && !targetEmail.trim().isEmpty()) {
+                targetEmail = targetEmail.trim();
+                if (user.getEmail() == null || user.getEmail().trim().isEmpty()) {
+                    user.setEmail(targetEmail);
+                }
 
-            try {
-                emailService.sendOtpEmail(targetEmail, user.getUsername(), otp);
-                String maskedEmail = maskEmail(targetEmail);
-                successMessage = "Mã xác thực OTP đã được gửi tới email " + maskedEmail + "!";
-                targetDisplay = maskedEmail;
-            } catch (Exception e) {
-                log.error("Lỗi khi gửi email OTP qua Gmail: {}", e.getMessage(), e);
-                successMessage = "Mã xác thực OTP đã được tạo thành công! Vui lòng kiểm tra hộp thư.";
+                try {
+                    emailService.sendOtpEmail(targetEmail, user.getUsername(), otp);
+                    String maskedEmail = maskEmail(targetEmail);
+                    successMessage = "Mã xác thực OTP đã được gửi tới email " + maskedEmail + "!";
+                    targetDisplay = maskedEmail;
+                } catch (Exception e) {
+                    log.error("Lỗi khi gửi email OTP: {}", e.getMessage(), e);
+                    successMessage = "Mã xác thực OTP đã được tạo thành công! Vui lòng kiểm tra hộp thư.";
+                }
+            } else {
+                successMessage = "Mã xác thực OTP đã được tạo thành công!";
             }
         }
 

@@ -15,10 +15,10 @@ import java.time.Duration;
 @Slf4j
 public class TelegramService {
 
-    @Value("${telegram.bot-token:8247650585:AAH0c3-MeWs5ibIWLemoMr0kfef56Zli4BQ}")
+    @Value("${telegram.bot-token:}")
     private String botToken;
 
-    @Value("${telegram.default-chat-id:8813999524}")
+    @Value("${telegram.default-chat-id:}")
     private String defaultChatId;
 
     private final HttpClient httpClient = HttpClient.newBuilder()
