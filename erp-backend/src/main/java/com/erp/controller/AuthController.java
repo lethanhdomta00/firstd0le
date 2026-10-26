@@ -8,11 +8,15 @@ import com.erp.model.Role;
 import com.erp.model.User;
 import com.erp.repository.UserRepository;
 import com.erp.security.JwtTokenProvider;
+import com.erp.service.EmailService;
+import com.erp.service.TelegramService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
@@ -25,35 +29,42 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
+@Slf4j
 public class AuthController {
 
     private final AuthenticationManager authenticationManager;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider tokenProvider;
+    private final EmailService emailService;
+    private final TelegramService telegramService;
     private final SecureRandom secureRandom = new SecureRandom();
 
     @GetMapping("/version")
     public ResponseEntity<?> getVersion() {
         return ResponseEntity.ok(Map.of(
             "status", "UP",
-            "version", "1.0.2-forgot-password",
+            "version", "1.0.3-email-telegram-otp",
             "message", "Spring Boot CI/CD & Auth Service is working!"
         ));
     }
 
     @PostMapping("/login")
     public ResponseEntity<?> authenticateUser(@RequestBody LoginRequest loginRequest) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        loginRequest.getUsername(),
-                        loginRequest.getPassword()
-                )
-        );
+        try {
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            loginRequest.getUsername(),
+                            loginRequest.getPassword()
+                    )
+            );
 
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-        String jwt = tokenProvider.generateToken(authentication);
-        return ResponseEntity.ok(new JwtAuthenticationResponse(jwt));
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+            String jwt = tokenProvider.generateToken(authentication);
+            return ResponseEntity.ok(new JwtAuthenticationResponse(jwt));
+        } catch (AuthenticationException e) {
+            return ResponseEntity.status(401).body(Map.of("message", "Tên đăng nhập hoặc mật khẩu không chính xác!"));
+        }
     }
 
     @PostMapping("/register")
@@ -95,11 +106,56 @@ public class AuthController {
         String otp = String.format("%06d", secureRandom.nextInt(1_000_000));
         user.setResetPasswordToken(otp);
         user.setResetPasswordTokenExpiry(LocalDateTime.now().plusMinutes(15));
+
+        String channel = request.getChannel() != null ? request.getChannel().trim().toUpperCase() : "EMAIL";
+        String successMessage;
+        String targetDisplay = "";
+
+        if ("TELEGRAM".equals(channel)) {
+            String chatId = request.getTelegramChatId();
+            boolean sent = telegramService.sendOtpMessage(chatId, user.getUsername(), otp);
+            if (sent) {
+                successMessage = "Mã xác thực OTP đã được gửi tới tài khoản Telegram của bạn!";
+                targetDisplay = "Telegram (Chat ID: " + (chatId != null ? chatId : "Mặc định") + ")";
+            } else {
+                successMessage = "Mã OTP đã được tạo! (Lưu ý: Bạn có thể nhập mã OTP hiển thị trên màn hình để tiếp tục).";
+            }
+        } else {
+            // Mặc định gửi qua Gmail
+            String targetEmail = request.getEmail();
+            if (targetEmail == null || targetEmail.trim().isEmpty()) {
+                if (user.getEmail() != null && !user.getEmail().trim().isEmpty()) {
+                    targetEmail = user.getEmail();
+                } else if (identifier.contains("@")) {
+                    targetEmail = identifier;
+                } else {
+                    targetEmail = "dolemta090899@gmail.com";
+                }
+            }
+            targetEmail = targetEmail.trim();
+
+            if (user.getEmail() == null || user.getEmail().trim().isEmpty()) {
+                user.setEmail(targetEmail);
+            }
+
+            try {
+                emailService.sendOtpEmail(targetEmail, user.getUsername(), otp);
+                String maskedEmail = maskEmail(targetEmail);
+                successMessage = "Mã xác thực OTP đã được gửi tới email " + maskedEmail + "!";
+                targetDisplay = maskedEmail;
+            } catch (Exception e) {
+                log.error("Lỗi khi gửi email OTP qua Gmail: {}", e.getMessage(), e);
+                successMessage = "Mã xác thực OTP đã được tạo thành công! Vui lòng kiểm tra hộp thư.";
+            }
+        }
+
         userRepository.save(user);
 
         return ResponseEntity.ok(Map.of(
                 "status", "SUCCESS",
-                "message", "Mã xác thực OTP gồm 6 chữ số đã được tạo thành công! (Hiệu lực trong 15 phút)",
+                "message", successMessage,
+                "channel", channel,
+                "target", targetDisplay,
                 "otp", otp,
                 "username", user.getUsername(),
                 "expiresInMinutes", 15
@@ -162,5 +218,12 @@ public class AuthController {
                 "status", "SUCCESS",
                 "message", "Đặt lại mật khẩu thành công! Bạn có thể đăng nhập ngay với mật khẩu mới."
         ));
+    }
+
+    private String maskEmail(String email) {
+        if (email == null || !email.contains("@")) return email;
+        int atIndex = email.indexOf("@");
+        if (atIndex <= 2) return email;
+        return email.charAt(0) + "***" + email.substring(atIndex - 1);
     }
 }

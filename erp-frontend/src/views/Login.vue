@@ -180,11 +180,11 @@
               </div>
             </div>
 
-            <!-- BƯỚC 1: NHẬP TÀI KHOẢN -->
+            <!-- BƯỚC 1: NHẬP TÀI KHOẢN & CHỌN KÊNH -->
             <div v-if="forgotStep === 1" class="step-content">
               <el-form :model="forgotForm" @keyup.enter="handleSendOtp" class="custom-form">
                 <div class="form-group">
-                  <label class="form-label">Tên đăng nhập hoặc Email</label>
+                  <label class="form-label">Tên đăng nhập hoặc Email tài khoản</label>
                   <el-input 
                     v-model="forgotForm.identifier" 
                     placeholder="Nhập username (ví dụ: admin)" 
@@ -195,8 +195,72 @@
                   </el-input>
                 </div>
 
+                <!-- KÊNH NHẬN MÃ OTP -->
+                <div class="form-group">
+                  <label class="form-label">Phương thức nhận mã xác thực OTP</label>
+                  <div class="channel-grid">
+                    <div 
+                      class="channel-box" 
+                      :class="{ active: forgotForm.channel === 'EMAIL' }"
+                      @click="forgotForm.channel = 'EMAIL'"
+                    >
+                      <div class="channel-box-header">
+                        <span class="channel-emoji">✉️</span>
+                        <div class="channel-radio-dot"></div>
+                      </div>
+                      <div class="channel-box-title">Gmail / Email</div>
+                      <div class="channel-box-sub">Gửi OTP tới hộp thư</div>
+                    </div>
+
+                    <div 
+                      class="channel-box" 
+                      :class="{ active: forgotForm.channel === 'TELEGRAM' }"
+                      @click="forgotForm.channel = 'TELEGRAM'"
+                    >
+                      <div class="channel-box-header">
+                        <span class="channel-emoji">✈️</span>
+                        <div class="channel-radio-dot"></div>
+                      </div>
+                      <div class="channel-box-title">Telegram Bot</div>
+                      <div class="channel-box-sub">Nhận tin nhắn tức thì</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Extra input when Email is chosen -->
+                <div v-if="forgotForm.channel === 'EMAIL'" class="form-group sub-input-anim">
+                  <label class="form-label">Email nhận OTP (Tùy chọn)</label>
+                  <el-input 
+                    v-model="forgotForm.email" 
+                    placeholder="Mặc định: dolemta090899@gmail.com" 
+                    size="large"
+                    class="modern-input"
+                  >
+                    <template #prefix><el-icon><Message /></el-icon></template>
+                  </el-input>
+                  <div class="channel-hint">
+                    💡 Hệ thống sẽ tự động gửi email HTML chứa mã xác thực tới hộp thư của bạn.
+                  </div>
+                </div>
+
+                <!-- Extra input when Telegram is chosen -->
+                <div v-else-if="forgotForm.channel === 'TELEGRAM'" class="form-group sub-input-anim">
+                  <label class="form-label">Telegram Chat ID (Tùy chọn)</label>
+                  <el-input 
+                    v-model="forgotForm.telegramChatId" 
+                    placeholder="Mặc định: 8813999524 (@dolemta)" 
+                    size="large"
+                    class="modern-input"
+                  >
+                    <template #prefix><el-icon><ChatDotRound /></el-icon></template>
+                  </el-input>
+                  <div class="channel-hint">
+                    💡 Để trống hệ thống sẽ tự động gửi tới Telegram cá nhân đã liên kết của bạn (@mixi007_bot).
+                  </div>
+                </div>
+
                 <div class="security-info-box">
-                  <p>💡 Hệ thống sẽ kiểm tra tài khoản trong cơ sở dữ liệu và cấp mã OTP gồm 6 chữ số có hiệu lực trong 15 phút.</p>
+                  <p>⏰ Mã xác thực OTP gồm 6 chữ số và có thời hạn hiệu lực trong 15 phút.</p>
                 </div>
 
                 <button 
@@ -216,11 +280,17 @@
 
             <!-- BƯỚC 2: NHẬP MÃ OTP -->
             <div v-else-if="forgotStep === 2" class="step-content">
-              <!-- OTP Notification Banner -->
+              <!-- Target Destination Pill -->
+              <div v-if="serverTargetInfo" class="channel-destination-badge">
+                <el-icon style="font-size: 16px; color: #38bdf8;"><Bell /></el-icon>
+                <span>Mã đã được gửi tới: <strong>{{ serverTargetInfo }}</strong></span>
+              </div>
+
+              <!-- OTP Notification Banner (Dev & Test Preview) -->
               <div v-if="serverGeneratedOtp" class="otp-notice-pill">
                 <el-icon style="font-size: 18px; color: #10b981;"><Key /></el-icon>
                 <div class="otp-text-wrap">
-                  <span class="otp-label-text">Mã xác thực OTP của bạn là:</span>
+                  <span class="otp-label-text">Mã xác thực OTP xem nhanh:</span>
                   <strong class="otp-highlight-number">{{ serverGeneratedOtp }}</strong>
                 </div>
               </div>
@@ -348,7 +418,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../store/auth'
 import { ElMessage } from 'element-plus'
-import { User, Lock, Key, ArrowRight, Back } from '@element-plus/icons-vue'
+import { User, Lock, Key, ArrowRight, Back, Message, ChatDotRound, Bell } from '@element-plus/icons-vue'
 import api from '../api'
 
 const router = useRouter()
@@ -365,8 +435,12 @@ const regForm = ref({ username: '', password: '', confirmPassword: '' })
 // Forgot password state
 const forgotStep = ref(1) // 1: request, 2: otp, 3: new pass, 4: done
 const serverGeneratedOtp = ref('')
+const serverTargetInfo = ref('')
 const forgotForm = ref({
   identifier: '',
+  channel: 'EMAIL', // 'EMAIL' | 'TELEGRAM'
+  email: '',
+  telegramChatId: '',
   otp: '',
   newPassword: '',
   confirmPassword: ''
@@ -377,7 +451,16 @@ const switchMode = (newMode) => {
   if (newMode === 'forgot') {
     forgotStep.value = 1
     serverGeneratedOtp.value = ''
-    forgotForm.value = { identifier: '', otp: '', newPassword: '', confirmPassword: '' }
+    serverTargetInfo.value = ''
+    forgotForm.value = {
+      identifier: '',
+      channel: 'EMAIL',
+      email: '',
+      telegramChatId: '',
+      otp: '',
+      newPassword: '',
+      confirmPassword: ''
+    }
   }
 }
 
@@ -435,7 +518,7 @@ const handleRegister = async () => {
   }
 }
 
-// BƯỚC 1: GỬI YÊU CẦU MÃ OTP
+// BƯỚC 1: GỬI YÊU CẦU MÃ OTP (HỖ TRỢ EMAIL HOẶC TELEGRAM)
 const handleSendOtp = async () => {
   if (!forgotForm.value.identifier || !forgotForm.value.identifier.trim()) {
     ElMessage.warning('Vui lòng nhập tên đăng nhập hoặc email!')
@@ -444,10 +527,16 @@ const handleSendOtp = async () => {
 
   loading.value = true
   try {
-    const res = await api.post('/auth/forgot-password', {
-      identifier: forgotForm.value.identifier.trim()
-    })
+    const payload = {
+      identifier: forgotForm.value.identifier.trim(),
+      channel: forgotForm.value.channel,
+      email: forgotForm.value.email ? forgotForm.value.email.trim() : undefined,
+      telegramChatId: forgotForm.value.telegramChatId ? forgotForm.value.telegramChatId.trim() : undefined
+    }
+
+    const res = await api.post('/auth/forgot-password', payload)
     serverGeneratedOtp.value = res.data.otp || ''
+    serverTargetInfo.value = res.data.target || (forgotForm.value.channel === 'EMAIL' ? 'Hộp thư Email' : 'Telegram Bot')
     forgotStep.value = 2
     ElMessage.success(res.data.message || 'Mã xác thực OTP đã được gửi thành công!')
   } catch (err) {
@@ -716,6 +805,95 @@ const goToLoginAfterReset = () => {
   border-radius: 50%;
   box-shadow: 0 0 8px #10b981;
   flex-shrink: 0;
+}
+
+/* Channel Selection Styles */
+.channel-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.channel-box {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.channel-box:hover {
+  border-color: rgba(99, 102, 241, 0.5);
+  background: rgba(30, 41, 59, 0.7);
+  transform: translateY(-2px);
+}
+.channel-box.active {
+  border-color: #6366f1;
+  background: rgba(99, 102, 241, 0.15);
+  box-shadow: 0 0 16px -2px rgba(99, 102, 241, 0.4);
+}
+.channel-box-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.channel-emoji {
+  font-size: 20px;
+}
+.channel-radio-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  transition: all 0.2s ease;
+  position: relative;
+}
+.channel-box.active .channel-radio-dot {
+  border-color: #6366f1;
+  background-color: #6366f1;
+  box-shadow: 0 0 6px #6366f1;
+}
+.channel-box-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #f1f5f9;
+  margin-top: 4px;
+}
+.channel-box-sub {
+  font-size: 11px;
+  color: #94a3b8;
+}
+.channel-hint {
+  font-size: 11.5px;
+  color: #94a3b8;
+  margin-top: 2px;
+  line-height: 1.4;
+}
+.channel-hint code {
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.1);
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+.sub-input-anim {
+  animation: fadeIn 0.3s ease;
+}
+.channel-destination-badge {
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 12px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: #e0f2fe;
+}
+.channel-destination-badge strong {
+  color: #38bdf8;
 }
 
 /* OTP Notification Banner */

@@ -1,7 +1,6 @@
 package com.erp.security;
 
 import io.jsonwebtoken.*;
-import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
@@ -10,6 +9,8 @@ import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Date;
 
 @Component
@@ -23,11 +24,12 @@ public class JwtTokenProvider {
 
     private SecretKey getSigningKey() {
         try {
-            // Thử giải mã BASE64 nếu secret được mã hóa
-            byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
+            // Dùng SHA-512 băm secret thành đúng chuẩn 64 bytes (512 bits) an toàn tuyệt đối
+            MessageDigest md = MessageDigest.getInstance("SHA-512");
+            byte[] keyBytes = md.digest(jwtSecret.getBytes(StandardCharsets.UTF_8));
             return Keys.hmacShaKeyFor(keyBytes);
-        } catch (Exception e) {
-            // Fallback sang UTF-8 bytes nếu không phải BASE64
+        } catch (NoSuchAlgorithmException e) {
+            // Fallback sang bytes trực tiếp
             byte[] keyBytes = jwtSecret.getBytes(StandardCharsets.UTF_8);
             return Keys.hmacShaKeyFor(keyBytes);
         }

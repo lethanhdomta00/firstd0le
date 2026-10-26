@@ -14,6 +14,21 @@ spring:
     properties:
       hibernate:
         format_sql: true
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME:dolemta090899@gmail.com}
+    password: ${MAIL_PASSWORD:ejnptwyajyhprfjp}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 8000
+          timeout: 8000
+          writetimeout: 8000
 
 server:
   address: 0.0.0.0
@@ -28,3 +43,6 @@ cloudinary:
   api-key: ${CLOUDINARY_API_KEY:246986112431434}
   api-secret: ${CLOUDINARY_API_SECRET:KjR_XssmdSoq59O_Poa9WlUgnCw}
 
+telegram:
+  bot-token: ${TELEGRAM_BOT_TOKEN:8247650585:AAH0c3-MeWs5ibIWLemoMr0kfef56Zli4BQ}
+  default-chat-id: ${TELEGRAM_DEFAULT_CHAT_ID:8813999524}
