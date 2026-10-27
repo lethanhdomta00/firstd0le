@@ -3,45 +3,130 @@
     <!-- Reusable Base Page Header -->
     <BasePageHeader
       title="Quản lý Sản phẩm"
-      subtitle="Danh sách hàng hóa, giá niêm yết, tồn kho và hình ảnh sản phẩm"
+      subtitle="Danh sách hàng hóa, giá niêm yết, phân trang cơ sở dữ liệu và tồn kho"
       :icon="Goods"
     >
-      <BaseButton type="gradient" size="large" :icon="Plus" @click="openDialog()" class="btn-add">
+      <BaseButton 
+        v-if="authStore.isAdmin"
+        type="gradient" 
+        size="large" 
+        :icon="Plus" 
+        @click="openDialog()" 
+        class="btn-add"
+      >
         Thêm sản phẩm mới
       </BaseButton>
     </BasePageHeader>
 
-    <!-- Reusable Base Table with Built-in Skeleton Loading, Responsive Scroll & Toolbar -->
+    <!-- Floating Batch Actions Bar (when products are selected) -->
+    <transition name="el-zoom-in-top">
+      <div v-if="selectedProductIds.length > 0 && authStore.isAdmin" class="batch-bar">
+        <div class="batch-left">
+          <el-icon class="batch-icon"><Delete /></el-icon>
+          <span>Đã chọn <strong>{{ selectedProductIds.length }}</strong> sản phẩm</span>
+        </div>
+        <div class="batch-actions">
+          <el-button size="small" @click="clearSelection">Bỏ chọn</el-button>
+          <el-button 
+            type="danger" 
+            size="small" 
+            :loading="batchDeleting"
+            @click="handleBatchDelete"
+          >
+            Xóa {{ selectedProductIds.length }} sản phẩm đã chọn
+          </el-button>
+        </div>
+      </div>
+    </transition>
+
+    <!-- Reusable Base Table with Built-in Skeleton Loading & Server-Side Pagination -->
     <BaseTable 
-      :data="filteredProducts" 
+      ref="tableRef"
+      :data="products" 
       :loading="loading" 
       :has-thumbnail="true" 
       :skeleton-columns="6" 
       :skeleton-rows="5"
-      min-width="720px"
+      min-width="760px"
+      :show-pagination="true"
+      :pagination="{
+        currentPage: page + 1,
+        pageSize: size,
+        total: totalElements
+      }"
+      @page-change="handlePageChange"
+      @size-change="handleSizeChange"
+      @selection-change="handleSelectionChange"
     >
-      <!-- Search Toolbar -->
+      <!-- Search & Multi-Filter Toolbar -->
       <template #toolbar>
         <div class="toolbar-wrap">
-          <el-input 
-            v-model="searchQuery" 
-            placeholder="Tìm theo tên sản phẩm hoặc mã SKU..." 
-            clearable
-            class="search-input"
-          >
-            <template #prefix><el-icon><Search /></el-icon></template>
-          </el-input>
+          <div class="filter-group">
+            <!-- Keyword Search -->
+            <el-input 
+              v-model="filters.keyword" 
+              placeholder="Tìm theo tên hoặc mã SKU..." 
+              clearable
+              class="filter-search"
+              @clear="onSearch"
+              @keyup.enter="onSearch"
+            >
+              <template #prefix><el-icon><Search /></el-icon></template>
+            </el-input>
+
+            <!-- Stock Status Filter -->
+            <el-select 
+              v-model="filters.stockStatus" 
+              placeholder="Tồn kho" 
+              class="filter-select"
+              @change="onFilterChange"
+            >
+              <el-option label="Tất cả kho hàng" value="ALL" />
+              <el-option label="Còn hàng (> 10)" value="IN_STOCK" />
+              <el-option label="Sắp hết (1 - 10)" value="LOW_STOCK" />
+              <el-option label="Đã hết hàng (0)" value="OUT_OF_STOCK" />
+            </el-select>
+
+            <!-- Sorting Selector -->
+            <el-select 
+              v-model="filters.sort" 
+              placeholder="Sắp xếp" 
+              class="filter-select"
+              @change="onFilterChange"
+            >
+              <el-option label="Mới nhất (Mặc định)" value="id,desc" />
+              <el-option label="Giá: Thấp đến Cao" value="price,asc" />
+              <el-option label="Giá: Cao đến Thấp" value="price,desc" />
+              <el-option label="Tồn kho: Nhiều nhất" value="stock,desc" />
+              <el-option label="Tên sản phẩm: A - Z" value="name,asc" />
+            </el-select>
+
+            <!-- Reset Filters -->
+            <el-button @click="resetFilters" plain class="btn-reset">
+              <el-icon><RefreshRight /></el-icon>
+              <span>Đặt lại</span>
+            </el-button>
+          </div>
+
           <div class="count-tag">
-            <span>Hiển thị <strong>{{ filteredProducts.length }}</strong> sản phẩm</span>
+            <span>Tổng số: <strong>{{ totalElements }}</strong> sản phẩm</span>
           </div>
         </div>
       </template>
+
+      <!-- Selection Column (Admin Only) -->
+      <el-table-column 
+        v-if="authStore.isAdmin" 
+        type="selection" 
+        width="48" 
+        align="center" 
+      />
 
       <!-- Table Columns -->
       <el-table-column prop="id" label="ID" width="70" align="center" />
       
       <!-- Product Image Column -->
-      <el-table-column label="Hình ảnh" width="100" align="center">
+      <el-table-column label="Hình ảnh" width="90" align="center">
         <template #default="{ row }">
           <el-image
             v-if="row.imageUrl"
@@ -84,20 +169,24 @@
         <template #default="{ row }">
           <BaseStatusBadge
             :type="row.stock > 10 ? 'success' : (row.stock > 0 ? 'warning' : 'danger')"
-            :text="row.stock + ' cái'"
+            :text="row.stock > 0 ? row.stock + ' cái' : 'Hết hàng'"
           />
         </template>
       </el-table-column>
 
+      <!-- Actions Column -->
       <el-table-column label="Thao tác" width="150" align="center" fixed="right">
         <template #default="{ row }">
-          <el-button size="small" @click="openDialog(row)">Sửa</el-button>
-          <el-button size="small" type="danger" @click="deleteProduct(row.id)">Xóa</el-button>
+          <div v-if="authStore.isAdmin" class="action-btn-group">
+            <el-button size="small" @click="openDialog(row)">Sửa</el-button>
+            <el-button size="small" type="danger" plain @click="deleteProduct(row.id)">Xóa</el-button>
+          </div>
+          <el-tag v-else size="small" type="info">Chỉ xem</el-tag>
         </template>
       </el-table-column>
     </BaseTable>
 
-    <!-- Reusable Base Dialog (Auto Responsive Width) -->
+    <!-- Product Create/Edit Dialog -->
     <BaseDialog 
       v-model="dialogVisible" 
       :title="form.id ? 'Cập nhật Sản phẩm' : 'Thêm Sản phẩm Mới'" 
@@ -182,17 +271,33 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
+import { useAuthStore } from '../store/auth'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Picture, Delete, UploadFilled, Loading, Search, Goods } from '@element-plus/icons-vue'
+import { Plus, Picture, Delete, UploadFilled, Loading, Search, Goods, RefreshRight } from '@element-plus/icons-vue'
 import api from '../api'
 
+const authStore = useAuthStore()
+
+const tableRef = ref(null)
 const products = ref([])
+const totalElements = ref(0)
+const totalPages = ref(0)
+const page = ref(0)
+const size = ref(10)
 const loading = ref(false)
 const saving = ref(false)
 const uploading = ref(false)
+const batchDeleting = ref(false)
 const dialogVisible = ref(false)
-const searchQuery = ref('')
+
+const selectedProductIds = ref([])
+
+const filters = reactive({
+  keyword: '',
+  stockStatus: 'ALL',
+  sort: 'id,desc'
+})
 
 const form = ref({
   id: null,
@@ -203,15 +308,6 @@ const form = ref({
   imageUrl: ''
 })
 
-const filteredProducts = computed(() => {
-  if (!searchQuery.value || !searchQuery.value.trim()) return products.value
-  const query = searchQuery.value.toLowerCase().trim()
-  return products.value.filter(p => 
-    (p.name && p.name.toLowerCase().includes(query)) ||
-    (p.sku && p.sku.toLowerCase().includes(query))
-  )
-})
-
 const formatCurrency = (val) => {
   if (val == null) return '0 ₫'
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val)
@@ -220,12 +316,102 @@ const formatCurrency = (val) => {
 const fetchProducts = async () => {
   loading.value = true
   try {
-    const res = await api.get('/products')
-    products.value = res.data
+    const [sortBy, sortDir] = filters.sort.split(',')
+    const params = {
+      page: page.value,
+      size: size.value,
+      keyword: filters.keyword ? filters.keyword.trim() : undefined,
+      stockStatus: filters.stockStatus !== 'ALL' ? filters.stockStatus : undefined,
+      sortBy: sortBy || 'id',
+      sortDir: sortDir || 'desc'
+    }
+
+    const res = await api.get('/products', { params })
+    if (res.data && res.data.content !== undefined) {
+      // Spring Data Page<Product> response
+      products.value = res.data.content
+      totalElements.value = res.data.totalElements
+      totalPages.value = res.data.totalPages
+    } else if (Array.isArray(res.data)) {
+      // Fallback if array
+      products.value = res.data
+      totalElements.value = res.data.length
+    }
   } catch (e) {
     ElMessage.error('Không thể tải danh sách sản phẩm!')
   } finally {
     loading.value = false
+  }
+}
+
+const onSearch = () => {
+  page.value = 0
+  fetchProducts()
+}
+
+const onFilterChange = () => {
+  page.value = 0
+  fetchProducts()
+}
+
+const resetFilters = () => {
+  filters.keyword = ''
+  filters.stockStatus = 'ALL'
+  filters.sort = 'id,desc'
+  page.value = 0
+  fetchProducts()
+}
+
+const handlePageChange = (newPage) => {
+  page.value = newPage - 1 // Element Plus is 1-indexed, Spring Data is 0-indexed
+  fetchProducts()
+}
+
+const handleSizeChange = (newSize) => {
+  size.value = newSize
+  page.value = 0
+  fetchProducts()
+}
+
+const handleSelectionChange = (selection) => {
+  selectedProductIds.value = selection.map(item => item.id)
+}
+
+const clearSelection = () => {
+  selectedProductIds.value = []
+  if (tableRef.value && tableRef.value.$el) {
+    const elTable = tableRef.value.$el.querySelector('.el-table')
+    if (elTable && elTable.__vueParentComponent?.ctx?.clearSelection) {
+      elTable.__vueParentComponent.ctx.clearSelection()
+    }
+  }
+}
+
+const handleBatchDelete = async () => {
+  if (selectedProductIds.value.length === 0) return
+
+  try {
+    await ElMessageBox.confirm(
+      `Bạn có chắc chắn muốn xóa vĩnh viễn ${selectedProductIds.value.length} sản phẩm đã chọn?`,
+      'Xác nhận xóa hàng loạt',
+      {
+        confirmButtonText: 'Xóa ngay',
+        cancelButtonText: 'Hủy',
+        type: 'warning'
+      }
+    )
+
+    batchDeleting.value = true
+    await api.post('/products/batch-delete', { ids: selectedProductIds.value })
+    ElMessage.success(`Đã xóa ${selectedProductIds.value.length} sản phẩm thành công!`)
+    selectedProductIds.value = []
+    fetchProducts()
+  } catch (e) {
+    if (e !== 'cancel') {
+      ElMessage.error(e.response?.data?.message || 'Lỗi khi xóa hàng loạt sản phẩm!')
+    }
+  } finally {
+    batchDeleting.value = false
   }
 }
 
@@ -313,8 +499,40 @@ onMounted(() => {
 .products-container {
   display: flex;
   flex-direction: column;
+  gap: 16px;
 }
 
+/* Floating Batch Bar */
+.batch-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 18px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  color: #991b1b;
+  font-size: 14px;
+}
+
+.batch-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.batch-icon {
+  font-size: 18px;
+  color: #ef4444;
+}
+
+.batch-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Filter Toolbar */
 .toolbar-wrap {
   width: 100%;
   display: flex;
@@ -324,8 +542,25 @@ onMounted(() => {
   gap: 12px;
 }
 
-.search-input {
-  max-width: 320px;
+.filter-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.filter-search {
+  width: 250px;
+}
+
+.filter-select {
+  width: 170px;
+}
+
+.btn-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .count-tag {
@@ -334,8 +569,8 @@ onMounted(() => {
 }
 
 .product-thumb {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   border-radius: 8px;
   border: 1px solid #e2e8f0;
   display: inline-block;
@@ -343,15 +578,15 @@ onMounted(() => {
 }
 
 .image-placeholder {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   border-radius: 8px;
   background-color: #f1f5f9;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   color: #94a3b8;
-  font-size: 20px;
+  font-size: 18px;
   border: 1px dashed #cbd5e1;
 }
 
@@ -365,6 +600,12 @@ onMounted(() => {
   color: #0284c7;
 }
 
+.action-btn-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 /* Upload Styling */
 .upload-wrapper {
   width: 100%;
@@ -372,8 +613,8 @@ onMounted(() => {
 
 .image-preview-box {
   position: relative;
-  width: 150px;
-  height: 150px;
+  width: 140px;
+  height: 140px;
   border-radius: 12px;
   overflow: hidden;
   border: 2px solid #e2e8f0;
@@ -392,7 +633,7 @@ onMounted(() => {
 }
 
 :deep(.image-uploader .el-upload-dragger) {
-  padding: 18px;
+  padding: 16px;
   border-radius: 12px;
   border: 2px dashed #cbd5e1;
   background-color: #f8fafc;
@@ -405,7 +646,7 @@ onMounted(() => {
 }
 
 .upload-icon {
-  font-size: 32px;
+  font-size: 30px;
   color: #0284c7;
   margin-bottom: 6px;
 }
@@ -423,13 +664,21 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
-  .search-input {
+  .filter-search,
+  .filter-select,
+  .btn-add {
+    width: 100%;
     max-width: 100%;
+  }
+
+  .filter-group {
     width: 100%;
   }
 
-  .btn-add {
-    width: 100%;
+  .batch-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
   }
 }
 </style>

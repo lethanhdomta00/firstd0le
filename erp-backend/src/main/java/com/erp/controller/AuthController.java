@@ -4,6 +4,8 @@ import com.erp.dto.ForgotPasswordRequest;
 import com.erp.dto.JwtAuthenticationResponse;
 import com.erp.dto.LoginRequest;
 import com.erp.dto.ResetPasswordRequest;
+import com.erp.dto.UserProfileUpdateRequest;
+import com.erp.dto.UserResponseDto;
 import com.erp.model.Role;
 import com.erp.model.User;
 import com.erp.repository.UserRepository;
@@ -52,6 +54,12 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<?> authenticateUser(@RequestBody LoginRequest loginRequest) {
         try {
+            // Kiểm tra trạng thái tài khoản trước khi cấp token
+            Optional<User> userOpt = userRepository.findByUsername(loginRequest.getUsername());
+            if (userOpt.isPresent() && "LOCKED".equalsIgnoreCase(userOpt.get().getStatus())) {
+                return ResponseEntity.status(403).body(Map.of("message", "Tài khoản của bạn đã bị khóa! Vui lòng liên hệ Quản trị viên."));
+            }
+
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
                             loginRequest.getUsername(),
@@ -61,10 +69,49 @@ public class AuthController {
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
             String jwt = tokenProvider.generateToken(authentication);
-            return ResponseEntity.ok(new JwtAuthenticationResponse(jwt));
+
+            User user = userOpt.orElseGet(() -> userRepository.findByUsername(loginRequest.getUsername()).orElse(null));
+            return ResponseEntity.ok(new JwtAuthenticationResponse(jwt, UserResponseDto.fromEntity(user)));
         } catch (AuthenticationException e) {
             return ResponseEntity.status(401).body(Map.of("message", "Tên đăng nhập hoặc mật khẩu không chính xác!"));
         }
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<?> getCurrentUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
+            return ResponseEntity.status(401).body(Map.of("message", "Chưa đăng nhập!"));
+        }
+        String username = authentication.getName();
+        Optional<User> userOpt = userRepository.findByUsername(username);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.status(404).body(Map.of("message", "Không tìm thấy thông tin tài khoản!"));
+        }
+        return ResponseEntity.ok(UserResponseDto.fromEntity(userOpt.get()));
+    }
+
+    @PutMapping("/profile")
+    public ResponseEntity<?> updateProfile(@RequestBody UserProfileUpdateRequest request) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
+            return ResponseEntity.status(401).body(Map.of("message", "Chưa đăng nhập!"));
+        }
+        String username = authentication.getName();
+        Optional<User> userOpt = userRepository.findByUsername(username);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.status(404).body(Map.of("message", "Không tìm thấy thông tin tài khoản!"));
+        }
+
+        User user = userOpt.get();
+        if (request.getFullName() != null) user.setFullName(request.getFullName().trim());
+        if (request.getEmail() != null) user.setEmail(request.getEmail().trim());
+        if (request.getPhone() != null) user.setPhone(request.getPhone().trim());
+        if (request.getAvatarUrl() != null) user.setAvatarUrl(request.getAvatarUrl().trim());
+        if (request.getBio() != null) user.setBio(request.getBio().trim());
+
+        User updated = userRepository.save(user);
+        return ResponseEntity.ok(UserResponseDto.fromEntity(updated));
     }
 
     @PostMapping("/register")

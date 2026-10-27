@@ -4,6 +4,7 @@
     :title="title"
     :width="dialogWidth"
     :before-close="handleClose"
+    :align-center="alignCenter"
     destroy-on-close
     class="base-dialog"
     v-bind="$attrs"
@@ -75,6 +76,10 @@ const props = defineProps({
   confirmType: {
     type: String,
     default: 'primary'
+  },
+  alignCenter: {
+    type: Boolean,
+    default: true
   },
   showFooter: {
     type: Boolean,

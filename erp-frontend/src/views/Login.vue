@@ -522,13 +522,13 @@ const handleLogin = async () => {
   loadingText.value = 'Đang xác thực tài khoản...'
   loadingSubText.value = 'Hệ thống đang kiểm tra thông tin đăng nhập của bạn...'
   loading.value = true
-  const success = await authStore.login(loginForm.value.username, loginForm.value.password)
+  const result = await authStore.login(loginForm.value.username, loginForm.value.password)
   loading.value = false
-  if (success) {
+  if (result === true || result?.success) {
     ElMessage.success('Đăng nhập thành công!')
     router.push('/')
   } else {
-    ElMessage.error('Tên đăng nhập hoặc mật khẩu không chính xác!')
+    ElMessage.error(result?.message || 'Tên đăng nhập hoặc mật khẩu không chính xác!')
     if (loginCaptchaRef.value) loginCaptchaRef.value.reset()
   }
 }
