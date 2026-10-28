@@ -316,6 +316,9 @@
         </el-form-item>
       </el-form>
     </BaseDialog>
+
+    <!-- Trợ lý ảo ERP AI Chatbot Widget (Nổi ở góc phải dưới) -->
+    <ChatWidget />
   </el-container>
 </template>
 
@@ -326,6 +329,7 @@ import { useAuthStore } from '../store/auth'
 import { useResponsive } from '../composables/useResponsive'
 import { ElMessage } from 'element-plus'
 import api from '../api'
+import ChatWidget from '../components/chat/ChatWidget.vue'
 import { 
   Monitor, 
   Goods, 
