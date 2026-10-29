@@ -19,8 +19,8 @@ spring:
   mail:
     host: ${MAIL_HOST:smtp.gmail.com}
     port: ${MAIL_PORT:587}
-    username: ${MAIL_USERNAME:}
-    password: ${MAIL_PASSWORD:}
+    username: ${MAIL_USERNAME:${mail.smtp.username:dolemta090899@gmail.com}}
+    password: ${MAIL_PASSWORD:${mail.smtp.password:ejnptwyajyhprfjp}}
     properties:
       mail:
         smtp:
@@ -46,8 +46,8 @@ cloudinary:
   api-secret: ${CLOUDINARY_API_SECRET:KjR_XssmdSoq59O_Poa9WlUgnCw}
 
 telegram:
-  bot-token: ${TELEGRAM_BOT_TOKEN:}
-  default-chat-id: ${TELEGRAM_DEFAULT_CHAT_ID:}
+  bot-token: ${TELEGRAM_BOT_TOKEN:${telegram.bot-token:8247650585:AAH0c3-MeWs5ibIWLemoMr0kfef56Zli4BQ}}
+  default-chat-id: ${TELEGRAM_DEFAULT_CHAT_ID:${telegram.default-chat-id:8813999524}}
 
 gemini:
   # Danh sách API Keys được nạp tự động từ file gemini-keys.yml (hoặc biến môi trường GEMINI_API_KEYS)

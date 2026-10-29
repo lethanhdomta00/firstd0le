@@ -1,24 +1,11 @@
 <template>
-  <div class="auth-wrapper">
+  <div class="auth-page">
     <!-- Ambient Background Lighting -->
-    <div class="glow-orb orb-1"></div>
-    <div class="glow-orb orb-2"></div>
-    <div class="glow-orb orb-3"></div>
+    <div class="bg-gradient-mesh"></div>
 
-    <div class="auth-container">
-      <!-- Brand Header -->
-      <div class="brand-header">
-        <div class="brand-logo">
-          <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-          </svg>
-        </div>
-        <h1 class="brand-title">ERP Cloud System</h1>
-        <p class="brand-subtitle">Hệ thống quản trị tài nguyên doanh nghiệp toàn diện</p>
-      </div>
-
-      <!-- Main Glass Card -->
-      <div class="glass-card">
+    <div class="auth-shell">
+      <!-- MODE 1: LOGIN (SPLIT SCREEN 2 COLUMNS - FIGMA IMAGE 1) -->
+      <div v-if="mode === 'login'" class="login-split-card">
         <!-- Reusable Base Loading Overlay -->
         <BaseLoading 
           :active="loading" 
@@ -26,453 +13,549 @@
           :sub-text="loadingSubText" 
         />
 
-        <!-- MODE 1: LOGIN -->
-        <transition name="fade-slide" mode="out-in">
-          <div v-if="mode === 'login'" key="login" class="form-section">
-            <div class="form-title-wrap">
-              <h2 class="form-title">Đăng nhập</h2>
-              <p class="form-desc">Chào mừng bạn trở lại! Vui lòng nhập thông tin.</p>
+        <!-- LEFT COLUMN: BRAND HERO & SLA METRICS -->
+        <div class="hero-column">
+          <!-- Logo & Enterprise Badge -->
+          <div class="brand-top">
+            <div class="brand-logo-icon">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2">
+                <circle cx="12" cy="12" r="3" fill="currentColor" />
+                <path stroke-linecap="round" d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6l2.1 2.1M5.6 18.4l2.1-2.1m8.6-8.6l2.1-2.1" />
+              </svg>
             </div>
-
-            <!-- Quick Demo Credential Pill -->
-            <div class="demo-credential-pill" @click="fillDemoAccount">
-              <span class="pulse-dot"></span>
-              <span>Tài khoản Demo: <strong>admin</strong> / <strong>password</strong> (Click để điền)</span>
-            </div>
-
-            <el-form :model="loginForm" @keyup.enter="handleLogin" class="custom-form">
-              <div class="form-group">
-                <label class="form-label">Tên đăng nhập</label>
-                <el-input 
-                  v-model="loginForm.username" 
-                  placeholder="Nhập username của bạn" 
-                  size="large"
-                  class="modern-input"
-                >
-                  <template #prefix><el-icon><User /></el-icon></template>
-                </el-input>
+            <div class="brand-info">
+              <div class="brand-title-row">
+                <span class="brand-name">ERP Cloud</span>
+                <span class="enterprise-pill">ENTERPRISE</span>
               </div>
+              <span class="brand-sub">Hệ thống Quản trị Doanh nghiệp Thông minh</span>
+            </div>
+          </div>
 
-              <div class="form-group">
-                <div class="label-row">
-                  <label class="form-label">Mật khẩu</label>
-                  <a href="javascript:void(0)" class="forgot-link" @click="switchMode('forgot')">Quên mật khẩu?</a>
+          <!-- Hero Headline -->
+          <div class="hero-body">
+            <div class="system-status-pill">
+              <span class="green-dot"></span>
+              <span>Hệ thống phân tán hoạt động 100%</span>
+            </div>
+
+            <h1 class="hero-heading">
+              Đột phá hiệu suất,<br />
+              <span class="highlight-blue">kết nối tương lai</span> doanh nghiệp.
+            </h1>
+
+            <p class="hero-desc">
+              Tối ưu hóa nguồn lực, quản trị luồng dữ liệu thời gian thực và đồng bộ hóa mọi quy trình chỉ trong một nền tảng duy nhất.
+            </p>
+
+            <!-- SLA & Security Live Metric Card -->
+            <div class="sla-metric-card">
+              <div class="sla-card-header">
+                <div class="sla-title-group">
+                  <span class="sla-icon">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="2" y="3" width="20" height="14" rx="2" />
+                      <line x1="8" y1="21" x2="16" y2="21" />
+                      <line x1="12" y1="17" x2="12" y2="21" />
+                    </svg>
+                  </span>
+                  <div>
+                    <div class="sla-title">Chỉ số vận hành hệ thống</div>
+                    <div class="sla-sub">Cập nhật theo thời gian thực</div>
+                  </div>
                 </div>
-                <el-input 
-                  v-model="loginForm.password" 
-                  type="password" 
-                  placeholder="Nhập mật khẩu" 
-                  show-password
-                  size="large"
-                  class="modern-input"
-                >
-                  <template #prefix><el-icon><Lock /></el-icon></template>
-                </el-input>
+                <span class="online-pill">Online</span>
               </div>
 
-              <div class="remember-row">
-                <el-checkbox v-model="rememberMe" label="Ghi nhớ đăng nhập" class="custom-checkbox" />
+              <div class="sla-divider"></div>
+
+              <div class="sla-stats-grid">
+                <div class="sla-stat-item">
+                  <div class="sla-label">Độ tin cậy SLA</div>
+                  <div class="sla-value">99.98%</div>
+                  <div class="sla-sub-badge tier-badge">⚡ Chuẩn Tier 4</div>
+                </div>
+
+                <div class="sla-stat-separator"></div>
+
+                <div class="sla-stat-item">
+                  <div class="sla-label">Bảo mật đa tầng</div>
+                  <div class="sla-value">ISO 27001</div>
+                  <div class="sla-sub-badge soc-badge">🛡️ SOC 2 Type II</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Hero Footer -->
+          <div class="hero-footer">
+            <span class="footer-badge">🔒 Mã hóa TLS 1.3 | AES-256</span>
+            <span class="footer-dot">•</span>
+            <span class="footer-badge">🛡️ FIDO2 & SSO Ready</span>
+            <span class="version-tag">v4.2-SG01/WAS1-S</span>
+          </div>
+        </div>
+
+        <!-- RIGHT COLUMN: LOGIN FORM -->
+        <div class="form-column">
+          <!-- Top Row: Language switcher -->
+          <div class="form-top-bar">
+            <div class="lang-pill">
+              <span>🌐 VIE</span>
+              <span class="chevron">⌄</span>
+            </div>
+          </div>
+
+          <div class="form-inner">
+            <!-- Form Header -->
+            <div class="form-heading-group">
+              <div class="form-title-row">
+                <h2 class="form-title">Đăng nhập</h2>
+                <span class="portal-badge">Cổng Quản trị</span>
+              </div>
+              <p class="form-subtitle">Truy cập không gian làm việc số cho doanh nghiệp</p>
+            </div>
+
+            <!-- Demo Account Quick Card (Figma Match) -->
+            <div class="demo-card-banner" @click="fillDemoAccount">
+              <div class="demo-card-left">
+                <div class="demo-icon-box">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
+                <div class="demo-text">
+                  <div class="demo-title">Tài khoản demo</div>
+                  <div class="demo-sub">admin@enterprisegroup.vn</div>
+                </div>
+              </div>
+              <button type="button" class="btn-demo-autofill">
+                Điền mẫu ⚡
+              </button>
+            </div>
+
+            <!-- Main Login Form -->
+            <form @submit.prevent="handleLogin" class="auth-form-fields">
+              <!-- Username Field -->
+              <div class="input-block">
+                <label class="input-label">Tên đăng nhập hoặc Email</label>
+                <div class="input-wrap">
+                  <span class="input-icon">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="2" y="4" width="20" height="16" rx="2" />
+                      <path d="M22 7l-8.97 5.7a1.94 1.94 0 01-2.06 0L2 7" />
+                    </svg>
+                  </span>
+                  <input 
+                    v-model="loginForm.username" 
+                    type="text" 
+                    placeholder="name@enterprise.vn" 
+                    required 
+                    autocomplete="username"
+                    class="native-input"
+                  />
+                </div>
               </div>
 
-              <!-- Reusable Math Captcha Challenge -->
-              <div class="form-group" style="margin-top: 2px;">
+              <!-- Password Field -->
+              <div class="input-block">
+                <div class="label-with-link">
+                  <label class="input-label">Mật khẩu</label>
+                  <a href="javascript:void(0)" class="link-forgot" @click="switchMode('forgot')">
+                    Quên mật khẩu?
+                  </a>
+                </div>
+                <div class="input-wrap">
+                  <span class="input-icon">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                      <path d="M7 11V7a5 5 0 0110 0v4" />
+                    </svg>
+                  </span>
+                  <input 
+                    v-model="loginForm.password" 
+                    :type="showPassword ? 'text' : 'password'" 
+                    placeholder="••••••••••••" 
+                    required 
+                    autocomplete="current-password"
+                    class="native-input"
+                  />
+                  <button type="button" class="eye-toggle" @click="showPassword = !showPassword">
+                    <svg v-if="!showPassword" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                    <svg v-else viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24" />
+                      <line x1="1" y1="1" x2="23" y2="23" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Options Row: Remember Me & Passkey -->
+              <div class="options-row">
+                <label class="checkbox-label">
+                  <input type="checkbox" v-model="rememberMe" class="custom-chk" />
+                  <span>Ghi nhớ đăng nhập</span>
+                </label>
+                <div class="passkey-pill">
+                  <span>🔑 Passkey</span>
+                </div>
+              </div>
+
+              <!-- Math Captcha Challenge -->
+              <div class="captcha-box">
                 <BaseMathCaptcha 
                   ref="loginCaptchaRef" 
                   v-model="isLoginCaptchaPassed"
-                  label="Xác thực giải toán bảo vệ"
+                  label="Xác thực bảo vệ hệ thống"
                 />
               </div>
 
-              <button 
-                type="button" 
-                class="btn-gradient" 
-                :disabled="loading" 
-                @click="handleLogin"
-              >
-                <span v-if="!loading" class="btn-content">
-                  Đăng nhập
-                  <el-icon class="btn-icon"><ArrowRight /></el-icon>
-                </span>
-                <span v-else class="btn-content">Đang xác thực...</span>
+              <!-- Main Submit Button -->
+              <button type="submit" class="btn-primary-submit" :disabled="loading">
+                <span>{{ loading ? 'Đang xác thực...' : 'Đăng nhập' }}</span>
+                <span class="btn-arrow">➔</span>
               </button>
-            </el-form>
+            </form>
 
-            <div class="switch-mode-text">
-              Chưa có tài khoản? 
-              <a href="javascript:void(0)" class="highlight-link" @click="switchMode('register')">Đăng ký tài khoản mới</a>
-            </div>
-          </div>
-
-          <!-- MODE 2: REGISTER -->
-          <div v-else-if="mode === 'register'" key="register" class="form-section">
-            <div class="form-title-wrap">
-              <h2 class="form-title">Đăng ký tài khoản</h2>
-              <p class="form-desc">Tạo tài khoản quản trị viên mới cho hệ thống ERP.</p>
+            <!-- Social Logins Divider -->
+            <div class="divider-text">
+              <span>HOẶC TIẾP TỤC VỚI</span>
             </div>
 
-            <el-form :model="regForm" @keyup.enter="handleRegister" class="custom-form">
-              <div class="form-group">
-                <label class="form-label">Tên đăng nhập mong muốn</label>
-                <el-input 
-                  v-model="regForm.username" 
-                  placeholder="Ví dụ: nva_manager" 
-                  size="large"
-                  class="modern-input"
-                >
-                  <template #prefix><el-icon><User /></el-icon></template>
-                </el-input>
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">Mật khẩu</label>
-                <el-input 
-                  v-model="regForm.password" 
-                  type="password" 
-                  placeholder="Tối thiểu 6 ký tự" 
-                  show-password
-                  size="large"
-                  class="modern-input"
-                >
-                  <template #prefix><el-icon><Lock /></el-icon></template>
-                </el-input>
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">Xác nhận mật khẩu</label>
-                <el-input 
-                  v-model="regForm.confirmPassword" 
-                  type="password" 
-                  placeholder="Nhập lại mật khẩu" 
-                  show-password
-                  size="large"
-                  class="modern-input"
-                >
-                  <template #prefix><el-icon><Key /></el-icon></template>
-                </el-input>
-              </div>
-
-              <button 
-                type="button" 
-                class="btn-gradient btn-gradient-emerald" 
-                :disabled="loading" 
-                @click="handleRegister"
-              >
-                <span v-if="!loading" class="btn-content">
-                  Tạo tài khoản ngay
-                  <el-icon class="btn-icon"><ArrowRight /></el-icon>
-                </span>
-                <span v-else class="btn-content">Đang khởi tạo...</span>
-              </button>
-            </el-form>
-
-            <div class="switch-mode-text">
-              Đã có tài khoản? 
-              <a href="javascript:void(0)" class="highlight-link" @click="switchMode('login')">Quay lại Đăng nhập</a>
-            </div>
-          </div>
-
-          <!-- MODE 3: FORGOT PASSWORD (HOÀN CHỈNH 3 BƯỚC + OTP) -->
-          <div v-else-if="mode === 'forgot'" key="forgot" class="form-section">
-            <div class="form-title-wrap">
-              <h2 class="form-title">Khôi phục mật khẩu</h2>
-              <p class="form-desc">Quy trình đặt lại mật khẩu bảo mật qua mã xác thực OTP.</p>
-            </div>
-
-            <!-- Step Wizard Indicator -->
-            <div class="wizard-steps">
-              <div :class="['step-item', { active: forgotStep >= 1, current: forgotStep === 1 }]">
-                <div class="step-circle">1</div>
-                <span class="step-label">Tài khoản</span>
-              </div>
-              <div class="step-line" :class="{ filled: forgotStep >= 2 }"></div>
-              <div :class="['step-item', { active: forgotStep >= 2, current: forgotStep === 2 }]">
-                <div class="step-circle">2</div>
-                <span class="step-label">Nhập OTP</span>
-              </div>
-              <div class="step-line" :class="{ filled: forgotStep >= 3 }"></div>
-              <div :class="['step-item', { active: forgotStep >= 3, current: forgotStep === 3 }]">
-                <div class="step-circle">3</div>
-                <span class="step-label">Mật khẩu mới</span>
-              </div>
-            </div>
-
-            <!-- BƯỚC 1: NHẬP TÀI KHOẢN & CHỌN KÊNH -->
-            <div v-if="forgotStep === 1" class="step-content">
-              <el-form :model="forgotForm" @keyup.enter="handleSendOtp" class="custom-form">
-                <div class="form-group">
-                  <label class="form-label">Tên đăng nhập hoặc Email tài khoản</label>
-                  <el-input 
-                    v-model="forgotForm.identifier" 
-                    placeholder="Nhập username (ví dụ: admin)" 
-                    size="large"
-                    class="modern-input"
-                  >
-                    <template #prefix><el-icon><User /></el-icon></template>
-                  </el-input>
-                </div>
-
-                <!-- KÊNH NHẬN MÃ OTP -->
-                <div class="form-group">
-                  <label class="form-label">Phương thức nhận mã xác thực OTP</label>
-                  <div class="channel-grid">
-                    <div 
-                      class="channel-box" 
-                      :class="{ active: forgotForm.channel === 'EMAIL' }"
-                      @click="forgotForm.channel = 'EMAIL'"
-                    >
-                      <div class="channel-box-header">
-                        <span class="channel-emoji">✉️</span>
-                        <div class="channel-radio-dot"></div>
-                      </div>
-                      <div class="channel-box-title">Gmail / Email</div>
-                      <div class="channel-box-sub">Gửi OTP tới hộp thư</div>
-                    </div>
-
-                    <div 
-                      class="channel-box" 
-                      :class="{ active: forgotForm.channel === 'TELEGRAM' }"
-                      @click="forgotForm.channel = 'TELEGRAM'"
-                    >
-                      <div class="channel-box-header">
-                        <span class="channel-emoji">✈️</span>
-                        <div class="channel-radio-dot"></div>
-                      </div>
-                      <div class="channel-box-title">Telegram Bot</div>
-                      <div class="channel-box-sub">Nhận tin nhắn tức thì</div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Extra input when Email is chosen -->
-                <div v-if="forgotForm.channel === 'EMAIL'" class="form-group sub-input-anim">
-                  <label class="form-label">Email nhận OTP</label>
-                  <el-input 
-                    v-model="forgotForm.email" 
-                    placeholder="Nhập email nhận mã OTP (ví dụ: your-email@gmail.com)" 
-                    size="large"
-                    class="modern-input"
-                  >
-                    <template #prefix><el-icon><Message /></el-icon></template>
-                  </el-input>
-                  <div class="channel-hint">
-                    💡 Để trống hệ thống sẽ gửi về email đã đăng ký của tài khoản.
-                  </div>
-                </div>
-
-                <!-- Extra input when Telegram is chosen -->
-                <div v-else-if="forgotForm.channel === 'TELEGRAM'" class="form-group sub-input-anim">
-                  <label class="form-label">Telegram Chat ID (Tùy chọn)</label>
-                  <el-input 
-                    v-model="forgotForm.telegramChatId" 
-                    placeholder="Nhập Telegram Chat ID của bạn (ví dụ: 123456789)" 
-                    size="large"
-                    class="modern-input"
-                  >
-                    <template #prefix><el-icon><ChatDotRound /></el-icon></template>
-                  </el-input>
-                  <div class="channel-hint">
-                    💡 Để trống hệ thống sẽ tự động gửi tới Telegram đã cấu hình.
-                  </div>
-                </div>
-
-                <div class="security-info-box">
-                  <p>⏰ Mã xác thực OTP gồm 6 chữ số và có thời hạn hiệu lực trong 15 phút.</p>
-                </div>
-
-                <!-- Reusable Math Captcha Anti-Spam -->
-                <div class="form-group" style="margin-top: 4px;">
-                  <BaseMathCaptcha 
-                    ref="forgotCaptchaRef" 
-                    v-model="isForgotCaptchaPassed"
-                    label="Giải phép tính để nhận mã OTP (Chống spam)"
-                  />
-                </div>
-
-                <button 
-                  type="button" 
-                  class="btn-gradient" 
-                  :disabled="loading" 
-                  @click="handleSendOtp"
-                >
-                  <span v-if="!loading" class="btn-content">
-                    Gửi mã xác thực OTP
-                    <el-icon class="btn-icon"><ArrowRight /></el-icon>
-                  </span>
-                  <span v-else class="btn-content">Đang gửi yêu cầu...</span>
-                </button>
-              </el-form>
-            </div>
-
-            <!-- BƯỚC 2: NHẬP MÃ OTP -->
-            <div v-else-if="forgotStep === 2" class="step-content">
-              <!-- Target Destination Pill -->
-              <div v-if="serverTargetInfo" class="channel-destination-badge">
-                <el-icon style="font-size: 16px; color: #38bdf8;"><Bell /></el-icon>
-                <span>Mã đã được gửi tới: <strong>{{ serverTargetInfo }}</strong></span>
-              </div>
-
-              <!-- OTP Notification Banner (Dev & Test Preview) -->
-              <div v-if="serverGeneratedOtp" class="otp-notice-pill">
-                <el-icon style="font-size: 18px; color: #10b981;"><Key /></el-icon>
-                <div class="otp-text-wrap">
-                  <span class="otp-label-text">Mã xác thực OTP xem nhanh:</span>
-                  <strong class="otp-highlight-number">{{ serverGeneratedOtp }}</strong>
-                </div>
-              </div>
-
-              <el-form :model="forgotForm" @keyup.enter="handleVerifyOtp" class="custom-form">
-                <div class="form-group">
-                  <label class="form-label">Nhập mã OTP 6 chữ số</label>
-                  <el-input 
-                    v-model="forgotForm.otp" 
-                    placeholder="Nhập 6 số (VD: 123456)" 
-                    maxlength="6"
-                    size="large"
-                    class="modern-input otp-input-field"
-                  >
-                    <template #prefix><el-icon><Key /></el-icon></template>
-                  </el-input>
-                </div>
-
-                <button 
-                  type="button" 
-                  class="btn-gradient" 
-                  :disabled="loading" 
-                  @click="handleVerifyOtp"
-                >
-                  <span v-if="!loading" class="btn-content">
-                    Xác nhận mã OTP
-                    <el-icon class="btn-icon"><ArrowRight /></el-icon>
-                  </span>
-                  <span v-else class="btn-content">Đang kiểm tra...</span>
-                </button>
-
-                <div class="resend-row">
-                  <a href="javascript:void(0)" class="resend-link" @click="handleSendOtp">Chưa nhận được? Gửi lại mã OTP</a>
-                </div>
-              </el-form>
-            </div>
-
-            <!-- BƯỚC 3: THIẾT LẬP MẬT KHẨU MỚI -->
-            <div v-else-if="forgotStep === 3" class="step-content">
-              <el-form :model="forgotForm" @keyup.enter="handleResetPassword" class="custom-form">
-                <div class="form-group">
-                  <label class="form-label">Mật khẩu mới</label>
-                  <el-input 
-                    v-model="forgotForm.newPassword" 
-                    type="password" 
-                    placeholder="Tối thiểu 6 ký tự" 
-                    show-password
-                    size="large"
-                    class="modern-input"
-                  >
-                    <template #prefix><el-icon><Lock /></el-icon></template>
-                  </el-input>
-                </div>
-
-                <div class="form-group">
-                  <label class="form-label">Xác nhận mật khẩu mới</label>
-                  <el-input 
-                    v-model="forgotForm.confirmPassword" 
-                    type="password" 
-                    placeholder="Nhập lại mật khẩu mới" 
-                    show-password
-                    size="large"
-                    class="modern-input"
-                  >
-                    <template #prefix><el-icon><Key /></el-icon></template>
-                  </el-input>
-                </div>
-
-                <button 
-                  type="button" 
-                  class="btn-gradient btn-gradient-emerald" 
-                  :disabled="loading" 
-                  @click="handleResetPassword"
-                >
-                  <span v-if="!loading" class="btn-content">
-                    Cập nhật mật khẩu mới
-                    <el-icon class="btn-icon"><ArrowRight /></el-icon>
-                  </span>
-                  <span v-else class="btn-content">Đang lưu mật khẩu...</span>
-                </button>
-              </el-form>
-            </div>
-
-            <!-- BƯỚC 4: THÀNH CÔNG -->
-            <div v-else-if="forgotStep === 4" class="step-content text-center">
-              <div class="success-icon-badge">
-                <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="#10b981" stroke-width="2.5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+            <!-- Social Logins (Google & Microsoft Entra) -->
+            <div class="social-btn-grid">
+              <button type="button" class="btn-social" @click="handleSocialLogin('Google')">
+                <svg viewBox="0 0 24 24" width="18" height="18" class="social-icon">
+                  <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
+                  <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.24v3.15C3.26 21.41 7.33 24 12 24z"/>
+                  <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.24C.45 8.16 0 9.98 0 12s.45 3.84 1.24 5.42l4.04-3.15z"/>
+                  <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.59 1.24 6.58l4.04 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
                 </svg>
-              </div>
-              <h3 class="success-title">Đổi mật khẩu thành công!</h3>
-              <p class="success-desc">Mật khẩu tài khoản của bạn đã được cập nhật vào cơ sở dữ liệu.</p>
-              
-              <button 
-                type="button" 
-                class="btn-gradient" 
-                @click="goToLoginAfterReset"
-              >
-                <span class="btn-content">
-                  Đăng nhập ngay
-                  <el-icon class="btn-icon"><ArrowRight /></el-icon>
-                </span>
+                <span>Google ID</span>
+              </button>
+
+              <button type="button" class="btn-social" @click="handleSocialLogin('Microsoft')">
+                <svg viewBox="0 0 24 24" width="18" height="18" class="social-icon">
+                  <path fill="#F25022" d="M1 1h10v10H1z"/>
+                  <path fill="#7FBA00" d="M13 1h10v10H13z"/>
+                  <path fill="#00A4EF" d="M1 13h10v10H1z"/>
+                  <path fill="#FFB900" d="M13 13h10v10H13z"/>
+                </svg>
+                <span>Microsoft Entra</span>
               </button>
             </div>
 
-            <div class="switch-mode-text">
-              <a href="javascript:void(0)" class="highlight-link back-link" @click="switchMode('login')">
-                <el-icon><Back /></el-icon> Quay lại Đăng nhập
-              </a>
+            <!-- Footer Legal Links -->
+            <div class="form-bottom-legal">
+              <div class="legal-links">
+                <a href="#">Điều khoản</a>
+                <span class="dot">•</span>
+                <a href="#">Bảo mật</a>
+                <span class="dot">•</span>
+                <a href="#">Hỗ trợ</a>
+              </div>
+              <div class="copyright-text">© 2026 Enterprise Group</div>
             </div>
           </div>
-        </transition>
+        </div>
       </div>
 
-      <!-- Footer Info -->
-      <div class="auth-footer">
-        © 2026 ERP Cloud • Powered by Spring Boot 3 & Vue 3 • Hosted on Vercel
+      <!-- MODE 2: FORGOT PASSWORD (STEP WIZARD - FIGMA IMAGE 2) -->
+      <div v-else-if="mode === 'forgot'" class="forgot-center-card">
+        <BaseLoading 
+          :active="loading" 
+          :text="loadingText" 
+          :sub-text="loadingSubText" 
+        />
+
+        <!-- Brand Top -->
+        <div class="forgot-header-bar">
+          <div class="brand-logo-row">
+            <div class="brand-logo-icon mini">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2">
+                <circle cx="12" cy="12" r="3" fill="currentColor" />
+                <path stroke-linecap="round" d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6l2.1 2.1M5.6 18.4l2.1-2.1m8.6-8.6l2.1-2.1" />
+              </svg>
+            </div>
+            <span class="brand-name">ERP Cloud</span>
+            <span class="enterprise-pill">ENTERPRISE</span>
+          </div>
+
+          <div class="lang-pill">
+            <span>🌐 VIE</span>
+            <span class="chevron">⌄</span>
+          </div>
+        </div>
+
+        <!-- Inner Card -->
+        <div class="forgot-modal-box">
+          <!-- 3-Step Wizard Indicator -->
+          <div class="wizard-steps-bar">
+            <div :class="['wizard-step-node', { active: forgotStep >= 1, current: forgotStep === 1 }]">
+              <span class="step-num">1</span>
+              <span class="step-txt">Tài khoản</span>
+            </div>
+            <div class="wizard-step-line" :class="{ filled: forgotStep >= 2 }"></div>
+            <div :class="['wizard-step-node', { active: forgotStep >= 2, current: forgotStep === 2 }]">
+              <span class="step-num">2</span>
+              <span class="step-txt">Mã OTP</span>
+            </div>
+            <div class="wizard-step-line" :class="{ filled: forgotStep >= 3 }"></div>
+            <div :class="['wizard-step-node', { active: forgotStep >= 3, current: forgotStep === 3 }]">
+              <span class="step-num">3</span>
+              <span class="step-txt">Mật khẩu mới</span>
+            </div>
+          </div>
+
+          <div class="forgot-title-area">
+            <h2 class="forgot-main-title">Khôi phục mật khẩu</h2>
+            <p class="forgot-sub-title">Nhập thông tin tài khoản để nhận mã xác thực một lần (OTP)</p>
+          </div>
+
+          <!-- STEP 1: Enter Username & Choose Channel -->
+          <div v-if="forgotStep === 1" class="step-view">
+            <div class="input-block">
+              <div class="label-with-link">
+                <label class="input-label">Email hoặc tên đăng nhập</label>
+                <button type="button" class="btn-sample-fill" @click="forgotForm.identifier = 'admin'">
+                  ⚡ Mẫu
+                </button>
+              </div>
+              <div class="input-wrap">
+                <span class="input-icon">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="2" y="4" width="20" height="16" rx="2" />
+                    <path d="M22 7l-8.97 5.7a1.94 1.94 0 01-2.06 0L2 7" />
+                  </svg>
+                </span>
+                <input 
+                  v-model="forgotForm.identifier" 
+                  type="text" 
+                  placeholder="admin@enterprisegroup.vn" 
+                  class="native-input" 
+                  @keyup.enter="handleSendOtp"
+                />
+              </div>
+            </div>
+
+            <!-- Choose Channel Tabs -->
+            <div class="input-block">
+              <label class="input-label">Nhận mã qua</label>
+              <div class="channel-toggle-grid">
+                <button 
+                  type="button" 
+                  class="channel-pill-btn" 
+                  :class="{ active: forgotForm.channel === 'EMAIL' }"
+                  @click="forgotForm.channel = 'EMAIL'"
+                >
+                  <span class="channel-icon">✉️</span>
+                  <span>Email công ty</span>
+                </button>
+
+                <button 
+                  type="button" 
+                  class="channel-pill-btn" 
+                  :class="{ active: forgotForm.channel === 'TELEGRAM' }"
+                  @click="forgotForm.channel = 'TELEGRAM'"
+                >
+                  <span class="channel-icon">✈️</span>
+                  <span>Telegram Bot</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Email Detail if chosen -->
+            <div v-if="forgotForm.channel === 'EMAIL'" class="input-block">
+              <label class="input-label">Hộp thư nhận OTP (Tùy chọn)</label>
+              <input 
+                v-model="forgotForm.email" 
+                type="email" 
+                placeholder="Mặc định: dolemta090899@gmail.com" 
+                class="native-input" 
+                @keyup.enter="handleSendOtp"
+              />
+              <span class="channel-hint-text">💡 Để trống hệ thống sẽ tự động gửi về email của tài khoản (dolemta090899@gmail.com).</span>
+            </div>
+
+            <!-- Telegram Detail if chosen -->
+            <div v-if="forgotForm.channel === 'TELEGRAM'" class="input-block">
+              <label class="input-label">Telegram Chat ID (Tùy chọn)</label>
+              <input 
+                v-model="forgotForm.telegramChatId" 
+                type="text" 
+                placeholder="Mặc định: 8813999524" 
+                class="native-input" 
+                @keyup.enter="handleSendOtp"
+              />
+              <span class="channel-hint-text">💡 Để trống hệ thống sẽ tự động gửi tới Telegram đã cấu hình (@mixi007_bot).</span>
+            </div>
+
+            <!-- Captcha for protection -->
+            <div class="captcha-box">
+              <BaseMathCaptcha 
+                ref="forgotCaptchaRef" 
+                v-model="isForgotCaptchaPassed"
+                label="Giải phép tính để nhận mã OTP"
+              />
+            </div>
+
+            <!-- Action Button -->
+            <button 
+              type="button" 
+              class="btn-primary-submit" 
+              :disabled="loading" 
+              @click="handleSendOtp"
+            >
+              <span>{{ loading ? 'Đang gửi mã...' : 'Gửi mã xác thực' }}</span>
+              <span class="btn-arrow">➔</span>
+            </button>
+          </div>
+
+          <!-- STEP 2: Enter OTP -->
+          <div v-else-if="forgotStep === 2" class="step-view">
+            <div v-if="serverTargetInfo" class="channel-destination-badge">
+              <span>Mã đã được gửi tới: <strong>{{ serverTargetInfo }}</strong></span>
+            </div>
+
+            <div 
+              v-if="serverGeneratedOtp" 
+              class="otp-notice-pill" 
+              style="cursor: pointer;" 
+              @click="forgotForm.otp = serverGeneratedOtp"
+              title="Click để tự động điền mã"
+            >
+              <span>Mã xác thực xem nhanh: <strong>{{ serverGeneratedOtp }}</strong> <span style="font-size: 11px; opacity: 0.85;">(Click để điền)</span></span>
+            </div>
+
+            <div class="input-block">
+              <label class="input-label">Nhập mã OTP 6 chữ số</label>
+              <input 
+                v-model="forgotForm.otp" 
+                type="text" 
+                maxlength="6" 
+                placeholder="123456" 
+                class="native-input text-center font-mono font-bold text-lg" 
+                @keyup.enter="handleVerifyOtp"
+              />
+            </div>
+
+            <button 
+              type="button" 
+              class="btn-primary-submit" 
+              :disabled="loading" 
+              @click="handleVerifyOtp"
+            >
+              <span>{{ loading ? 'Đang kiểm tra...' : 'Xác thực OTP' }}</span>
+              <span class="btn-arrow">➔</span>
+            </button>
+
+            <div class="resend-text-center">
+              <a href="javascript:void(0)" class="link-forgot" @click="handleSendOtp">Chưa nhận được mã? Gửi lại</a>
+            </div>
+          </div>
+
+          <!-- STEP 3: Set New Password -->
+          <div v-else-if="forgotStep === 3" class="step-view">
+            <div class="input-block">
+              <label class="input-label">Mật khẩu mới</label>
+              <input 
+                v-model="forgotForm.newPassword" 
+                type="password" 
+                placeholder="Tối thiểu 6 ký tự" 
+                class="native-input" 
+              />
+            </div>
+
+            <div class="input-block">
+              <label class="input-label">Xác nhận mật khẩu mới</label>
+              <input 
+                v-model="forgotForm.confirmPassword" 
+                type="password" 
+                placeholder="Nhập lại mật khẩu mới" 
+                class="native-input" 
+                @keyup.enter="handleResetPassword"
+              />
+            </div>
+
+            <button 
+              type="button" 
+              class="btn-primary-submit" 
+              :disabled="loading" 
+              @click="handleResetPassword"
+            >
+              <span>{{ loading ? 'Đang cập nhật...' : 'Cập nhật mật khẩu' }}</span>
+              <span class="btn-arrow">➔</span>
+            </button>
+          </div>
+
+          <!-- STEP 4: Success -->
+          <div v-else-if="forgotStep === 4" class="step-view text-center">
+            <div class="success-badge-circle">✓</div>
+            <h3 class="success-title">Đổi mật khẩu thành công!</h3>
+            <p class="success-desc">Mật khẩu mới của bạn đã được cập nhật an toàn vào hệ thống.</p>
+            <button type="button" class="btn-primary-submit" @click="goToLoginAfterReset">
+              <span>Đăng nhập ngay</span>
+              <span class="btn-arrow">➔</span>
+            </button>
+          </div>
+
+          <!-- Back to Login Link -->
+          <div class="back-login-row">
+            <a href="javascript:void(0)" class="link-back" @click="switchMode('login')">
+              ← Quay lại đăng nhập
+            </a>
+          </div>
+        </div>
+
+        <div class="forgot-page-footer">
+          <span>© 2026 Enterprise Group</span>
+          <span class="footer-dot">•</span>
+          <span>🔒 Mã hóa TLS 1.3</span>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../store/auth'
 import { ElMessage } from 'element-plus'
-import { User, Lock, Key, ArrowRight, Back, Message, ChatDotRound, Bell } from '@element-plus/icons-vue'
 import api from '../api'
+import BaseMathCaptcha from '../components/base/BaseMathCaptcha.vue'
+import BaseLoading from '../components/base/BaseLoading.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
 
-// 'login' | 'register' | 'forgot'
-const mode = ref('login')
+// State
+const mode = ref('login') // 'login' | 'forgot'
 const loading = ref(false)
 const loadingText = ref('Đang xử lý...')
-const loadingSubText = ref('')
+const loadingSubText = ref('Vui lòng đợi giây lát...')
+const showPassword = ref(false)
 const rememberMe = ref(true)
 
-// Math Captcha Anti-Spam references & states
-const loginCaptchaRef = ref(null)
+// Captcha
 const isLoginCaptchaPassed = ref(false)
-
-const forgotCaptchaRef = ref(null)
 const isForgotCaptchaPassed = ref(false)
+const loginCaptchaRef = ref(null)
+const forgotCaptchaRef = ref(null)
 
-const loginForm = ref({ username: 'admin', password: 'password' })
-const regForm = ref({ username: '', password: '', confirmPassword: '' })
+// Forms
+const loginForm = reactive({
+  username: '',
+  password: ''
+})
 
-// Forgot password state
-const forgotStep = ref(1) // 1: request, 2: otp, 3: new pass, 4: done
-const serverGeneratedOtp = ref('')
-const serverTargetInfo = ref('')
-const forgotForm = ref({
+const forgotStep = ref(1)
+const forgotForm = reactive({
   identifier: '',
-  channel: 'EMAIL', // 'EMAIL' | 'TELEGRAM'
+  channel: 'EMAIL',
   email: '',
   telegramChatId: '',
   otp: '',
@@ -480,36 +563,52 @@ const forgotForm = ref({
   confirmPassword: ''
 })
 
-const switchMode = (newMode) => {
+const serverTargetInfo = ref('')
+const serverGeneratedOtp = ref('')
+
+function switchMode(newMode) {
   mode.value = newMode
   if (newMode === 'forgot') {
     forgotStep.value = 1
-    serverGeneratedOtp.value = ''
     serverTargetInfo.value = ''
-    forgotForm.value = {
-      identifier: '',
-      channel: 'EMAIL',
-      email: '',
-      telegramChatId: '',
-      otp: '',
-      newPassword: '',
-      confirmPassword: ''
-    }
+    serverGeneratedOtp.value = ''
+    forgotForm.identifier = ''
+    forgotForm.channel = 'EMAIL'
+    forgotForm.email = ''
+    forgotForm.telegramChatId = ''
+    forgotForm.otp = ''
+    forgotForm.newPassword = ''
+    forgotForm.confirmPassword = ''
     if (forgotCaptchaRef.value) forgotCaptchaRef.value.reset()
   } else if (newMode === 'login') {
     if (loginCaptchaRef.value) loginCaptchaRef.value.reset()
   }
 }
 
-const fillDemoAccount = () => {
-  loginForm.value.username = 'admin'
-  loginForm.value.password = 'password'
-  ElMessage.info('Đã tự động điền tài khoản quản trị Demo!')
+function fillDemoAccount() {
+  loginForm.username = 'admin'
+  loginForm.password = 'password'
+  if (loginCaptchaRef.value && loginCaptchaRef.value.autoSolveForDemo) {
+    loginCaptchaRef.value.autoSolveForDemo()
+  } else {
+    isLoginCaptchaPassed.value = true
+  }
+  ElMessage.success({
+    message: '⚡ Đã tự động điền tài khoản Quản trị viên (admin / password)!',
+    duration: 2500
+  })
 }
 
-const handleLogin = async () => {
-  if (!loginForm.value.username || !loginForm.value.password) {
-    ElMessage.warning('Vui lòng điền đầy đủ tên đăng nhập và mật khẩu!')
+function handleSocialLogin(provider) {
+  ElMessage.info({
+    message: `Đang kết nối xác thực SSO với ${provider}... (Tính năng Enterprise)`,
+    duration: 3000
+  })
+}
+
+async function handleLogin() {
+  if (!loginForm.username || !loginForm.password) {
+    ElMessage.warning('Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.')
     return
   }
 
@@ -519,106 +618,79 @@ const handleLogin = async () => {
     return
   }
 
-  loadingText.value = 'Đang xác thực tài khoản...'
-  loadingSubText.value = 'Hệ thống đang kiểm tra thông tin đăng nhập của bạn...'
   loading.value = true
-  const result = await authStore.login(loginForm.value.username, loginForm.value.password)
-  loading.value = false
-  if (result === true || result?.success) {
-    ElMessage.success('Đăng nhập thành công!')
-    router.push('/')
-  } else {
-    ElMessage.error(result?.message || 'Tên đăng nhập hoặc mật khẩu không chính xác!')
-    if (loginCaptchaRef.value) loginCaptchaRef.value.reset()
-  }
-}
+  loadingText.value = 'Đang xác thực thông tin...'
+  loadingSubText.value = 'Mã hóa token và thiết lập phiên làm việc...'
 
-const handleRegister = async () => {
-  if (!regForm.value.username || !regForm.value.password) {
-    ElMessage.warning('Vui lòng điền đầy đủ thông tin!')
-    return
-  }
-  if (regForm.value.password !== regForm.value.confirmPassword) {
-    ElMessage.error('Mật khẩu xác nhận không trùng khớp!')
-    return
-  }
-  if (regForm.value.password.length < 6) {
-    ElMessage.warning('Mật khẩu phải có ít nhất 6 ký tự!')
-    return
-  }
-
-  loadingText.value = 'Đang tạo tài khoản mới...'
-  loadingSubText.value = 'Đang lưu trữ dữ liệu người dùng...'
-  loading.value = true
   try {
-    await api.post('/auth/register', {
-      username: regForm.value.username,
-      password: regForm.value.password
-    })
-    ElMessage.success('Tạo tài khoản thành công! Bạn có thể đăng nhập ngay.')
-    loginForm.value.username = regForm.value.username
-    loginForm.value.password = regForm.value.password
-    regForm.value = { username: '', password: '', confirmPassword: '' }
-    mode.value = 'login'
+    const result = await authStore.login(loginForm.username.trim(), loginForm.password)
+    if (result === true || result?.success) {
+      ElMessage.success('Đăng nhập thành công! Đang chuyển hướng vào hệ thống...')
+      router.push('/')
+    } else {
+      ElMessage.error(result?.message || 'Tên đăng nhập hoặc mật khẩu không chính xác!')
+      if (loginCaptchaRef.value) loginCaptchaRef.value.reset()
+    }
   } catch (err) {
-    ElMessage.error(err.response?.data?.message || err.response?.data || 'Không thể tạo tài khoản!')
+    ElMessage.error(err.response?.data?.message || err.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại.')
+    if (loginCaptchaRef.value) loginCaptchaRef.value.reset()
   } finally {
     loading.value = false
   }
 }
 
-// BƯỚC 1: GỬI YÊU CẦU MÃ OTP (HỖ TRỢ EMAIL HOẶC TELEGRAM)
-const handleSendOtp = async () => {
-  if (!forgotForm.value.identifier || !forgotForm.value.identifier.trim()) {
+async function handleSendOtp() {
+  if (!forgotForm.identifier || !forgotForm.identifier.trim()) {
     ElMessage.warning('Vui lòng nhập tên đăng nhập hoặc email!')
     return
   }
 
-  // Chống spam: Bắt buộc giải đúng phép toán
-  if (forgotCaptchaRef.value && !forgotCaptchaRef.value.validate()) {
+  // Chống spam: Bắt buộc giải đúng phép toán (chỉ khi ở Step 1)
+  if (forgotStep.value === 1 && forgotCaptchaRef.value && !forgotCaptchaRef.value.validate()) {
     ElMessage.warning('Vui lòng giải đúng phép tính để nhận mã OTP!')
     return
   }
 
-  loadingText.value = forgotForm.value.channel === 'EMAIL' 
+  loading.value = true
+  loadingText.value = forgotForm.channel === 'EMAIL' 
     ? 'Đang gửi mã OTP qua Email...' 
     : 'Đang gửi mã OTP qua Telegram...'
   loadingSubText.value = 'Hệ thống đang bảo mật mã và chuyển phát tức thì...'
-  loading.value = true
+
   try {
     const payload = {
-      identifier: forgotForm.value.identifier.trim(),
-      channel: forgotForm.value.channel,
-      email: forgotForm.value.email ? forgotForm.value.email.trim() : undefined,
-      telegramChatId: forgotForm.value.telegramChatId ? forgotForm.value.telegramChatId.trim() : undefined
+      identifier: forgotForm.identifier.trim(),
+      channel: forgotForm.channel,
+      email: forgotForm.email ? forgotForm.email.trim() : undefined,
+      telegramChatId: forgotForm.telegramChatId ? forgotForm.telegramChatId.trim() : undefined
     }
 
     const res = await api.post('/auth/forgot-password', payload)
-    serverGeneratedOtp.value = res.data.otp || ''
-    serverTargetInfo.value = res.data.target || (forgotForm.value.channel === 'EMAIL' ? 'Hộp thư Email' : 'Telegram Bot')
+    serverGeneratedOtp.value = res.data?.otp || ''
+    serverTargetInfo.value = res.data?.target || (forgotForm.channel === 'EMAIL' ? 'Hộp thư Email' : 'Telegram Bot')
     forgotStep.value = 2
-    ElMessage.success(res.data.message || 'Mã xác thực OTP đã được gửi thành công!')
+    ElMessage.success(res.data?.message || 'Mã xác thực OTP đã được gửi thành công!')
   } catch (err) {
     ElMessage.error(err.response?.data?.message || 'Không tìm thấy tài khoản trong hệ thống!')
-    if (forgotCaptchaRef.value) forgotCaptchaRef.value.reset()
+    if (forgotStep.value === 1 && forgotCaptchaRef.value) forgotCaptchaRef.value.reset()
   } finally {
     loading.value = false
   }
 }
 
-// BƯỚC 2: XÁC NHẬN MÃ OTP
-const handleVerifyOtp = async () => {
-  if (!forgotForm.value.otp || forgotForm.value.otp.trim().length !== 6) {
+async function handleVerifyOtp() {
+  if (!forgotForm.otp || forgotForm.otp.trim().length !== 6) {
     ElMessage.warning('Vui lòng nhập đầy đủ mã OTP 6 chữ số!')
     return
   }
 
+  loading.value = true
   loadingText.value = 'Đang kiểm tra mã OTP...'
   loadingSubText.value = 'Xác minh tính hợp lệ và thời hạn sử dụng...'
-  loading.value = true
+
   try {
     await api.post('/auth/verify-otp', {
-      otp: forgotForm.value.otp.trim()
+      otp: forgotForm.otp.trim()
     })
     forgotStep.value = 3
     ElMessage.success('Xác thực OTP thành công! Vui lòng tạo mật khẩu mới.')
@@ -629,24 +701,25 @@ const handleVerifyOtp = async () => {
   }
 }
 
-// BƯỚC 3: ĐẶT MẬT KHẨU MỚI
-const handleResetPassword = async () => {
-  if (!forgotForm.value.newPassword || forgotForm.value.newPassword.length < 6) {
+async function handleResetPassword() {
+  if (!forgotForm.newPassword || forgotForm.newPassword.length < 6) {
     ElMessage.warning('Mật khẩu mới phải có ít nhất 6 ký tự!')
     return
   }
-  if (forgotForm.value.newPassword !== forgotForm.value.confirmPassword) {
-    ElMessage.error('Mật khẩu xác nhận không trùng khớp!')
+
+  if (forgotForm.newPassword !== forgotForm.confirmPassword) {
+    ElMessage.warning('Mật khẩu xác nhận không trùng khớp!')
     return
   }
 
+  loading.value = true
   loadingText.value = 'Đang đặt lại mật khẩu mới...'
   loadingSubText.value = 'Mật khẩu đang được mã hóa an toàn vào cơ sở dữ liệu...'
-  loading.value = true
+
   try {
     await api.post('/auth/reset-password', {
-      token: forgotForm.value.otp.trim(),
-      newPassword: forgotForm.value.newPassword
+      token: forgotForm.otp.trim(),
+      newPassword: forgotForm.newPassword
     })
     forgotStep.value = 4
     ElMessage.success('Đặt lại mật khẩu thành công!')
@@ -657,600 +730,891 @@ const handleResetPassword = async () => {
   }
 }
 
-const goToLoginAfterReset = () => {
-  loginForm.value.username = forgotForm.value.identifier
-  loginForm.value.password = forgotForm.value.newPassword
-  mode.value = 'login'
+function goToLoginAfterReset() {
+  loginForm.username = forgotForm.identifier
+  loginForm.password = forgotForm.newPassword
+  switchMode('login')
 }
 </script>
 
 <style scoped>
-/* Main Container - Crisp Modern White & Light Theme */
-.auth-wrapper {
-  position: relative;
+/* ==============================================================================
+   FIGMA ENTERPRISE AUTHENTICATION STYLES (MATCHING IMAGES 1 & 2)
+   ============================================================================== */
+.auth-page {
   min-height: 100vh;
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #f1f5f9 100%);
-  overflow: hidden;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  padding: 24px 16px;
-  box-sizing: border-box;
+  background-color: #f8fafc;
+  padding: 32px 16px;
+  position: relative;
+  overflow-x: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  color: #0f172a;
 }
 
-/* Soft Pastel Ambient Lighting */
-.glow-orb {
+.bg-gradient-mesh {
   position: absolute;
-  border-radius: 50%;
-  filter: blur(90px);
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(at 0% 0%, rgba(219, 234, 254, 0.7) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(224, 242, 254, 0.6) 0px, transparent 50%),
+    radial-gradient(at 50% 50%, rgba(241, 245, 249, 0.5) 0px, transparent 50%);
   pointer-events: none;
+  z-index: 0;
+}
+
+.auth-shell {
+  width: 100%;
+  max-width: 1100px;
+  position: relative;
   z-index: 1;
 }
-.orb-1 {
-  width: 450px;
-  height: 450px;
-  background: radial-gradient(circle, #c7d2fe 0%, transparent 70%);
-  top: -100px;
-  left: -100px;
-  opacity: 0.5;
-}
-.orb-2 {
-  width: 500px;
-  height: 500px;
-  background: radial-gradient(circle, #bae6fd 0%, transparent 70%);
-  bottom: -150px;
-  right: -100px;
-  opacity: 0.5;
-}
-.orb-3 {
-  width: 350px;
-  height: 350px;
-  background: radial-gradient(circle, #ddd6fe 0%, transparent 70%);
-  top: 40%;
-  left: 60%;
-  opacity: 0.4;
-}
 
-/* Auth Center Column */
-.auth-container {
-  position: relative;
-  z-index: 2;
-  width: 100%;
-  max-width: 440px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-/* Brand Header */
-.brand-header {
-  text-align: center;
-  margin-bottom: 24px;
-}
-.brand-logo {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 58px;
-  height: 58px;
-  border-radius: 18px;
-  background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 50%, #0284c7 100%);
-  color: #ffffff;
-  box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.35);
-  margin-bottom: 12px;
-}
-.brand-title {
-  margin: 0;
-  font-size: 26px;
-  font-weight: 800;
-  letter-spacing: -0.5px;
-  color: #0f172a;
-}
-.brand-subtitle {
-  margin: 6px 0 0 0;
-  font-size: 13.5px;
-  color: #64748b;
-  font-weight: 400;
-}
-
-/* Main White Card (Crisp High-Contrast Glassmorphism) */
-.glass-card {
-  position: relative;
-  width: 100%;
+/* ==================== SPLIT CARD (IMAGE 1) ==================== */
+.login-split-card {
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
   background: #ffffff;
-  border: 1px solid #e2e8f0;
   border-radius: 24px;
-  padding: 32px 28px;
-  box-shadow: 0 20px 45px -10px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(15, 23, 42, 0.04);
-  box-sizing: border-box;
+  box-shadow: 0 20px 40px -15px rgba(15, 23, 42, 0.08), 0 0 1px 1px rgba(226, 232, 240, 0.8);
   overflow: hidden;
+  position: relative;
+  min-height: 680px;
 }
 
-/* Form Headings */
-.form-title-wrap {
-  margin-bottom: 20px;
-}
-.form-title {
-  margin: 0;
-  font-size: 22px;
-  font-weight: 800;
-  color: #0f172a;
-}
-.form-desc {
-  margin: 6px 0 0 0;
-  font-size: 13.5px;
-  color: #64748b;
-}
-
-/* Wizard Steps */
-.wizard-steps {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 24px;
-  padding: 0 8px;
-}
-
-.step-item {
+/* LEFT COLUMN: HERO AREA */
+.hero-column {
+  background: linear-gradient(145deg, #f0f7ff 0%, #e0effe 100%);
+  padding: 44px 40px;
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
+  border-right: 1px solid #e2e8f0;
+  position: relative;
+}
+
+.brand-top {
+  display: flex;
   align-items: center;
-  gap: 4px;
-  opacity: 0.5;
-  transition: all 0.3s ease;
+  gap: 14px;
 }
 
-.step-item.active {
-  opacity: 1;
-}
-
-.step-circle {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: #f1f5f9;
-  border: 1px solid #cbd5e1;
-  color: #64748b;
+.brand-logo-icon {
+  width: 44px;
+  height: 44px;
+  background: #2563eb;
+  color: #ffffff;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
-  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
 }
 
-.step-item.current .step-circle {
-  background: #4f46e5;
-  border-color: #4f46e5;
-  color: #ffffff;
-  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
+.brand-logo-icon.mini {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
 }
 
-.step-label {
-  font-size: 11px;
-  color: #64748b;
-  font-weight: 500;
-}
-.step-item.active .step-label {
-  color: #0f172a;
-  font-weight: 600;
-}
-
-.step-line {
-  flex: 1;
-  height: 2px;
-  background: #e2e8f0;
-  margin: 0 6px 16px 6px;
-  transition: all 0.3s ease;
-}
-
-.step-line.filled {
-  background: #4f46e5;
-}
-
-/* Demo Credential Pill */
-.demo-credential-pill {
+.brand-title-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: #eef2ff;
-  border: 1px solid #c7d2fe;
-  padding: 9px 12px;
-  border-radius: 12px;
-  margin-bottom: 20px;
-  font-size: 12px;
-  color: #4338ca;
-  cursor: pointer;
-  transition: all 0.25s ease;
-}
-.demo-credential-pill:hover {
-  background: #e0e7ff;
-  border-color: #a5b4fc;
-  transform: translateY(-1px);
-}
-.pulse-dot {
-  width: 8px;
-  height: 8px;
-  background-color: #10b981;
-  border-radius: 50%;
-  box-shadow: 0 0 8px #10b981;
-  flex-shrink: 0;
 }
 
-/* Channel Selection Styles */
-.channel-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+.brand-name {
+  font-size: 19px;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.3px;
+}
+
+.enterprise-pill {
+  font-size: 10px;
+  font-weight: 700;
+  background: #dbeafe;
+  color: #1d4ed8;
+  padding: 2px 7px;
+  border-radius: 6px;
+  letter-spacing: 0.5px;
+}
+
+.brand-sub {
+  font-size: 12px;
+  color: #64748b;
+  display: block;
+  margin-top: 2px;
+}
+
+.hero-body {
+  margin: 36px 0;
+}
+
+.system-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid #e2e8f0;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 22px;
+  backdrop-filter: blur(4px);
+}
+
+.green-dot {
+  width: 8px;
+  height: 8px;
+  background: #10b981;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+
+.hero-heading {
+  font-size: 32px;
+  line-height: 1.25;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.8px;
+  margin: 0 0 16px 0;
+}
+
+.highlight-blue {
+  color: #2563eb;
+}
+
+.hero-desc {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #475569;
+  margin: 0 0 28px 0;
+  max-width: 440px;
+}
+
+/* Floating SLA Card */
+.sla-metric-card {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 18px 20px;
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.05), 0 0 0 1px rgba(226, 232, 240, 0.8);
+}
+
+.sla-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sla-title-group {
+  display: flex;
+  align-items: center;
   gap: 12px;
 }
-.channel-box {
-  background: #f8fafc;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 14px;
-  padding: 12px 14px;
-  cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+
+.sla-icon {
+  width: 32px;
+  height: 32px;
+  background: #eff6ff;
+  color: #2563eb;
+  border-radius: 8px;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.channel-box:hover {
-  border-color: #6366f1;
-  background: #ffffff;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px -4px rgba(15, 23, 42, 0.08);
-}
-.channel-box.active {
-  border-color: #4f46e5;
-  background: #eef2ff;
-  box-shadow: 0 0 0 1px #4f46e5, 0 4px 14px -2px rgba(79, 70, 229, 0.2);
-}
-.channel-box-header {
-  display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: center;
 }
-.channel-emoji {
-  font-size: 20px;
-}
-.channel-radio-dot {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 2px solid #cbd5e1;
-  transition: all 0.2s ease;
-  position: relative;
-}
-.channel-box.active .channel-radio-dot {
-  border-color: #4f46e5;
-  background-color: #4f46e5;
-  box-shadow: 0 0 6px rgba(79, 70, 229, 0.6);
-}
-.channel-box-title {
+
+.sla-title {
   font-size: 13px;
   font-weight: 700;
   color: #0f172a;
-  margin-top: 4px;
 }
-.channel-box-sub {
+
+.sla-sub {
   font-size: 11px;
   color: #64748b;
 }
-.channel-hint {
-  font-size: 11.5px;
-  color: #64748b;
-  margin-top: 2px;
-  line-height: 1.4;
-}
-.channel-hint code {
-  color: #0284c7;
-  background: #e0f2fe;
-  padding: 2px 5px;
-  border-radius: 4px;
+
+.online-pill {
+  font-size: 11px;
   font-weight: 600;
+  color: #059669;
+  background: #ecfdf5;
+  padding: 3px 10px;
+  border-radius: 12px;
 }
-.sub-input-anim {
-  animation: fadeIn 0.3s ease;
+
+.sla-divider {
+  height: 1px;
+  background: #f1f5f9;
+  margin: 14px 0;
 }
-.channel-destination-badge {
-  background: #f0f9ff;
-  border: 1px solid #bae6fd;
+
+.sla-stats-grid {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+}
+
+.sla-stat-item {
+  text-align: left;
+}
+
+.sla-label {
+  font-size: 11px;
+  color: #64748b;
+  margin-bottom: 2px;
+}
+
+.sla-value {
+  font-size: 20px;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.5px;
+}
+
+.sla-sub-badge {
+  font-size: 10px;
+  font-weight: 600;
+  margin-top: 3px;
+}
+
+.tier-badge {
+  color: #0284c7;
+}
+
+.soc-badge {
+  color: #4f46e5;
+}
+
+.sla-stat-separator {
+  width: 1px;
+  height: 36px;
+  background: #e2e8f0;
+}
+
+.hero-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: #64748b;
+  flex-wrap: wrap;
+}
+
+.footer-dot {
+  color: #cbd5e1;
+}
+
+.version-tag {
+  margin-left: auto;
+  font-family: monospace;
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+/* RIGHT COLUMN: LOGIN FORM */
+.form-column {
+  padding: 40px 48px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.form-top-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+.lang-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #e2e8f0;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #475569;
+  cursor: pointer;
+  background: #ffffff;
+}
+
+.chevron {
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+.form-inner {
+  max-width: 420px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.form-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.form-title {
+  font-size: 26px;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.5px;
+  margin: 0;
+}
+
+.portal-badge {
+  font-size: 11px;
+  font-weight: 600;
+  background: #eff6ff;
+  color: #2563eb;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.form-subtitle {
+  font-size: 13px;
+  color: #64748b;
+  margin: 0 0 20px 0;
+}
+
+/* Demo Credential Card */
+.demo-card-banner {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
   border-radius: 12px;
   padding: 10px 14px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 16px;
-  font-size: 13px;
-  color: #0369a1;
-}
-.channel-destination-badge strong {
-  color: #0284c7;
+  justify-content: space-between;
+  margin-bottom: 22px;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-/* OTP Notification Banner */
-.otp-notice-pill {
-  background: #f0fdf4;
-  border: 1px solid #bbf7d0;
-  border-radius: 14px;
-  padding: 12px 14px;
+.demo-card-banner:hover {
+  background: #e0f2fe;
+  border-color: #93c5fd;
+  transform: translateY(-1px);
+}
+
+.demo-card-left {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-.otp-text-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.otp-label-text {
-  font-size: 12px;
-  color: #166534;
-}
-.otp-highlight-number {
-  font-size: 20px;
-  letter-spacing: 4px;
-  color: #15803d;
-  font-weight: 800;
+  gap: 10px;
 }
 
-.otp-input-field :deep(input) {
-  letter-spacing: 4px;
-  font-size: 18px;
+.demo-icon-box {
+  width: 32px;
+  height: 32px;
+  background: #2563eb;
+  color: #ffffff;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.demo-title {
+  font-size: 12px;
   font-weight: 700;
-  text-align: center;
+  color: #1e3a8a;
 }
 
-.resend-row {
-  text-align: center;
-  margin-top: 10px;
-}
-.resend-link {
-  font-size: 12px;
-  color: #4f46e5;
-  text-decoration: none;
-}
-.resend-link:hover {
-  color: #3730a3;
-  text-decoration: underline;
+.demo-sub {
+  font-size: 11px;
+  color: #3b82f6;
+  font-family: monospace;
 }
 
-/* Form Elements */
-.custom-form {
+.btn-demo-autofill {
+  background: #ffffff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* Form Fields */
+.auth-form-fields {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
 }
-.form-group {
+
+.input-block {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
-.label-row {
+
+.label-with-link {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
-.form-label {
+
+.input-label {
   font-size: 13px;
   font-weight: 600;
-  color: #1e293b;
+  color: #334155;
 }
-.forgot-link {
+
+.link-forgot {
   font-size: 12px;
-  color: #4f46e5;
-  font-weight: 500;
+  color: #2563eb;
   text-decoration: none;
-  transition: color 0.2s;
+  font-weight: 600;
 }
-.forgot-link:hover {
-  color: #3730a3;
+
+.link-forgot:hover {
   text-decoration: underline;
 }
 
-/* Modern Inputs in Light Theme */
-:deep(.modern-input .el-input__wrapper) {
-  background-color: #f8fafc !important;
-  border: 1.5px solid #cbd5e1 !important;
-  border-radius: 14px !important;
-  box-shadow: none !important;
-  padding: 8px 14px !important;
-  transition: all 0.25s ease;
-}
-:deep(.modern-input .el-input__wrapper:hover) {
-  border-color: #6366f1 !important;
-  background-color: #ffffff !important;
-}
-:deep(.modern-input .el-input__wrapper.is-focus) {
-  border-color: #4f46e5 !important;
-  background-color: #ffffff !important;
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15) !important;
-}
-:deep(.modern-input input) {
-  color: #0f172a !important;
-  font-size: 14px;
-  font-weight: 500;
-}
-:deep(.modern-input input::placeholder) {
-  color: #94a3b8 !important;
-}
-:deep(.modern-input .el-input__prefix-inner) {
-  color: #64748b;
-  font-size: 16px;
+.input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
 }
 
-/* Checkbox */
-.remember-row {
+.input-icon {
+  position: absolute;
+  left: 14px;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+
+.native-input {
+  width: 100%;
+  padding: 12px 14px 12px 42px;
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  font-size: 14px;
+  color: #0f172a;
+  outline: none;
+  transition: all 0.2s;
+  box-sizing: border-box;
+}
+
+.native-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.eye-toggle {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+}
+
+.eye-toggle:hover {
+  color: #475569;
+}
+
+.options-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-}
-:deep(.custom-checkbox .el-checkbox__label) {
-  color: #475569 !important;
-  font-size: 13px;
-  font-weight: 500;
+  margin-top: -2px;
 }
 
-/* Action Button */
-.btn-gradient {
-  width: 100%;
-  padding: 13px 20px;
-  border-radius: 14px;
-  border: none;
-  background: linear-gradient(135deg, #4f46e5 0%, #4338ca 50%, #2563eb 100%);
-  color: #ffffff;
-  font-size: 15px;
-  font-weight: 600;
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #475569;
   cursor: pointer;
-  box-shadow: 0 8px 24px -4px rgba(79, 70, 229, 0.4);
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  margin-top: 6px;
 }
-.btn-gradient:hover:not(:disabled) {
-  background: linear-gradient(135deg, #4338ca 0%, #3730a3 50%, #1d4ed8 100%);
-  box-shadow: 0 12px 28px -4px rgba(79, 70, 229, 0.55);
-  transform: translateY(-2px);
+
+.custom-chk {
+  width: 16px;
+  height: 16px;
+  accent-color: #2563eb;
+  cursor: pointer;
 }
-.btn-gradient:active:not(:disabled) {
-  transform: translateY(1px) scale(0.99);
-  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+
+.passkey-pill {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 3px 8px;
+  border-radius: 6px;
 }
-.btn-gradient:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
+
+.captcha-box {
+  margin-top: 2px;
 }
-.btn-gradient-emerald {
-  background: linear-gradient(135deg, #10b981 0%, #059669 50%, #0d9488 100%);
-  box-shadow: 0 8px 24px -4px rgba(16, 185, 129, 0.35);
-}
-.btn-gradient-emerald:hover:not(:disabled) {
-  background: linear-gradient(135deg, #059669 0%, #047857 50%, #0f766e 100%);
-  box-shadow: 0 12px 28px -4px rgba(16, 185, 129, 0.5);
-}
-.btn-content {
+
+.btn-primary-submit {
+  width: 100%;
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  padding: 13px 20px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.25);
+  transition: all 0.2s;
 }
-.btn-icon {
+
+.btn-primary-submit:hover:not(:disabled) {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.3);
+}
+
+.btn-primary-submit:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.btn-arrow {
   font-size: 16px;
-  transition: transform 0.25s ease;
-}
-.btn-gradient:hover .btn-icon {
-  transform: translateX(4px);
+  transition: transform 0.2s;
 }
 
-/* Security Box for Forgot view */
-.security-info-box {
-  background: #f0f9ff;
-  border: 1px dashed #7dd3fc;
-  padding: 12px 14px;
-  border-radius: 12px;
-  color: #0369a1;
-  font-size: 12px;
-  line-height: 1.5;
-}
-.security-info-box p {
-  margin: 0;
+.btn-primary-submit:hover .btn-arrow {
+  transform: translateX(3px);
 }
 
-/* Success Card */
-.text-center {
+.divider-text {
+  display: flex;
+  align-items: center;
   text-align: center;
+  margin: 18px 0 14px 0;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 600;
 }
-.success-icon-badge {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  background: #f0fdf4;
-  border: 2px solid #bbf7d0;
+
+.divider-text::before,
+.divider-text::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.divider-text span {
+  padding: 0 12px;
+}
+
+.social-btn-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.btn-social {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 auto 16px auto;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.2s;
 }
+
+.btn-social:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.form-bottom-legal {
+  margin-top: 28px;
+  text-align: center;
+}
+
+.legal-links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.legal-links a {
+  color: #64748b;
+  text-decoration: none;
+}
+
+.legal-links a:hover {
+  color: #2563eb;
+}
+
+.copyright-text {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 6px;
+}
+
+/* ==================== FORGOT PASSWORD (IMAGE 2) ==================== */
+.forgot-center-card {
+  max-width: 540px;
+  margin: 0 auto;
+}
+
+.forgot-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.brand-logo-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.forgot-modal-box {
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 36px 36px 30px 36px;
+  box-shadow: 0 20px 40px -15px rgba(15, 23, 42, 0.08), 0 0 1px 1px rgba(226, 232, 240, 0.8);
+}
+
+.wizard-steps-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 28px;
+}
+
+.wizard-step-node {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.step-num {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.step-txt {
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.wizard-step-node.active .step-num {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.wizard-step-node.active .step-txt {
+  color: #0f172a;
+}
+
+.wizard-step-line {
+  flex: 1;
+  height: 2px;
+  background: #e2e8f0;
+  margin: 0 10px;
+}
+
+.wizard-step-line.filled {
+  background: #2563eb;
+}
+
+.forgot-title-area {
+  margin-bottom: 22px;
+}
+
+.forgot-main-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 6px 0;
+}
+
+.forgot-sub-title {
+  font-size: 13px;
+  color: #64748b;
+  margin: 0;
+}
+
+.step-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.btn-sample-fill {
+  background: none;
+  border: none;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.channel-toggle-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.channel-pill-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 14px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.channel-pill-btn.active {
+  background: #eff6ff;
+  border-color: #2563eb;
+  color: #1d4ed8;
+}
+
+.channel-hint-text {
+  font-size: 11.5px;
+  color: #64748b;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.channel-destination-badge {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+.otp-notice-pill {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.resend-text-center {
+  text-align: center;
+  margin-top: 4px;
+}
+
+.back-login-row {
+  margin-top: 24px;
+  text-align: center;
+}
+
+.link-back {
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  text-decoration: none;
+}
+
+.link-back:hover {
+  color: #2563eb;
+}
+
+.forgot-page-footer {
+  margin-top: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.success-badge-circle {
+  width: 52px;
+  height: 52px;
+  background: #10b981;
+  color: #ffffff;
+  border-radius: 50%;
+  font-size: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 12px auto;
+}
+
 .success-title {
   font-size: 20px;
   font-weight: 800;
   color: #0f172a;
-  margin: 0 0 8px 0;
-}
-.success-desc {
-  font-size: 13.5px;
-  color: #64748b;
-  margin: 0 0 24px 0;
+  margin: 0 0 6px 0;
 }
 
-/* Switch Link */
-.switch-mode-text {
-  text-align: center;
-  margin-top: 24px;
+.success-desc {
   font-size: 13px;
   color: #64748b;
-}
-.highlight-link {
-  color: #4f46e5;
-  font-weight: 600;
-  text-decoration: none;
-  transition: color 0.2s;
-}
-.highlight-link:hover {
-  color: #3730a3;
-  text-decoration: underline;
-}
-.back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  margin: 0 0 20px 0;
 }
 
-/* Footer */
-.auth-footer {
-  margin-top: 24px;
-  font-size: 12px;
-  color: #64748b;
-  text-align: center;
-}
-
-/* Animations */
-.fade-slide-enter-active,
-.fade-slide-leave-active {
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.fade-slide-enter-from {
-  opacity: 0;
-  transform: translateY(8px);
-}
-.fade-slide-leave-to {
-  opacity: 0;
-  transform: translateY(-8px);
-}
-
-/* Responsive Media Queries */
-@media (max-width: 480px) {
-  .auth-wrapper {
-    padding: 16px 12px;
+/* Responsive adjustments */
+@media (max-width: 900px) {
+  .login-split-card {
+    grid-template-columns: 1fr;
   }
-  .glass-card {
-    padding: 22px 16px;
-    border-radius: 18px;
+  .hero-column {
+    padding: 32px 24px;
   }
-  .brand-title {
-    font-size: 22px;
-  }
-  .brand-subtitle {
-    font-size: 12px;
-  }
-  .demo-credential-pill {
-    padding: 8px 10px;
-    font-size: 11px;
-    line-height: 1.4;
-  }
-  .form-title {
-    font-size: 20px;
+  .form-column {
+    padding: 32px 24px;
   }
 }
 </style>

@@ -1,20 +1,28 @@
 <template>
   <div class="chat-widget-wrapper">
-    <!-- 1. FLOATING ACTION BUTTON (Flat style, không đổ bóng, viền sắc nét) -->
+    <!-- 0. COPILOT TEASER PILL (FIGMA IMAGES 4 & 5 MATCH) -->
+    <transition name="fade">
+      <div v-if="!isOpen" class="copilot-teaser-pill" @click="toggleWidget">
+        <span class="teaser-icon">💬</span>
+        <span class="teaser-text">Trợ lý Copilot: <em>"Hôm nay tôi giúp gì..."</em></span>
+      </div>
+    </transition>
+
+    <!-- 1. FLOATING ACTION BUTTON (FIGMA IMAGE 5 MATCH) -->
     <div 
       class="chat-floating-btn" 
       :class="{ 'is-active': isOpen, 'btn-dark': isDarkMode }" 
       @click="toggleWidget"
-      title="Trợ lý ảo ERP AI"
+      title="Trợ lý ảo ERP AI Copilot"
     >
       <div class="btn-inner">
-        <el-icon v-if="!isOpen" class="btn-icon"><ChatDotRound /></el-icon>
+        <span v-if="!isOpen" class="unread-pulse-badge"></span>
+        <el-icon v-if="!isOpen" class="btn-icon"><Cpu /></el-icon>
         <el-icon v-else class="btn-icon"><Close /></el-icon>
-        <span class="online-indicator" title="AI đang trực tuyến"></span>
       </div>
     </div>
 
-    <!-- 2. CỬA SỔ HỘI THOẠI CHATBOT (Flat Clean Window, KHÔNG ĐỔ BÓNG) -->
+    <!-- 2. CỬA SỔ HỘI THOẠI CHATBOT (FIGMA IMAGE 5 MATCH - SLEEK SLATE DARK) -->
     <transition name="chat-popup">
       <div 
         v-if="isOpen" 
@@ -31,12 +39,13 @@
               <span class="avatar-status-dot"></span>
             </div>
             <div class="bot-info">
-              <div class="bot-title">Trợ lý ảo ERP AI</div>
+              <div class="bot-title-row">
+                <span class="bot-title">Trợ lý AI ERP</span>
+                <span class="live-pill">LIVE</span>
+              </div>
               <div class="bot-status">
                 <span class="status-dot">●</span>
-                <span class="status-text">Trực tuyến</span>
-                <span class="status-sep">•</span>
-                <span class="status-desc">Tra cứu ERP</span>
+                <span class="status-desc">Túc trực cùng bạn 24/7</span>
               </div>
             </div>
           </div>
@@ -168,7 +177,7 @@
           <div class="input-form">
             <el-input 
               v-model="inputMessage" 
-              placeholder="Hỏi bất kỳ điều gì về hệ thống ERP..." 
+              placeholder="Nhập câu hỏi hoặc ra lệnh cho Trợ lý AI..." 
               :disabled="loading || isStreaming"
               clearable
               class="chat-input"
@@ -186,7 +195,7 @@
           </div>
 
           <div class="footer-note">
-            <span>Tài khoản: <strong>@{{ authStore.user?.username }}</strong> • Phân lập dữ liệu độc lập</span>
+            <span>Trợ lý ERP AI Copilot • Kết nối thời gian thực Database</span>
           </div>
         </div>
       </div>
@@ -431,41 +440,103 @@ onMounted(() => {
   right: 24px;
   z-index: 1000;
   font-family: inherit;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 /* ========================================================
-   1. FLOATING ACTION BUTTON (PHẲNG - HOÀN TOÀN KHÔNG ĐỔ BÓNG)
+   0. COPILOT TEASER PILL (FIGMA IMAGES 4 & 5)
+   ======================================================== */
+.copilot-teaser-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  padding: 8px 14px;
+  border-radius: 20px;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+  font-size: 12.5px;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.2s;
+  user-select: none;
+}
+
+.copilot-teaser-pill:hover {
+  background: #f8fafc;
+  border-color: #2563eb;
+  transform: translateX(-2px);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.15);
+}
+
+.teaser-icon {
+  font-size: 14px;
+}
+
+.teaser-text em {
+  color: #2563eb;
+  font-style: normal;
+}
+
+/* ========================================================
+   1. FLOATING ACTION BUTTON (FIGMA IMAGE 5 MATCH)
    ======================================================== */
 .chat-floating-btn {
-  width: 54px;
-  height: 54px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
-  background: #1e293b;
-  border: 2px solid #38bdf8;
+  background: #2563eb;
+  border: 2px solid #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #38bdf8;
+  color: #ffffff;
   cursor: pointer;
-  box-shadow: none !important;
-  transition: all 0.25s ease;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.35);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   user-select: none;
 }
 
 .chat-floating-btn:hover {
-  transform: scale(1.05);
-  background: #0f172a;
-  border-color: #60a5fa;
-  color: #ffffff;
-  box-shadow: none !important;
+  transform: scale(1.08);
+  background: #1d4ed8;
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.45);
 }
 
 .chat-floating-btn.is-active {
-  transform: rotate(90deg);
-  background: #0f172a;
-  border-color: #ef4444;
-  color: #ef4444;
+  background: #ef4444;
+  border-color: #ffffff;
+  box-shadow: 0 8px 20px rgba(239, 68, 68, 0.35);
+}
+
+.unread-pulse-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 12px;
+  height: 12px;
+  background: #ef4444;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+}
+
+.bot-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.live-pill {
+  font-size: 9px;
+  font-weight: 800;
+  background: #10b981;
+  color: #ffffff;
+  padding: 1px 6px;
+  border-radius: 6px;
+  letter-spacing: 0.5px;
 }
 
 .btn-inner {

@@ -204,6 +204,15 @@ const reset = () => {
   generateNewEquation()
 }
 
+const autoSolveForDemo = () => {
+  userAnswer.value = String(correctAnswer.value)
+  isVerified.value = true
+  hasError.value = false
+  errorMessage.value = ''
+  emit('update:modelValue', true)
+  emit('verified')
+}
+
 watch(() => props.modelValue, (val) => {
   if (!val && isVerified.value) {
     reset()
@@ -217,6 +226,7 @@ onMounted(() => {
 defineExpose({
   validate,
   reset,
+  autoSolveForDemo,
   isVerified
 })
 </script>

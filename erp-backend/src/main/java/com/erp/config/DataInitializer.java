@@ -32,9 +32,9 @@ public class DataInitializer implements CommandLineRunner {
             admin.setPassword(passwordEncoder.encode("password"));
             admin.setRole(Role.ADMIN);
             admin.setStatus("ACTIVE");
-            admin.setEmail("admin@erp.com");
+            admin.setEmail("dolemta090899@gmail.com");
             userRepository.save(admin);
-            log.info("Initialized default ADMIN account: admin / password");
+            log.info("Initialized default ADMIN account: admin / password (dolemta090899@gmail.com)");
         } else {
             User admin = adminOpt.get();
             boolean changed = false;
@@ -46,9 +46,13 @@ public class DataInitializer implements CommandLineRunner {
                 admin.setStatus("ACTIVE");
                 changed = true;
             }
+            if (admin.getEmail() == null || admin.getEmail().isEmpty() || "admin@erp.com".equals(admin.getEmail())) {
+                admin.setEmail("dolemta090899@gmail.com");
+                changed = true;
+            }
             if (changed) {
                 userRepository.save(admin);
-                log.info("Updated admin account to ROLE_ADMIN and ACTIVE");
+                log.info("Updated admin account with active status and real email (dolemta090899@gmail.com)");
             }
         }
 

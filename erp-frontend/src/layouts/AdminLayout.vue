@@ -1,24 +1,155 @@
 <template>
   <el-container class="admin-layout">
-    <!-- DESKTOP SIDEBAR (Visible on >= 992px) -->
+    <!-- DESKTOP SIDEBAR (Visible on >= 992px) - FIGMA IMAGES 3 & 4 -->
     <el-aside 
       v-if="!isMobile" 
-      :width="isCollapse ? '64px' : '230px'" 
+      :width="isCollapse ? '72px' : '248px'" 
       class="desktop-sidebar"
+      :class="{ 'is-collapsed': isCollapse }"
     >
-      <div class="sidebar-logo">
-        <el-icon class="logo-icon"><Goods /></el-icon>
-        <span v-if="!isCollapse" class="logo-text">ERP System</span>
+      <!-- Sidebar Brand Top -->
+      <div class="sidebar-brand-header">
+        <div class="brand-left" @click="$router.push('/')">
+          <div class="brand-icon">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 15a4 4 0 004 4h11a3 3 0 000-6 5.5 5.5 0 00-10.7-1.8A4.002 4.002 0 003 15z" fill="#2563eb"/>
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8.5 14.5l2 2 4.5-4.5" stroke="#ffffff" stroke-width="2.2" />
+            </svg>
+          </div>
+          <div v-if="!isCollapse" class="brand-text-block">
+            <div class="brand-name">ERP Cloud</div>
+            <span class="enterprise-tag">ENTERPRISE SUITE</span>
+          </div>
+        </div>
+
+        <button 
+          type="button" 
+          class="btn-collapse-sidebar" 
+          :title="isCollapse ? 'Mở rộng thanh menu' : 'Thu gọn thanh menu'"
+          @click="toggleSidebar"
+        >
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+            <line x1="15" y1="3" x2="15" y2="21"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Navigation Section Label -->
+      <div v-if="!isCollapse" class="nav-section-title">
+        ĐIỀU HƯỚNG CHÍNH
+      </div>
+
+      <!-- Main Navigation Menu -->
+      <el-menu 
+        :default-active="$route.path" 
+        router 
+        :collapse="isCollapse"
+        background-color="transparent" 
+        class="custom-enterprise-menu"
+      >
+        <el-menu-item index="/">
+          <el-icon><Monitor /></el-icon>
+          <template #title>
+            <span class="menu-title-text">Tổng quan Dashboard</span>
+          </template>
+        </el-menu-item>
+
+        <el-menu-item index="/products">
+          <el-icon><Goods /></el-icon>
+          <template #title>
+            <span class="menu-title-text">Quản lý Sản phẩm</span>
+          </template>
+        </el-menu-item>
+
+        <el-menu-item index="/orders" @click.prevent="notifyFeature('Quản lý Đơn hàng')">
+          <el-icon><Tickets /></el-icon>
+          <template #title>
+            <span class="menu-title-text">Quản lý Đơn hàng</span>
+          </template>
+        </el-menu-item>
+
+        <el-menu-item v-if="authStore.isAdmin" index="/users">
+          <el-icon><User /></el-icon>
+          <template #title>
+            <span class="menu-title-text">Quản lý Tài khoản</span>
+          </template>
+        </el-menu-item>
+
+        <el-menu-item index="/ai-copilot" @click.prevent="openChatWidget">
+          <el-icon class="ai-sparkle-icon"><Cpu /></el-icon>
+          <template #title>
+            <div class="ai-menu-item-row">
+              <span class="menu-title-text">Trợ lý AI Copilot</span>
+              <span class="ai-pill-tag">LIVE</span>
+            </div>
+          </template>
+        </el-menu-item>
+
+        <el-menu-item v-if="authStore.isAdmin" index="/announcements">
+          <el-icon><BellFilled /></el-icon>
+          <template #title>
+            <span class="menu-title-text">Quản lý Thông báo</span>
+          </template>
+        </el-menu-item>
+
+        <el-menu-item index="/analytics" @click.prevent="notifyFeature('Báo cáo & Phân tích')">
+          <el-icon><DataAnalysis /></el-icon>
+          <template #title>
+            <span class="menu-title-text">Báo cáo & Phân tích</span>
+          </template>
+        </el-menu-item>
+
+        <el-menu-item index="/settings" @click.prevent="profileDialogVisible = true">
+          <el-icon><Setting /></el-icon>
+          <template #title>
+            <span class="menu-title-text">Cài đặt hệ thống</span>
+          </template>
+        </el-menu-item>
+      </el-menu>
+
+      <!-- Bottom Info Card (Figma Match) -->
+      <div class="sidebar-bottom-card" v-if="!isCollapse">
+        <div class="server-status-row">
+          <span class="pulse-green-dot"></span>
+          <span class="server-title">Hệ thống hoạt động</span>
+        </div>
+        <div class="server-version">v4.2.0 • Máy chủ Việt Nam</div>
+      </div>
+      <div v-else class="sidebar-bottom-icon" title="Hệ thống hoạt động: v4.2.0">
+        <span class="pulse-green-dot"></span>
+      </div>
+    </el-aside>
+
+    <!-- MOBILE DRAWER SIDEBAR (<992px) -->
+    <el-drawer
+      v-else
+      v-model="mobileDrawerVisible"
+      direction="ltr"
+      size="260px"
+      :with-header="false"
+      class="mobile-drawer"
+    >
+      <div class="drawer-header">
+        <div class="brand-left">
+          <div class="brand-icon">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2">
+              <circle cx="12" cy="12" r="3" fill="currentColor" />
+              <path stroke-linecap="round" d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6l2.1 2.1M5.6 18.4l2.1-2.1m8.6-8.6l2.1-2.1" />
+            </svg>
+          </div>
+          <div class="brand-text-block">
+            <span class="brand-name">ERP Cloud</span>
+            <span class="enterprise-tag">ENTERPRISE SUITE</span>
+          </div>
+        </div>
       </div>
 
       <el-menu 
         :default-active="$route.path" 
         router 
-        :collapse="isCollapse"
-        background-color="#1e293b" 
-        text-color="#94a3b8" 
-        active-text-color="#38bdf8"
-        class="custom-menu"
+        class="custom-enterprise-menu"
+        @select="mobileDrawerVisible = false"
       >
         <el-menu-item index="/">
           <el-icon><Monitor /></el-icon>
@@ -37,75 +168,32 @@
           <template #title>Quản lý Thông báo</template>
         </el-menu-item>
       </el-menu>
-    </el-aside>
-
-    <!-- MOBILE DRAWER SIDEBAR (Visible on < 992px) -->
-    <el-drawer
-      v-else
-      v-model="mobileDrawerVisible"
-      direction="ltr"
-      size="260px"
-      :with-header="false"
-      class="mobile-drawer"
-    >
-      <div class="drawer-header">
-        <div class="sidebar-logo">
-          <el-icon class="logo-icon"><Goods /></el-icon>
-          <span class="logo-text">ERP System</span>
-        </div>
-      </div>
-
-      <el-menu 
-        :default-active="$route.path" 
-        router 
-        background-color="#1e293b" 
-        text-color="#94a3b8" 
-        active-text-color="#38bdf8"
-        class="custom-menu"
-        @select="mobileDrawerVisible = false"
-      >
-        <el-menu-item index="/">
-          <el-icon><Monitor /></el-icon>
-          <span>Dashboard</span>
-        </el-menu-item>
-        <el-menu-item index="/products">
-          <el-icon><Goods /></el-icon>
-          <span>Quản lý Sản phẩm</span>
-        </el-menu-item>
-        <el-menu-item v-if="authStore.isAdmin" index="/users">
-          <el-icon><User /></el-icon>
-          <span>Quản lý Tài khoản</span>
-        </el-menu-item>
-        <el-menu-item v-if="authStore.isAdmin" index="/announcements">
-          <el-icon><BellFilled /></el-icon>
-          <span>Quản lý Thông báo</span>
-        </el-menu-item>
-      </el-menu>
     </el-drawer>
 
-    <!-- MAIN APP CONTENT AREA -->
+    <!-- MAIN APP CONTENT WRAPPER -->
     <el-container class="main-wrapper">
-      <!-- HEADER -->
+      <!-- ENTERPRISE TOP HEADER (FIGMA EXACT MATCH) -->
       <el-header class="top-header">
-        <div class="header-left">
-          <!-- Toggle button for desktop collapse or mobile drawer -->
-          <el-button 
-            type="text" 
-            class="toggle-btn"
-            @click="toggleSidebar"
+        <!-- Left: Inline Breadcrumb (ERP Core › Không gian làm việc) -->
+        <div class="header-left-group">
+          <button 
+            v-if="isMobile" 
+            type="button" 
+            class="btn-mobile-toggle" 
+            @click="mobileDrawerVisible = true"
           >
-            <el-icon :size="20">
-              <Expand v-if="isMobile ? !mobileDrawerVisible : isCollapse" />
-              <Fold v-else />
-            </el-icon>
-          </el-button>
+            <el-icon :size="20"><Expand /></el-icon>
+          </button>
 
-          <!-- Current Route Title -->
-          <span class="page-current-title">{{ currentRouteTitle }}</span>
+          <div class="header-breadcrumb-inline">
+            <span class="bc-root">ERP Core</span>
+            <span class="bc-arrow">›</span>
+            <span class="bc-leaf">Không gian làm việc</span>
+          </div>
         </div>
 
-        <!-- VỊ TRÍ 1: ĐỒNG HỒ THỜI GIAN THỰC (MÚI GIỜ +7) -->
-        <div class="header-center">
+        <!-- Center: Real-time Live Clock Card (Múi giờ GMT+7) -->
+        <div class="header-center-clock" v-if="!isMobile">
           <div 
             class="clean-clock-card" 
             :class="{ 
@@ -137,51 +225,67 @@
           </div>
         </div>
 
-        <!-- COLLAPSED HEADER RIGHT: SINGLE USER DROPDOWN -->
-        <div class="header-right">
+        <!-- Right: Actions, Bell, Help, User Profile with Online Status on Avatar -->
+        <div class="header-right-group">
+          <!-- Notification Bell with Red Dot -->
+          <div class="header-icon-wrap" @click="$router.push('/announcements')">
+            <button type="button" class="btn-header-icon" title="Thông báo hệ thống">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h24s-3-2-3-9"/>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+              </svg>
+              <span class="bell-red-badge"></span>
+            </button>
+          </div>
+
+          <!-- Help Center Icon [?] -->
+          <div class="header-icon-wrap" @click="notifyFeature('Trung tâm trợ giúp')">
+            <button type="button" class="btn-header-icon" title="Trung tâm trợ giúp">
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+            </button>
+          </div>
+
+          <!-- User Profile Dropdown: Name & Online Status on Left, Dark Avatar with Online Dot on Right -->
           <el-dropdown trigger="click" @command="handleUserMenuCommand" placement="bottom-end">
-            <div class="user-dropdown-trigger">
-              <el-avatar 
-                :size="34" 
-                :src="authStore.user?.avatarUrl" 
-                class="user-avatar"
-              >
-                {{ userInitial }}
-              </el-avatar>
-              <div class="user-details-wrap">
-                <span class="username-text">{{ userFullNameOrName }}</span>
-                <span class="user-role-badge" :class="authStore.isAdmin ? 'badge-admin' : 'badge-user'">
-                  {{ authStore.isAdmin ? 'ADMIN' : 'STAFF' }}
-                </span>
+            <div class="user-profile-trigger">
+              <div class="user-meta-block" v-if="!isMobile">
+                <div class="user-name">@{{ authStore.user?.username || 'admin' }}</div>
+                <div class="user-status-online-pill">
+                  <span class="online-pulse-dot"></span>
+                  <span class="online-status-text">Trực tuyến</span>
+                </div>
               </div>
-              <el-icon class="dropdown-caret"><ArrowDown /></el-icon>
+              <div class="user-avatar-dark">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                  <path fill-rule="evenodd" d="M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A18.683 18.683 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z" clip-rule="evenodd" />
+                </svg>
+                <span class="avatar-online-badge" title="Đang trực tuyến"></span>
+              </div>
             </div>
 
             <template #dropdown>
               <el-dropdown-menu class="user-dropdown-menu">
-                <!-- Dropdown Header Info Card -->
                 <div class="dropdown-user-header">
-                  <el-avatar 
-                    :size="42" 
-                    :src="authStore.user?.avatarUrl" 
-                    class="dropdown-header-avatar"
-                  >
-                    {{ userInitial }}
-                  </el-avatar>
+                  <div class="user-avatar-dark">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                      <path fill-rule="evenodd" d="M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A18.683 18.683 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z" clip-rule="evenodd" />
+                    </svg>
+                  </div>
                   <div class="dropdown-header-info">
                     <div class="dropdown-name">{{ userFullNameOrName }}</div>
-                    <div class="dropdown-sub">@{{ authStore.user?.username }}</div>
-                    <div v-if="authStore.user?.email" class="dropdown-email">{{ authStore.user?.email }}</div>
+                    <div class="dropdown-sub">@{{ authStore.user?.username }} ({{ authStore.user?.role }})</div>
                   </div>
                 </div>
 
-                <!-- Menu Item: Thông tin tài khoản -->
                 <el-dropdown-item divided command="profile">
                   <el-icon><User /></el-icon>
                   <span>Thông tin tài khoản</span>
                 </el-dropdown-item>
 
-                <!-- Menu Item: Đăng xuất -->
                 <el-dropdown-item command="logout" class="dropdown-item-danger">
                   <el-icon><SwitchButton /></el-icon>
                   <span>Đăng xuất</span>
@@ -192,26 +296,7 @@
         </div>
       </el-header>
 
-      <!-- VỊ TRÍ 2: THANH THÔNG BÁO / SỰ KIỆN HỆ THỐNG (CHẠY CHỮ MARQUEE LIÊN TỤC) -->
-      <div class="system-announcement-bar">
-        <div class="announcement-inner">
-          <div class="announcement-badge">
-            <span class="pulse-indicator"></span>
-            <el-icon class="announcement-icon"><BellFilled /></el-icon>
-            <span class="badge-title">THÔNG BÁO</span>
-          </div>
-          <div class="announcement-marquee-wrapper">
-            <div class="announcement-track">
-              <span class="announcement-item">{{ announcementMessage }}</span>
-              <span class="announcement-separator">✦</span>
-              <span class="announcement-item">{{ announcementMessage }}</span>
-              <span class="announcement-separator">✦</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- CONTENT BODY -->
+      <!-- MAIN CONTENT VIEW AREA -->
       <el-main class="content-body">
         <div class="content-container">
           <router-view></router-view>
@@ -318,71 +403,148 @@
     </BaseDialog>
 
     <!-- Trợ lý ảo ERP AI Chatbot Widget (Nổi ở góc phải dưới) -->
-    <ChatWidget />
+    <ChatWidget ref="chatWidgetRef" />
   </el-container>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { ref, computed, reactive, onMounted, onBeforeUnmount } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../store/auth'
-import { useResponsive } from '../composables/useResponsive'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import api from '../api'
+import BaseDialog from '../components/base/BaseDialog.vue'
 import ChatWidget from '../components/chat/ChatWidget.vue'
-import { 
-  Monitor, 
-  Goods, 
-  User, 
-  Fold, 
-  Expand, 
-  SwitchButton, 
-  ArrowDown, 
-  Delete, 
-  UploadFilled, 
-  Key, 
-  Message,
-  Clock,
+import { useResponsive } from '../composables/useResponsive'
+import {
+  Monitor,
+  Goods,
+  User,
   BellFilled,
+  Bell,
   Sunny,
-  Moon
+  Moon,
+  Delete,
+  UploadFilled,
+  Message,
+  Key,
+  SwitchButton,
+  ArrowDown,
+  Expand,
+  Tickets,
+  DataAnalysis,
+  Setting,
+  Cpu
 } from '@element-plus/icons-vue'
 
-const authStore = useAuthStore()
 const router = useRouter()
 const route = useRoute()
+const authStore = useAuthStore()
 const { isMobile } = useResponsive()
 
+// State
 const isCollapse = ref(false)
 const mobileDrawerVisible = ref(false)
+const isDaytime = ref(true)
+const chatWidgetRef = ref(null)
 
-// Vị trí 1: Đồng hồ thời gian thực (Múi giờ Việt Nam GMT+7)
+// Clock State
 const clockHours = ref('00')
 const clockMinutes = ref('00')
 const clockSeconds = ref('00')
-const clockPeriod = ref('')
+const clockPeriod = ref('AM')
 const clockDayName = ref('')
 const clockDateFormatted = ref('')
-let clockTimer = null
+let clockInterval = null
 
-const updateClock = () => {
+const isTopOfTheHour = computed(() => {
+  return clockMinutes.value === '00' && parseInt(clockSeconds.value, 10) < 3
+})
+
+// Announcement
+const announcementMessage = ref('Chào mừng đến với hệ thống ERP Cloud Enterprise • Đang đồng bộ dữ liệu thời gian thực')
+
+// Profile Dialog
+const profileDialogVisible = ref(false)
+const profileSaving = ref(false)
+const avatarUploading = ref(false)
+const profileForm = reactive({
+  fullName: '',
+  phone: '',
+  email: '',
+  bio: '',
+  avatarUrl: ''
+})
+
+const currentRouteTitle = computed(() => {
+  if (route.path === '/') return 'Bảng điều khiển'
+  if (route.path.startsWith('/products')) return 'Quản lý Sản phẩm'
+  if (route.path.startsWith('/users')) return 'Quản lý Tài khoản'
+  if (route.path.startsWith('/announcements')) return 'Quản lý Thông báo'
+  return 'Hệ thống ERP'
+})
+
+const currentRouteBreadcrumb = computed(() => {
+  if (route.path === '/') return 'Tổng quan Dashboard'
+  if (route.path.startsWith('/products')) return 'Kho hàng & Sản phẩm'
+  if (route.path.startsWith('/users')) return 'Danh sách nhân sự'
+  if (route.path.startsWith('/announcements')) return 'Cài đặt truyền thông'
+  return 'Trang chính'
+})
+
+const userFullNameOrName = computed(() => {
+  return authStore.user?.fullName || authStore.user?.username || 'Admin'
+})
+
+const userInitial = computed(() => {
+  const name = userFullNameOrName.value
+  return name.charAt(0).toUpperCase()
+})
+
+function toggleSidebar() {
+  isCollapse.value = !isCollapse.value
+}
+
+function toggleDayNight() {
+  isDaytime.value = !isDaytime.value
+}
+
+function openChatWidget() {
+  if (chatWidgetRef.value && chatWidgetRef.value.open) {
+    chatWidgetRef.value.open()
+  } else {
+    // If widget has isOpen
+    const widget = document.querySelector('.chat-floating-btn')
+    if (widget) widget.click()
+  }
+}
+
+function notifyFeature(name) {
+  ElMessage.info({
+    message: `Phân hệ [${name}] đang ở phiên bản Preview Enterprise.`,
+    duration: 2500
+  })
+}
+
+function focusGlobalSearch() {
+  ElMessage({
+    message: '⚡ Phím tắt tìm kiếm toàn hệ thống (⌘K) đã được kích hoạt!',
+    type: 'success',
+    duration: 2000
+  })
+}
+
+function updateClock() {
   const now = new Date()
-  const timeParts = new Intl.DateTimeFormat('vi-VN', {
-    timeZone: 'Asia/Ho_Chi_Minh',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false
-  }).formatToParts(now)
+  const h = now.getHours()
+  const m = now.getMinutes()
+  const s = now.getSeconds()
 
-  const h = timeParts.find(p => p.type === 'hour')?.value || '00'
-  const m = timeParts.find(p => p.type === 'minute')?.value || '00'
-  const s = timeParts.find(p => p.type === 'second')?.value || '00'
-
-  clockHours.value = h
-  clockMinutes.value = m
-  clockSeconds.value = s
-  clockPeriod.value = parseInt(h, 10) >= 12 ? 'PM' : 'AM'
+  clockHours.value = String(h).padStart(2, '0')
+  clockMinutes.value = String(m).padStart(2, '0')
+  clockSeconds.value = String(s).padStart(2, '0')
+  clockPeriod.value = h >= 12 ? 'PM' : 'AM'
+  isDaytime.value = (h >= 6 && h < 18)
 
   const dayFormatter = new Intl.DateTimeFormat('vi-VN', {
     timeZone: 'Asia/Ho_Chi_Minh',
@@ -399,257 +561,358 @@ const updateClock = () => {
   clockDateFormatted.value = dateFormatter.format(now)
 }
 
-// Kiểm tra ban ngày (6:00 - 18:00) hay ban đêm (18:00 - 6:00)
-const isDaytime = computed(() => {
-  const h = parseInt(clockHours.value, 10)
-  return h >= 6 && h < 18
-})
-
-// Kiểm tra tròn giờ (ví dụ: 12:00:00, 13:00:00 -> diễn ra trong đúng 3 giây đầu rồi tự tắt)
-const isTopOfTheHour = computed(() => {
-  return clockMinutes.value === '00' && parseInt(clockSeconds.value, 10) < 3
-})
-
-// Vị trí 2: Dòng chữ thông báo hệ thống (Lấy từ API và cập nhật tự động)
-const announcementMessage = ref(
-  '🎉 Chào mừng bạn đến với ERP Cloud System! Chúc bạn một ngày làm việc hiệu quả, năng lượng và hoàn thành tốt mọi mục tiêu.'
-)
-
-const fetchActiveAnnouncement = async () => {
+async function fetchAnnouncement() {
   try {
     const res = await api.get('/announcements/active')
     if (res.data && res.data.content) {
-      announcementMessage.value = res.data.content
+      announcementMessage.value = `${res.data.title || 'Thông báo'}: ${res.data.content}`
     }
-  } catch (e) {
-    // Keep fallback default
+  } catch {
+    // Keep default
   }
 }
 
-// Profile Modal State
-const profileDialogVisible = ref(false)
-const profileSaving = ref(false)
-const avatarUploading = ref(false)
-
-const profileForm = reactive({
-  fullName: '',
-  email: '',
-  phone: '',
-  avatarUrl: '',
-  bio: ''
-})
-
-onMounted(() => {
-  if (authStore.isAuthenticated && !authStore.user) {
-    authStore.fetchCurrentUser()
-  }
-  updateClock()
-  clockTimer = setInterval(updateClock, 1000)
-  fetchActiveAnnouncement()
-  window.addEventListener('announcement-updated', fetchActiveAnnouncement)
-})
-
-onUnmounted(() => {
-  if (clockTimer) {
-    clearInterval(clockTimer)
-  }
-  window.removeEventListener('announcement-updated', fetchActiveAnnouncement)
-})
-
-const displayName = computed(() => authStore.user?.username || 'Admin')
-const userFullNameOrName = computed(() => authStore.user?.fullName || authStore.user?.username || 'Admin')
-const userInitial = computed(() => {
-  const name = userFullNameOrName.value
-  return name ? name.charAt(0).toUpperCase() : 'A'
-})
-
-const toggleSidebar = () => {
-  if (isMobile.value) {
-    mobileDrawerVisible.value = !mobileDrawerVisible.value
-  } else {
-    isCollapse.value = !isCollapse.value
+function handleUserMenuCommand(command) {
+  if (command === 'logout') {
+    ElMessageBox.confirm('Bạn có chắc chắn muốn đăng xuất khỏi hệ thống?', 'Xác nhận đăng xuất', {
+      confirmButtonText: 'Đăng xuất',
+      cancelButtonText: 'Hủy',
+      type: 'warning'
+    }).then(() => {
+      authStore.logout()
+      ElMessage.success('Đã đăng xuất an toàn.')
+      router.push('/login')
+    }).catch(() => {})
+  } else if (command === 'profile') {
+    profileForm.fullName = authStore.user?.fullName || ''
+    profileForm.phone = authStore.user?.phone || ''
+    profileForm.email = authStore.user?.email || ''
+    profileForm.bio = authStore.user?.bio || ''
+    profileForm.avatarUrl = authStore.user?.avatarUrl || ''
+    profileDialogVisible.value = true
   }
 }
 
-const currentRouteTitle = computed(() => {
-  if (route.path === '/products') return 'Quản lý Sản phẩm'
-  if (route.path === '/users') return 'Quản lý Tài khoản'
-  if (route.path === '/announcements') return 'Quản lý Thông báo & Sự kiện'
-  return 'Tổng quan Dashboard'
-})
-
-const handleUserMenuCommand = (command) => {
-  if (command === 'profile') {
-    openProfileDialog()
-  } else if (command === 'logout') {
-    handleLogout()
-  }
-}
-
-const openProfileDialog = () => {
-  profileForm.fullName = authStore.user?.fullName || ''
-  profileForm.email = authStore.user?.email || ''
-  profileForm.phone = authStore.user?.phone || ''
-  profileForm.avatarUrl = authStore.user?.avatarUrl || ''
-  profileForm.bio = authStore.user?.bio || ''
-  profileDialogVisible.value = true
-}
-
-const handleAvatarUpload = async ({ file, onSuccess, onError }) => {
+async function handleAvatarUpload(options) {
   avatarUploading.value = true
-  const formData = new FormData()
-  formData.append('file', file)
-
   try {
-    const res = await api.post('/files/upload', formData, {
+    const formData = new FormData()
+    formData.append('file', options.file)
+    const res = await api.post('/users/avatar', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
-    profileForm.avatarUrl = res.data.url
-    ElMessage.success('Tải ảnh đại diện lên Cloudinary thành công!')
-    onSuccess(res.data)
+    profileForm.avatarUrl = res.data.avatarUrl
+    if (authStore.user) {
+      authStore.user.avatarUrl = res.data.avatarUrl
+    }
+    ElMessage.success('Tải ảnh đại diện lên thành công!')
   } catch (err) {
-    ElMessage.error(err.response?.data?.message || 'Lỗi khi tải ảnh đại diện lên Cloud!')
-    onError(err)
+    ElMessage.error(err.response?.data?.message || 'Tải ảnh thất bại.')
   } finally {
     avatarUploading.value = false
   }
 }
 
-const saveProfile = async () => {
+async function saveProfile() {
   profileSaving.value = true
   try {
-    const res = await authStore.updateProfile(profileForm)
-    if (res.success) {
-      ElMessage.success('Cập nhật thông tin tài khoản thành công!')
-      profileDialogVisible.value = false
-    } else {
-      ElMessage.error(res.message || 'Lỗi khi cập nhật thông tin!')
-    }
+    const res = await api.put('/users/profile', profileForm)
+    authStore.user = { ...authStore.user, ...res.data }
+    ElMessage.success('Cập nhật thông tin tài khoản thành công!')
+    profileDialogVisible.value = false
   } catch (err) {
-    ElMessage.error('Đã xảy ra lỗi khi lưu thông tin!')
+    ElMessage.error(err.response?.data?.message || 'Cập nhật thất bại.')
   } finally {
     profileSaving.value = false
   }
 }
 
-const handleLogout = () => {
-  authStore.logout()
-  router.push('/login')
-}
+onMounted(() => {
+  updateClock()
+  clockInterval = setInterval(updateClock, 1000)
+  fetchAnnouncement()
+})
+
+onBeforeUnmount(() => {
+  if (clockInterval) clearInterval(clockInterval)
+})
 </script>
 
 <style scoped>
+/* ==============================================================================
+   FIGMA ENTERPRISE ADMIN LAYOUT STYLES (MATCHING IMAGES 3 & 4)
+   ============================================================================== */
 .admin-layout {
   min-height: 100vh;
-  width: 100%;
   background-color: #f8fafc;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  color: #0f172a;
 }
 
-/* Desktop Sidebar */
+/* ==================== DESKTOP SIDEBAR ==================== */
 .desktop-sidebar {
-  background-color: #1e293b;
-  transition: width 0.28s cubic-bezier(0.4, 0, 0.2, 1);
-  overflow-x: hidden;
-  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
-  display: flex;
-  flex-direction: column;
-}
-
-.sidebar-logo {
-  height: 60px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  background-color: #0f172a;
-  color: #38bdf8;
-  font-weight: 700;
-  font-size: 18px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  white-space: nowrap;
-}
-
-.logo-icon {
-  font-size: 22px;
-}
-
-.custom-menu {
-  border-right: none;
-  flex: 1;
-}
-
-.custom-menu :deep(.el-menu-item) {
-  height: 50px;
-  line-height: 50px;
-  margin: 4px 8px;
-  border-radius: 8px;
-}
-
-.custom-menu :deep(.el-menu-item.is-active) {
-  background-color: #0284c7 !important;
-  color: #ffffff !important;
-  font-weight: 600;
-}
-
-/* Mobile Drawer */
-:deep(.mobile-drawer .el-drawer__body) {
-  padding: 0;
-  background-color: #1e293b;
-}
-
-.drawer-header {
-  background-color: #0f172a;
-}
-
-/* Main Area */
-.main-wrapper {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background-color: #f8fafc;
-  overflow-x: hidden;
-}
-
-/* Top Header */
-.top-header {
-  height: 60px;
   background-color: #ffffff;
-  border-bottom: 1px solid #e2e8f0;
+  border-right: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  position: relative;
+  z-index: 10;
+}
+
+.sidebar-brand-header {
+  height: 64px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 16px;
-  position: sticky;
-  top: 0;
-  z-index: 99;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  border-bottom: 1px solid #f1f5f9;
 }
 
-.header-left {
+.brand-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.brand-icon {
+  width: 36px;
+  height: 36px;
+  background: #2563eb;
+  color: #ffffff;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);
+  flex-shrink: 0;
+}
+
+.brand-name-row {
+  display: flex;
+  align-items: center;
+}
+
+.brand-name {
+  font-size: 16px;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.3px;
+  white-space: nowrap;
+}
+
+.enterprise-tag {
+  font-size: 9px;
+  font-weight: 700;
+  color: #64748b;
+  letter-spacing: 0.6px;
+  display: block;
+  white-space: nowrap;
+}
+
+.btn-collapse-sidebar {
+  background: none;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #64748b;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  padding: 0;
+}
+
+.btn-collapse-sidebar:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.nav-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: #94a3b8;
+  letter-spacing: 0.8px;
+  padding: 20px 20px 8px 20px;
+}
+
+/* Custom Enterprise Menu */
+.custom-enterprise-menu {
+  border-right: none;
+  padding: 6px 10px;
+  flex: 1;
+}
+
+:deep(.el-menu-item) {
+  height: 44px;
+  line-height: 44px;
+  border-radius: 10px;
+  margin-bottom: 4px;
+  color: #475569;
+  font-weight: 500;
+  font-size: 13.5px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  padding: 0 12px !important;
+}
+
+:deep(.el-menu-item .el-icon) {
+  font-size: 18px;
+  color: #64748b;
+  margin-right: 12px;
+  transition: color 0.2s;
+}
+
+:deep(.el-menu-item:hover) {
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
+
+:deep(.el-menu-item.is-active) {
+  background-color: #2563eb !important;
+  color: #ffffff !important;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+}
+
+:deep(.el-menu-item.is-active .el-icon) {
+  color: #ffffff !important;
+}
+
+.ai-menu-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.ai-pill-tag {
+  font-size: 9px;
+  font-weight: 800;
+  background: #eff6ff;
+  color: #2563eb;
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid #bfdbfe;
+}
+
+:deep(.el-menu-item.is-active .ai-pill-tag) {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+/* Sidebar Bottom Card */
+.sidebar-bottom-card {
+  margin: 12px;
+  padding: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.server-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pulse-green-dot {
+  width: 8px;
+  height: 8px;
+  background: #10b981;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
+  flex-shrink: 0;
+}
+
+.server-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.server-version {
+  font-size: 10px;
+  color: #64748b;
+  margin-top: 2px;
+  padding-left: 16px;
+}
+
+.sidebar-bottom-icon {
+  padding: 16px;
+  display: flex;
+  justify-content: center;
+}
+
+/* ==================== MAIN WRAPPER & HEADER ==================== */
+.main-wrapper {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.top-header {
+  height: 64px;
+  background-color: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 9;
+}
+
+.header-left-group {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.toggle-btn {
-  color: #475569 !important;
-  padding: 8px !important;
-  font-size: 18px;
-  border-radius: 8px;
+.btn-mobile-toggle {
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: #475569;
+  cursor: pointer;
+  padding: 4px;
 }
 
-.toggle-btn:hover {
-  background-color: #f1f5f9;
+/* Inline Breadcrumb (ERP Core › Không gian làm việc) */
+.header-breadcrumb-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
 }
 
-.page-current-title {
-  font-size: 16px;
+.bc-root {
+  font-weight: 500;
+  color: #64748b;
+}
+
+.bc-arrow {
+  color: #94a3b8;
+  font-size: 15px;
   font-weight: 600;
+}
+
+.bc-leaf {
+  font-weight: 700;
   color: #1e293b;
 }
 
-/* Header Center - Vị trí 1: Đồng hồ Tinh Gọn (Không Đổ Bóng, Icon Ngày/Đêm & Phóng To Tròn Giờ) */
-.header-center {
+/* Center Live Clock */
+.header-center-clock {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -663,7 +926,7 @@ const handleLogout = () => {
   border: 1px solid #e2e8f0;
   padding: 5px 14px 5px 8px;
   border-radius: 9999px;
-  box-shadow: none !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
   user-select: none;
 }
@@ -673,22 +936,20 @@ const handleLogout = () => {
   background: #f8fafc;
 }
 
-/* Hiệu ứng khi Tròn giờ (Ví dụ: 12:00, 13:00) */
 .clean-clock-card.is-top-hour {
   border-color: #818cf8;
   background: #f5f3ff;
-  transform: scale(1.06);
+  transform: scale(1.04);
 }
 
-/* Icon Mặt trời / Mặt trăng theo ban ngày (6:00-18:00) và ban đêm (18:00-6:00) */
 .day-night-icon {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: 16px;
   flex-shrink: 0;
   transition: all 0.3s ease;
 }
@@ -706,27 +967,25 @@ const handleLogout = () => {
 .clock-content-wrap {
   display: flex;
   flex-direction: column;
-  line-height: 1.2;
+  line-height: 1.15;
 }
 
 .clock-time-line {
   display: flex;
-  align-items: center;
-  gap: 3px;
+  align-items: baseline;
+  gap: 1px;
 }
 
 .clock-digits {
-  font-family: 'SF Mono', Monaco, 'Segoe UI Mono', monospace;
-  font-size: 15px;
-  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 14px;
+  font-weight: 800;
   color: #0f172a;
-  letter-spacing: 0.5px;
-  font-variant-numeric: tabular-nums;
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-  display: inline-block;
+  letter-spacing: -0.2px;
+  transition: all 0.3s ease;
 }
 
-/* Phóng to thời gian khi tròn giờ (trong 3 giây) */
+/* Phóng to kích thước chữ khi tròn giờ (trong 3 giây đầu: 12:00:00 - 12:00:02) */
 .clock-digits.scale-digits {
   font-size: 17px;
   font-weight: 800;
@@ -735,422 +994,332 @@ const handleLogout = () => {
 }
 
 .clock-seconds {
-  font-family: 'SF Mono', Monaco, 'Segoe UI Mono', monospace;
-  font-size: 13px;
-  font-weight: 600;
-  color: #64748b;
-  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: #2563eb;
 }
 
 .clock-ampm {
-  font-size: 9px;
-  font-weight: 700;
+  font-size: 9.5px;
+  font-weight: 800;
   color: #64748b;
-  margin-left: 2px;
-  background: #f1f5f9;
-  padding: 0 4px;
-  border-radius: 3px;
+  margin-left: 4px;
+  letter-spacing: 0.5px;
 }
 
 .clock-date-line {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   font-size: 11px;
+  color: #64748b;
 }
 
 .clock-day {
-  color: #64748b;
   font-weight: 600;
 }
 
 .clock-calendar {
   color: #475569;
-  font-weight: 500;
 }
 
 .clock-zone-pill {
-  background: #f1f5f9;
-  color: #0284c7;
   font-size: 9px;
   font-weight: 700;
-  padding: 0 4px;
-  border-radius: 3px;
-  letter-spacing: 0.5px;
+  background: #f1f5f9;
+  color: #475569;
+  padding: 1px 4px;
+  border-radius: 4px;
+  margin-left: 2px;
 }
 
-/* Vị trí 2: Thanh Thông Báo / Sự Kiện Hệ Thống (Marquee Chạy Chữ Mượt Mà) */
-.system-announcement-bar {
-  width: 100%;
-  background: linear-gradient(90deg, #ecfdf5 0%, #eff6ff 50%, #fffbeb 100%);
-  border-bottom: 1px solid #e2e8f0;
-  padding: 8px 16px;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  position: relative;
-  z-index: 10;
-  overflow: hidden;
-}
-
-.announcement-inner {
-  width: 100%;
-  max-width: 1400px;
-  margin: 0 auto;
+/* Header Right Group */
+.header-right-group {
   display: flex;
   align-items: center;
   gap: 14px;
 }
 
-.announcement-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: #ffffff;
-  padding: 3px 10px;
-  border-radius: 9999px;
-  border: 1px solid #cbd5e1;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-  flex-shrink: 0;
-  z-index: 2;
-}
-
-.pulse-indicator {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: #ef4444;
-  box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
-  animation: pulse-ring 1.8s infinite;
-}
-
-@keyframes pulse-ring {
-  0% {
-    transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
-  }
-  70% {
-    transform: scale(1);
-    box-shadow: 0 0 0 6px rgba(239, 68, 68, 0);
-  }
-  100% {
-    transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
-  }
-}
-
-.announcement-icon {
-  font-size: 14px;
-  color: #f59e0b;
-}
-
-.badge-title {
-  font-size: 11px;
-  font-weight: 700;
-  color: #1e293b;
-  letter-spacing: 0.5px;
-}
-
-/* MARQUEE RUNNING TEXT */
-.announcement-marquee-wrapper {
-  flex: 1;
-  overflow: hidden;
-  white-space: nowrap;
+/* Header Action Icons */
+.header-icon-wrap {
   position: relative;
-  mask-image: linear-gradient(to right, transparent, black 15px, black 95%, transparent);
-  -webkit-mask-image: linear-gradient(to right, transparent, black 15px, black 95%, transparent);
+  cursor: pointer;
 }
 
-.announcement-track {
-  display: inline-flex;
-  align-items: center;
-  gap: 32px;
-  white-space: nowrap;
-  animation: marquee-scroll 28s linear infinite;
-  will-change: transform;
-}
-
-.announcement-track:hover {
-  animation-play-state: paused;
-}
-
-.announcement-item {
-  font-size: 13px;
-  font-weight: 500;
-  color: #1e293b;
-  cursor: default;
-}
-
-.announcement-separator {
-  color: #f59e0b;
-  font-size: 10px;
-}
-
-@keyframes marquee-scroll {
-  0% {
-    transform: translateX(0);
-  }
-  100% {
-    transform: translateX(-50%);
-  }
-}
-
-/* Header Right - User Dropdown Trigger */
-.header-right {
+.btn-header-icon {
+  background: none;
+  border: none;
+  color: #475569;
+  cursor: pointer;
+  padding: 6px;
   display: flex;
   align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition: all 0.2s;
 }
 
-.user-dropdown-trigger {
+.btn-header-icon:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.bell-red-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 7px;
+  height: 7px;
+  background: #ef4444;
+  border: 1.5px solid #ffffff;
+  border-radius: 50%;
+}
+
+/* User Profile Trigger */
+.user-profile-trigger {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 5px 12px 5px 6px;
-  background-color: #f8fafc;
-  border-radius: 9999px;
-  border: 1px solid #e2e8f0;
   cursor: pointer;
-  transition: all 0.2s ease;
-  user-select: none;
+  padding: 3px 6px;
+  border-radius: 10px;
+  transition: all 0.2s;
 }
 
-.user-dropdown-trigger:hover {
-  background-color: #f1f5f9;
-  border-color: #cbd5e1;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+.user-profile-trigger:hover {
+  background: #f8fafc;
 }
 
-.user-details-wrap {
+.user-meta-block {
+  text-align: right;
   display: flex;
   flex-direction: column;
+  align-items: flex-end;
+}
+
+.user-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
   line-height: 1.2;
 }
 
-.user-avatar {
-  background: linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%);
+.user-status-online-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  padding: 1px 7px;
+  border-radius: 12px;
+  margin-top: 2px;
+}
+
+.online-pulse-dot {
+  width: 6px;
+  height: 6px;
+  background: #10b981;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
+}
+
+.online-status-text {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #15803d;
+  letter-spacing: 0.2px;
+}
+
+.user-avatar-dark {
+  width: 36px;
+  height: 36px;
+  background: #0f172a;
   color: #ffffff;
-  font-weight: 700;
-  font-size: 13px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.15);
   flex-shrink: 0;
+  position: relative;
 }
 
-.username-text {
-  font-size: 13px;
-  font-weight: 600;
-  color: #1e293b;
-  max-width: 130px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.avatar-online-badge {
+  position: absolute;
+  bottom: 0px;
+  right: 0px;
+  width: 10px;
+  height: 10px;
+  background: #10b981;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.3);
 }
 
-.user-role-badge {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  border-radius: 4px;
-  padding: 1px 4px;
-  display: inline-block;
-  margin-top: 1px;
-  width: fit-content;
-}
-
-.badge-admin {
-  background: #fee2e2;
-  color: #ef4444;
-}
-
-.badge-user {
-  background: #e0f2fe;
-  color: #0284c7;
-}
-
-.dropdown-caret {
-  font-size: 12px;
-  color: #94a3b8;
-  margin-left: 2px;
-  transition: transform 0.2s ease;
-}
-
-/* Dropdown Menu Header */
+/* Dropdown Menu styling */
 .dropdown-user-header {
-  padding: 12px 16px;
   display: flex;
   align-items: center;
   gap: 12px;
-  background-color: #f8fafc;
-  border-bottom: 1px solid #e2e8f0;
-  min-width: 220px;
-}
-
-.dropdown-header-avatar {
-  background: linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%);
-  color: #ffffff;
-  font-weight: 700;
-  font-size: 15px;
-  flex-shrink: 0;
+  padding: 12px 16px;
 }
 
 .dropdown-header-info {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  text-align: left;
 }
 
 .dropdown-name {
-  font-weight: 600;
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 700;
   color: #0f172a;
 }
 
 .dropdown-sub {
-  font-size: 12px;
-  color: #64748b;
-}
-
-.dropdown-email {
   font-size: 11px;
-  color: #94a3b8;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 150px;
+  color: #64748b;
 }
 
 .dropdown-item-danger {
   color: #ef4444 !important;
 }
 
-.dropdown-item-danger:hover {
-  background-color: #fef2f2 !important;
-  color: #dc2626 !important;
+/* ==================== ANNOUNCEMENT MARQUEE BAR ==================== */
+.system-announcement-bar {
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  padding: 0 16px;
 }
 
-/* Profile Form Avatar Upload Styling */
+.announcement-inner {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 12px;
+}
+
+.announcement-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  padding: 3px 8px;
+  border-radius: 6px;
+  color: #1d4ed8;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.pulse-indicator {
+  width: 6px;
+  height: 6px;
+  background: #2563eb;
+  border-radius: 50%;
+}
+
+.announcement-marquee-wrapper {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.announcement-track {
+  display: inline-block;
+  white-space: nowrap;
+  animation: marqueeAnim 35s linear infinite;
+}
+
+.announcement-item {
+  font-size: 12.5px;
+  color: #334155;
+  font-weight: 500;
+}
+
+.announcement-separator {
+  margin: 0 16px;
+  color: #3b82f6;
+  font-size: 10px;
+}
+
+@keyframes marqueeAnim {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
+
+/* ==================== CONTENT BODY ==================== */
+.content-body {
+  padding: 24px;
+  flex: 1;
+  background: #f8fafc;
+}
+
+.content-container {
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+/* Profile Form modal */
 .profile-avatar-row {
   display: flex;
   align-items: center;
-  gap: 18px;
-  padding: 16px;
-  background-color: #f8fafc;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  margin-bottom: 18px;
+  gap: 20px;
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #f1f5f9;
 }
 
 .avatar-preview-box {
   position: relative;
-  flex-shrink: 0;
 }
 
 .avatar-preview-img {
-  background: linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%);
-  color: white;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 32px;
   font-weight: 700;
-  font-size: 28px;
-  border: 2px solid #ffffff;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
 }
 
 .avatar-delete-badge {
   position: absolute;
   top: -4px;
   right: -4px;
-  width: 24px;
-  height: 24px;
   background: #ef4444;
-  color: white;
+  color: #ffffff;
   border-radius: 50%;
+  width: 22px;
+  height: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  font-size: 12px;
-  border: 2px solid white;
-  transition: transform 0.2s ease;
-}
-
-.avatar-delete-badge:hover {
-  transform: scale(1.1);
-  background: #dc2626;
-}
-
-.avatar-upload-action {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
 
 .avatar-action-title {
-  font-weight: 600;
   font-size: 14px;
+  font-weight: 700;
   color: #0f172a;
 }
 
 .avatar-tip {
   font-size: 12px;
   color: #64748b;
-  margin-bottom: 4px;
-}
-
-/* Main Content */
-.content-body {
-  padding: 24px;
-  flex: 1;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.content-container {
-  width: 100%;
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-/* Responsive Breakpoints */
-@media (max-width: 992px) {
-  .clock-date, .clock-divider, .clock-tz-badge {
-    display: none;
-  }
+  margin: 4px 0 10px 0;
 }
 
 @media (max-width: 768px) {
-  .header-center {
-    display: none;
-  }
-
   .top-header {
-    padding: 0 12px;
+    padding: 0 14px;
   }
-
   .content-body {
-    padding: 12px;
-  }
-
-  .page-current-title {
-    font-size: 14px;
-  }
-
-  .username-text {
-    display: none;
-  }
-
-  .user-role-badge {
-    display: none;
-  }
-
-  .dropdown-caret {
-    display: none;
-  }
-
-  .user-dropdown-trigger {
-    padding: 2px;
-    border-radius: 50%;
-  }
-
-  .profile-avatar-row {
-    flex-direction: column;
-    text-align: center;
+    padding: 16px 12px;
   }
 }
 </style>

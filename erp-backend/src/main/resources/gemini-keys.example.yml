@@ -14,3 +14,14 @@ gemini:
     # - "AIzaSy_Key_1_Cua_Ban..."
     # - "AIzaSy_Key_2_Du_Phong..."
 
+# Cấu hình gửi mail Gmail SMTP (Tùy chọn)
+# mail:
+#   smtp:
+#     username: "your-email@gmail.com"
+#     password: "your-16-char-app-password"
+
+# Cấu hình Telegram Bot (Tùy chọn)
+# telegram:
+#   bot-token: "your-bot-token"
+#   default-chat-id: "your-chat-id"
+
