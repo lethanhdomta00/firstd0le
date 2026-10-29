@@ -1,6 +1,8 @@
 spring:
   application:
     name: erp-backend
+  config:
+    import: optional:classpath:gemini-keys.yml
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/erp_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -46,3 +48,8 @@ cloudinary:
 telegram:
   bot-token: ${TELEGRAM_BOT_TOKEN:}
   default-chat-id: ${TELEGRAM_DEFAULT_CHAT_ID:}
+
+gemini:
+  # Danh sách API Keys được nạp tự động từ file gemini-keys.yml (hoặc biến môi trường GEMINI_API_KEYS)
+  model: ${GEMINI_MODEL:gemini-2.5-flash-lite}
+  api-url: https://generativelanguage.googleapis.com/v1beta/models

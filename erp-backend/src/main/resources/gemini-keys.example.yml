@@ -1,0 +1,15 @@
+# ==============================================================================
+#                      DANH SÁCH GOOGLE GEMINI API KEYS (MẪU)
+# ==============================================================================
+# Hướng dẫn:
+# 1. Sao chép (copy) file này thành 'gemini-keys.yml' cùng thư mục.
+# 2. Điền 1 hoặc nhiều API Key của bạn vào danh sách bên dưới (mỗi dòng 1 key, bắt đầu bằng dấu gạch ngang -).
+# 3. File 'gemini-keys.yml' đã được thêm vào .gitignore để đảm bảo bảo mật và không bị lộ key khi push lên Git.
+#
+# Lấy Key miễn phí tại: https://aistudio.google.com/app/apikey (Mã bắt đầu bằng AIzaSy...)
+# ==============================================================================
+
+gemini:
+  api-keys:
+    # - "AIzaSy_Key_1_Cua_Ban..."
+    # - "AIzaSy_Key_2_Du_Phong..."

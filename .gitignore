@@ -47,3 +47,8 @@ Thumbs.db
 # Scratch and temporary
 scratch/
 
+# Secrets & Local Configurations (DO NOT COMMIT SECRETS TO GIT)
+**/gemini-keys.yml
+*.env
+
+
