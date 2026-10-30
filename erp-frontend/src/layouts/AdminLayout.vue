@@ -8,8 +8,12 @@
       :class="{ 'is-collapsed': isCollapse }"
     >
       <!-- Sidebar Brand Top -->
-      <div class="sidebar-brand-header">
-        <div class="brand-left" @click="$router.push('/')">
+      <div class="sidebar-brand-header" :class="{ 'is-collapsed-header': isCollapse }">
+        <div 
+          class="brand-left" 
+          @click="isCollapse ? toggleSidebar() : $router.push('/')" 
+          :title="isCollapse ? 'Nhấn để mở rộng thanh menu' : 'Về trang chủ Dashboard'"
+        >
           <div class="brand-icon">
             <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M3 15a4 4 0 004 4h11a3 3 0 000-6 5.5 5.5 0 00-10.7-1.8A4.002 4.002 0 003 15z" fill="#2563eb"/>
@@ -23,9 +27,10 @@
         </div>
 
         <button 
+          v-if="!isCollapse"
           type="button" 
           class="btn-collapse-sidebar" 
-          :title="isCollapse ? 'Mở rộng thanh menu' : 'Thu gọn thanh menu'"
+          title="Thu gọn thanh menu"
           @click="toggleSidebar"
         >
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
@@ -116,7 +121,7 @@
         </div>
         <div class="server-version">v4.2.0 • Máy chủ Việt Nam</div>
       </div>
-      <div v-else class="sidebar-bottom-icon" title="Hệ thống hoạt động: v4.2.0">
+      <div v-else class="sidebar-bottom-icon" @click="toggleSidebar" title="Hệ thống hoạt động: v4.2.0 (Nhấn để mở rộng menu)">
         <span class="pulse-green-dot"></span>
       </div>
     </el-aside>
@@ -655,10 +660,17 @@ onBeforeUnmount(() => {
   border-right: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
+  height: 100vh;
+  position: sticky;
+  top: 0;
   transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
-  position: relative;
-  z-index: 10;
+  z-index: 100;
+  box-sizing: border-box;
+}
+
+.desktop-sidebar.is-collapsed {
+  width: 72px !important;
 }
 
 .sidebar-brand-header {
@@ -668,6 +680,18 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   padding: 0 16px;
   border-bottom: 1px solid #f1f5f9;
+  flex-shrink: 0;
+}
+
+.sidebar-brand-header.is-collapsed-header {
+  padding: 0 !important;
+  justify-content: center !important;
+}
+
+.desktop-sidebar.is-collapsed .brand-left {
+  justify-content: center;
+  width: 100%;
+  gap: 0;
 }
 
 .brand-left {
@@ -689,6 +713,11 @@ onBeforeUnmount(() => {
   justify-content: center;
   box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);
   flex-shrink: 0;
+  transition: transform 0.2s;
+}
+
+.brand-icon:hover {
+  transform: scale(1.05);
 }
 
 .brand-name-row {
@@ -739,6 +768,7 @@ onBeforeUnmount(() => {
   color: #94a3b8;
   letter-spacing: 0.8px;
   padding: 20px 20px 8px 20px;
+  flex-shrink: 0;
 }
 
 /* Custom Enterprise Menu */
@@ -746,6 +776,35 @@ onBeforeUnmount(() => {
   border-right: none;
   padding: 6px 10px;
   flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.desktop-sidebar.is-collapsed .custom-enterprise-menu {
+  padding: 8px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.desktop-sidebar.is-collapsed :deep(.el-menu-item) {
+  padding: 0 !important;
+  justify-content: center !important;
+  margin: 4px auto;
+  width: 46px;
+  height: 46px;
+  line-height: 46px;
+  border-radius: 12px;
+}
+
+.desktop-sidebar.is-collapsed :deep(.el-menu-item .el-icon) {
+  margin-right: 0 !important;
+  font-size: 20px;
+}
+
+.desktop-sidebar.is-collapsed :deep(.el-menu-item .menu-title-text),
+.desktop-sidebar.is-collapsed :deep(.el-menu-item .ai-pill-tag) {
+  display: none !important;
 }
 
 :deep(.el-menu-item) {
@@ -815,6 +874,7 @@ onBeforeUnmount(() => {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
+  flex-shrink: 0;
 }
 
 .server-status-row {
@@ -846,9 +906,18 @@ onBeforeUnmount(() => {
 }
 
 .sidebar-bottom-icon {
-  padding: 16px;
+  padding: 16px 0;
   display: flex;
   justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  border-top: 1px solid #f1f5f9;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+
+.sidebar-bottom-icon:hover {
+  background-color: #f8fafc;
 }
 
 /* ==================== MAIN WRAPPER & HEADER ==================== */

@@ -21,6 +21,23 @@
       </div>
     </div>
 
+    <!-- 1.2 DÒNG THÔNG BÁO HỆ THỐNG MARQUEE CHẠY CHỮ -->
+    <div v-if="announcementMessage" class="dashboard-announcement-marquee">
+      <div class="announcement-tag">
+        <span class="bell-icon">📢</span>
+        <span>THÔNG BÁO</span>
+      </div>
+      <div class="marquee-track-container">
+        <div class="marquee-content-stream">
+          <span class="announcement-text">{{ announcementMessage }}</span>
+          <span class="stream-divider">✦</span>
+          <span class="announcement-text">{{ announcementMessage }}</span>
+          <span class="stream-divider">✦</span>
+          <span class="announcement-text">{{ announcementMessage }}</span>
+        </div>
+      </div>
+    </div>
+
     <!-- 2. TOP 4 KPI STAT CARDS (FIGMA MATCH) -->
     <div class="kpi-cards-grid">
       <!-- Card 1: Tổng Sản phẩm -->
@@ -525,11 +542,23 @@ import api from '../api'
 const router = useRouter()
 const showBanner = ref(true)
 const chartTab = ref('week')
+const announcementMessage = ref('🎉 Chào mừng bạn đến với ERP Cloud System! Chúc bạn một ngày làm việc hiệu quả, năng lượng và hoàn thành xuất sắc mọi mục tiêu.')
 
 const stats = reactive({
   products: 120,
   users: 12
 })
+
+async function fetchActiveAnnouncement() {
+  try {
+    const res = await api.get('/announcements/active')
+    if (res.data && res.data.content) {
+      announcementMessage.value = `${res.data.title ? res.data.title + ': ' : ''}${res.data.content}`
+    }
+  } catch {
+    // Keep fallback
+  }
+}
 
 async function fetchRealStats() {
   try {
@@ -550,6 +579,7 @@ async function fetchRealStats() {
 
 function refreshData() {
   fetchRealStats()
+  fetchActiveAnnouncement()
   ElMessage.success('⚡ Đã đồng bộ dữ liệu thời gian thực từ Database!')
 }
 
@@ -567,6 +597,7 @@ function notifyFeature(name) {
 
 onMounted(() => {
   fetchRealStats()
+  fetchActiveAnnouncement()
 })
 </script>
 
@@ -591,6 +622,75 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+}
+
+/* ==================== 1.2 ANNOUNCEMENT MARQUEE ==================== */
+.dashboard-announcement-marquee {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+}
+
+.announcement-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border: 1px solid #fcd34d;
+  color: #92400e;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 3px 9px;
+  border-radius: 8px;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.marquee-track-container {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  mask-image: linear-gradient(to right, transparent, black 2%, black 98%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, black 2%, black 98%, transparent);
+}
+
+.marquee-content-stream {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  animation: stream-scroll 32s linear infinite;
+}
+
+.marquee-content-stream:hover {
+  animation-play-state: paused;
+}
+
+.announcement-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  cursor: default;
+}
+
+.stream-divider {
+  color: #f59e0b;
+  font-size: 11px;
+  margin: 0 20px;
+}
+
+@keyframes stream-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-33.33%);
+  }
 }
 
 .banner-left {

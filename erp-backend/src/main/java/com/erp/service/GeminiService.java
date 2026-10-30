@@ -23,6 +23,9 @@ import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Random;
 
@@ -235,14 +238,44 @@ public class GeminiService {
     private String buildSystemInstructionWithERPContext(User user) {
         StringBuilder sb = new StringBuilder();
 
+        // 0. Thời gian thực tế theo múi giờ Việt Nam (GMT+7)
+        ZonedDateTime nowVn = ZonedDateTime.now(ZoneId.of("Asia/Ho_Chi_Minh"));
+        DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("HH:mm:ss");
+        DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+        String dayOfWeekVn = switch (nowVn.getDayOfWeek()) {
+            case MONDAY -> "Thứ Hai";
+            case TUESDAY -> "Thứ Ba";
+            case WEDNESDAY -> "Thứ Tư";
+            case THURSDAY -> "Thứ Năm";
+            case FRIDAY -> "Thứ Sáu";
+            case SATURDAY -> "Thứ Bảy";
+            case SUNDAY -> "Chủ Nhật";
+        };
+        int hour = nowVn.getHour();
+        String periodVn = (hour >= 5 && hour < 12) ? "Buổi sáng" :
+                          (hour >= 12 && hour < 14) ? "Buổi trưa" :
+                          (hour >= 14 && hour < 18) ? "Buổi chiều" :
+                          (hour >= 18 && hour < 23) ? "Buổi tối" : "Đêm khuya";
+
         String displayName = user.getFullName() != null && !user.getFullName().isEmpty()
                 ? user.getFullName()
                 : "@" + user.getUsername();
 
         sb.append("Bạn là Trợ lý ảo AI thông minh của hệ thống quản lý doanh nghiệp ERP Cloud System.\n");
-        sb.append("Người dùng hiện tại: ").append(displayName)
-          .append(" (Username: @").append(user.getUsername())
-          .append(", Vai trò: ").append(user.getRole()).append(").\n\n");
+        sb.append("--- MÔI TRƯỜNG THỜI GIAN THỰC TẾ & HỆ THỐNG ---\n");
+        sb.append("• Thời gian thực tế hiện tại: ").append(nowVn.format(timeFmt)).append(" (GMT+7, Giờ Việt Nam)\n");
+        sb.append("• Ngày hiện tại: ").append(dayOfWeekVn).append(", ngày ").append(nowVn.format(dateFmt)).append("\n");
+        sb.append("• Buổi trong ngày: ").append(periodVn).append("\n");
+        sb.append("• Hệ thống: ERP Cloud Enterprise Suite v4.2.0\n");
+        sb.append("• Hạ tầng kỹ thuật: Java 17 LTS, Spring Boot 3.3.4, Spring Security 6, Spring WebSocket STOMP, Vue 3, MySQL 8, Redis\n");
+        sb.append("• Cụm máy chủ: Data Center VN-Central, Cam kết SLA 99.98%, Tiêu chuẩn ISO 27001\n\n");
+
+        sb.append("--- THÔNG TIN TÀI KHOẢN ĐANG GIAO TIẾP VỚI BẠN ---\n");
+        sb.append("• Họ và tên: ").append(displayName).append("\n");
+        sb.append("• Tên đăng nhập (Username): @").append(user.getUsername()).append("\n");
+        sb.append("• Email: ").append(user.getEmail() != null ? user.getEmail() : "Chưa cập nhật").append("\n");
+        sb.append("• Vai trò phân quyền: ").append(user.getRole()).append(" (").append(user.getRole() == com.erp.model.Role.ADMIN ? "Quản trị viên toàn quyền" : "Nhân viên tác nghiệp").append(")\n");
+        sb.append("• Trạng thái tài khoản: ").append(user.getStatus()).append("\n\n");
 
         sb.append("--- DỮ LIỆU THỜI GIAN THỰC TRONG DATABASE DOANH NGHIỆP (RAG CONTEXT) ---\n\n");
 
@@ -292,12 +325,16 @@ public class GeminiService {
         sb.append("\n");
 
         sb.append("--- NGUYÊN TẮC VÀ QUY TẮC PHẢN HỒI CỦA TRỢ LÝ AI ---\n");
-        sb.append("1. Giao tiếp bằng Tiếng Việt tự nhiên, linh hoạt, thân thiện và gần gũi như một người đồng nghiệp thông minh, nhiệt tình (xưng hô 'mình' - 'bạn', dùng emoji vui vẻ 😊, 📦, ✨, 👍).\n");
-        sb.append("2. Khi người dùng chào hỏi, cảm ơn, khen ngợi, đồng ý hoặc nói chuyện phiếm (chitchat, hỏi thăm sức khỏe, đùa vui), hãy đối đáp duyên dáng, chân thành, hóm hỉnh và uyển chuyển như con người thực thụ. TUYỆT ĐỐI KHÔNG trả lời máy móc hay lặp lại các câu dập khuôn.\n");
-        sb.append("3. Nếu người dùng hỏi hướng dẫn (ví dụ: 'cách tạo sản phẩm', 'làm sao thêm tài khoản'), hãy giải thích từng bước rõ ràng, sinh động.\n");
-        sb.append("4. Nếu người dùng ra lệnh tạo sản phẩm (ví dụ: 'Tạo sản phẩm Áo thun giá 100k tồn 20'), hãy kích hoạt công cụ 'create_product' (Function Calling) để tự động lưu vào Database!\n");
-        sb.append("5. Sử dụng chính xác dữ liệu thực tế ở trên để giải đáp mọi câu hỏi về số liệu kho hàng, giá bán, nhân sự.\n");
-        sb.append("6. Tuyệt đối không bịa đặt số liệu sai lệch về doanh nghiệp.");
+        sb.append("1. Giao tiếp bằng Tiếng Việt tự nhiên, linh hoạt, thân thiện và gần gũi như một người đồng nghiệp thông minh, nhiệt tình (xưng hô 'mình' - 'bạn', dùng emoji vui vẻ 😊, 📦, ✨, 👍, ⏰).\n");
+        sb.append("2. Trả lời THỜI GIAN & NGÀY THÁNG: Khi người dùng hỏi 'Mấy giờ rồi', 'Bây giờ là mấy giờ', 'Hôm nay thứ mấy', 'Hôm nay ngày mấy', hãy trả lời chính xác giờ:phút:giây, thứ ngày tháng năm dựa theo dữ liệu thời gian thực ở mục trên, kèm lời chào/lời chúc phù hợp buổi sáng/trưa/chiều/tối/đêm.\n");
+        sb.append("3. Trả lời DANH TÍNH NGƯỜI DÙNG: Khi người dùng hỏi 'Tôi là ai', 'Tài khoản của tôi', 'Thông tin của tôi', 'Quyền hạn của tôi', hãy trình bày rõ ràng tên, username, email, vai trò và quyền hạn của họ trong hệ thống ERP.\n");
+        sb.append("4. Trả lời HỆ THỐNG & SERVER: Khi hỏi 'Hệ thống phiên bản gì', 'Server ở đâu', 'Công nghệ gì', hãy trình bày thông tin kỹ thuật chính xác từ mục môi trường ở trên.\n");
+        sb.append("5. Hỗ trợ TÍNH TOÁN: Khi người dùng nhờ tính toán (cộng trừ nhân chia, tính tỷ lệ % tồn kho, doanh số), hãy tính toán chuẩn xác và giải thích ngắn gọn.\n");
+        sb.append("6. Khi người dùng chào hỏi, cảm ơn, khen ngợi, đồng ý hoặc nói chuyện phiếm (chitchat, hỏi thăm sức khỏe, đùa vui), hãy đối đáp duyên dáng, chân thành, hóm hỉnh và uyển chuyển như con người thực thụ. TUYỆT ĐỐI KHÔNG trả lời máy móc hay lặp lại các câu dập khuôn.\n");
+        sb.append("7. Nếu người dùng hỏi hướng dẫn (ví dụ: 'cách tạo sản phẩm', 'làm sao thêm tài khoản'), hãy giải thích từng bước rõ ràng, sinh động.\n");
+        sb.append("8. Nếu người dùng ra lệnh tạo sản phẩm (ví dụ: 'Tạo sản phẩm Áo thun giá 100k tồn 20'), hãy kích hoạt công cụ 'create_product' (Function Calling) để tự động lưu vào Database!\n");
+        sb.append("9. Sử dụng chính xác dữ liệu thực tế ở trên để giải đáp mọi câu hỏi về số liệu kho hàng, giá bán, nhân sự.\n");
+        sb.append("10. Tuyệt đối không bịa đặt số liệu sai lệch về doanh nghiệp.");
 
         return sb.toString();
     }

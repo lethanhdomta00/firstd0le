@@ -35,8 +35,17 @@ const routes = [
         name: 'Announcements',
         component: () => import('../views/Announcements.vue'),
         meta: { role: 'ADMIN' } // Quản lý Thông báo & Sự kiện
+      },
+      {
+        path: ':pathMatch(.*)*',
+        name: 'NotFound',
+        component: () => import('../views/NotFound.vue')
       }
     ]
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    redirect: '/'
   }
 ]
 
