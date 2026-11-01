@@ -37,6 +37,11 @@ const routes = [
         meta: { role: 'ADMIN' } // Quản lý Thông báo & Sự kiện
       },
       {
+        path: 'chat',
+        name: 'Chat',
+        component: () => import('../views/Chat.vue')
+      },
+      {
         path: ':pathMatch(.*)*',
         name: 'NotFound',
         component: () => import('../views/NotFound.vue')

@@ -1,6 +1,7 @@
 package com.erp.controller;
 
 import com.erp.dto.RealtimeMessageDto;
+import com.erp.dto.UserResponseDto;
 import com.erp.model.MessageStatus;
 import com.erp.model.MessageType;
 import com.erp.model.RealtimeMessage;
@@ -193,6 +194,20 @@ public class RealtimeChatController {
         String currentUsername = getCurrentUsername();
         long unreadCount = messageRepository.countByRecipientUsernameAndStatus(currentUsername, MessageStatus.SENT);
         return ResponseEntity.ok(Map.of("unreadCount", unreadCount));
+    }
+
+    /**
+     * Lấy danh sách đồng nghiệp trong doanh nghiệp để hiển thị trên danh bạ chat 1-1
+     */
+    @GetMapping("/api/realtime-chat/colleagues")
+    public ResponseEntity<List<UserResponseDto>> getColleagues() {
+        String currentUsername = getCurrentUsername();
+        List<UserResponseDto> colleagues = userRepository.findAll().stream()
+                .filter(u -> !u.getUsername().equalsIgnoreCase(currentUsername))
+                .filter(u -> !"LOCKED".equalsIgnoreCase(u.getStatus()))
+                .map(UserResponseDto::fromEntity)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(colleagues);
     }
 
     // =========================================================================

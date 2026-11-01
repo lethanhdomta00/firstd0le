@@ -81,6 +81,18 @@
           </template>
         </el-menu-item>
 
+        <el-menu-item index="/chat">
+          <el-icon><ChatDotRound /></el-icon>
+          <template #title>
+            <div class="menu-item-with-badge">
+              <span class="menu-title-text">Trò chuyện nội bộ</span>
+              <span v-if="chatStore.totalUnreadCount > 0" class="sidebar-unread-badge">
+                {{ chatStore.totalUnreadCount > 99 ? '99+' : chatStore.totalUnreadCount }}
+              </span>
+            </div>
+          </template>
+        </el-menu-item>
+
         <el-menu-item index="/ai-copilot" @click.prevent="openChatWidget">
           <el-icon class="ai-sparkle-icon"><Cpu /></el-icon>
           <template #title>
@@ -168,6 +180,10 @@
           <el-icon><User /></el-icon>
           <template #title>Quản lý Tài khoản</template>
         </el-menu-item>
+        <el-menu-item index="/chat">
+          <el-icon><ChatDotRound /></el-icon>
+          <template #title>Trò chuyện nội bộ</template>
+        </el-menu-item>
         <el-menu-item v-if="authStore.isAdmin" index="/announcements">
           <el-icon><BellFilled /></el-icon>
           <template #title>Quản lý Thông báo</template>
@@ -232,6 +248,18 @@
 
         <!-- Right: Actions, Bell, Help, User Profile with Online Status on Avatar -->
         <div class="header-right-group">
+          <!-- Chat Button with Live Unread Badge -->
+          <div class="header-icon-wrap" @click="$router.push('/chat')">
+            <button type="button" class="btn-header-icon" title="Trò chuyện nội bộ">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+              <span v-if="chatStore.totalUnreadCount > 0" class="chat-unread-count-badge">
+                {{ chatStore.totalUnreadCount > 99 ? '99+' : chatStore.totalUnreadCount }}
+              </span>
+            </button>
+          </div>
+
           <!-- Notification Bell with Red Dot -->
           <div class="header-icon-wrap" @click="$router.push('/announcements')">
             <button type="button" class="btn-header-icon" title="Thông báo hệ thống">
@@ -416,6 +444,7 @@
 import { ref, computed, reactive, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../store/auth'
+import { useRealtimeChatStore } from '../store/realtimeChat'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import api from '../api'
 import BaseDialog from '../components/base/BaseDialog.vue'
@@ -439,12 +468,14 @@ import {
   Tickets,
   DataAnalysis,
   Setting,
-  Cpu
+  Cpu,
+  ChatDotRound
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+const chatStore = useRealtimeChatStore()
 const { isMobile } = useResponsive()
 
 // State
@@ -584,6 +615,7 @@ function handleUserMenuCommand(command) {
       cancelButtonText: 'Hủy',
       type: 'warning'
     }).then(() => {
+      chatStore.disconnect()
       authStore.logout()
       ElMessage.success('Đã đăng xuất an toàn.')
       router.push('/login')
@@ -636,6 +668,8 @@ onMounted(() => {
   updateClock()
   clockInterval = setInterval(updateClock, 1000)
   fetchAnnouncement()
+  // Kích hoạt kết nối WebSocket STOMP thời gian thực
+  chatStore.connect()
 })
 
 onBeforeUnmount(() => {
@@ -1143,6 +1177,41 @@ onBeforeUnmount(() => {
   background: #ef4444;
   border: 1.5px solid #ffffff;
   border-radius: 50%;
+}
+
+.chat-unread-count-badge {
+  position: absolute;
+  top: -3px;
+  right: -5px;
+  min-width: 16px;
+  height: 16px;
+  background: #ef4444;
+  color: #ffffff;
+  border: 1.5px solid #ffffff;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+}
+
+.menu-item-with-badge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.sidebar-unread-badge {
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 10px;
+  margin-left: 8px;
 }
 
 /* User Profile Trigger */

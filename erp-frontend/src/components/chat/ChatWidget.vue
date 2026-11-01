@@ -1,26 +1,71 @@
 <template>
-  <div class="chat-widget-wrapper">
-    <!-- 0. COPILOT TEASER PILL (FIGMA IMAGES 4 & 5 MATCH) -->
-    <transition name="fade">
-      <div v-if="!isOpen" class="copilot-teaser-pill" @click="toggleWidget">
-        <span class="teaser-icon">💬</span>
-        <span class="teaser-text">Trợ lý Copilot: <em>"Hôm nay tôi giúp gì..."</em></span>
+  <div 
+    class="chat-widget-wrapper" 
+    :class="{ 
+      'is-on-chat-page': isOnChatPage, 
+      'is-collapsed-edge': isCollapsed && !isOpen,
+      'is-open': isOpen
+    }"
+  >
+    <!-- 0. KHI Ở CHẾ ĐỘ THU GỌN NÉP GÓC (MINI DOCKED TAB) -->
+    <transition name="dock-slide">
+      <div 
+        v-if="!isOpen && isCollapsed" 
+        class="copilot-docked-tab" 
+        @click="toggleCollapse(false)"
+        title="Nhấn để mở lại Trợ lý AI Copilot"
+      >
+        <span class="docked-icon">🤖</span>
+        <span class="docked-text">AI Copilot</span>
+        <span class="docked-arrow">◀</span>
       </div>
     </transition>
 
-    <!-- 1. FLOATING ACTION BUTTON (FIGMA IMAGE 5 MATCH) -->
-    <div 
-      class="chat-floating-btn" 
-      :class="{ 'is-active': isOpen, 'btn-dark': isDarkMode }" 
-      @click="toggleWidget"
-      title="Trợ lý ảo ERP AI Copilot"
-    >
-      <div class="btn-inner">
-        <span v-if="!isOpen" class="unread-pulse-badge"></span>
-        <el-icon v-if="!isOpen" class="btn-icon"><Cpu /></el-icon>
-        <el-icon v-else class="btn-icon"><Close /></el-icon>
+    <!-- 1. KHI Ở CHẾ ĐỘ THÔNG THƯỜNG -->
+    <template v-if="isOpen || !isCollapsed">
+      <!-- 0. COPILOT TEASER PILL (FIGMA IMAGES 4 & 5 MATCH) -->
+      <transition name="fade">
+        <div v-if="!isOpen && showTeaser" class="copilot-teaser-pill" @click="toggleWidget">
+          <span class="teaser-icon">💬</span>
+          <span class="teaser-text">Trợ lý Copilot: <em>"Hôm nay tôi giúp gì..."</em></span>
+          <button 
+            type="button" 
+            class="btn-teaser-close" 
+            title="Thu gọn gợi ý này" 
+            @click.stop="hideTeaser"
+          >
+            ✕
+          </button>
+        </div>
+      </transition>
+
+      <!-- 1. FLOATING ACTION BUTTON (FIGMA IMAGE 5 MATCH) -->
+      <div 
+        class="chat-floating-btn" 
+        :class="{ 'is-active': isOpen, 'btn-dark': isDarkMode }" 
+        @click="toggleWidget"
+        title="Trợ lý ảo ERP AI Copilot"
+      >
+        <div class="btn-inner">
+          <span v-if="!isOpen" class="unread-pulse-badge"></span>
+          <el-icon v-if="!isOpen" class="btn-icon"><Cpu /></el-icon>
+          <el-icon v-else class="btn-icon"><Close /></el-icon>
+        </div>
+
+        <!-- Nút thu nhỏ nép góc (hiện khi hover vào nút AI) -->
+        <button 
+          v-if="!isOpen" 
+          type="button" 
+          class="btn-collapse-trigger" 
+          title="Thu gọn nép vào mép màn hình"
+          @click.stop="toggleCollapse(true)"
+        >
+          <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="3">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </button>
       </div>
-    </div>
+    </template>
 
     <!-- 2. CỬA SỔ HỘI THOẠI CHATBOT (FIGMA IMAGE 5 MATCH - SLEEK SLATE DARK) -->
     <transition name="chat-popup">
@@ -33,7 +78,7 @@
         <div class="chat-header">
           <div class="header-left">
             <div class="bot-avatar-wrap">
-              <el-avatar :size="36" class="bot-avatar">
+              <el-avatar :size="30" class="bot-avatar">
                 <el-icon><Cpu /></el-icon>
               </el-avatar>
               <span class="avatar-status-dot"></span>
@@ -70,9 +115,16 @@
               <el-icon><Delete /></el-icon>
             </button>
 
-            <!-- Nút thu nhỏ -->
+            <!-- Nút thu nhỏ cửa sổ -->
             <button class="header-btn" title="Thu nhỏ" @click="isOpen = false">
               <el-icon><Minus /></el-icon>
+            </button>
+
+            <!-- Nút thu gọn nép góc -->
+            <button class="header-btn" title="Thu gọn nép vào mép màn hình" @click="isOpen = false; toggleCollapse(true)">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
             </button>
           </div>
         </div>
@@ -205,6 +257,7 @@
 
 <script setup>
 import { ref, reactive, computed, watch, nextTick, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { useAuthStore } from '../../store/auth'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import api from '../../api'
@@ -221,7 +274,31 @@ import {
   Moon
 } from '@element-plus/icons-vue'
 
+const route = useRoute()
 const authStore = useAuthStore()
+
+// Nhận diện khi người dùng đang ở trang /chat (Trò chuyện nội bộ) để không che nút gửi
+const isOnChatPage = computed(() => route?.path === '/chat')
+
+// Trạng thái thu gọn nép góc (Lưu trạng thái vào localStorage)
+const isCollapsed = ref(localStorage.getItem('erp_copilot_collapsed') === 'true')
+// Trạng thái ẩn teaser gợi ý
+const isTeaserHidden = ref(localStorage.getItem('erp_copilot_teaser_hidden') === 'true')
+
+// Chỉ hiển thị teaser pill khi chưa ẩn, không ở trang /chat và không ở chế độ thu gọn
+const showTeaser = computed(() => {
+  return !isTeaserHidden.value && !isOnChatPage.value && !isCollapsed.value
+})
+
+const toggleCollapse = (collapsed) => {
+  isCollapsed.value = collapsed
+  localStorage.setItem('erp_copilot_collapsed', collapsed ? 'true' : 'false')
+}
+
+const hideTeaser = () => {
+  isTeaserHidden.value = true
+  localStorage.setItem('erp_copilot_teaser_hidden', 'true')
+}
 
 // State điều khiển mở/đóng và theme
 const isOpen = ref(false)
@@ -431,6 +508,19 @@ onMounted(() => {
     fetchHistory()
   }
 })
+
+defineExpose({
+  open: () => {
+    isCollapsed.value = false
+    isOpen.value = true
+    scrollToBottom()
+  },
+  openWidget: () => {
+    isCollapsed.value = false
+    isOpen.value = true
+    scrollToBottom()
+  }
+})
 </script>
 
 <style scoped>
@@ -443,6 +533,118 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
+  transition: bottom 0.25s ease, right 0.25s ease;
+}
+
+/* Khi mở cửa sổ chat AI, cố định vị trí nút điều khiển ở góc */
+.chat-widget-wrapper.is-open {
+  bottom: 18px !important;
+  right: 18px !important;
+}
+
+/* Khi người dùng ở trang Chat Nội bộ /chat (và chưa mở popup AI), nâng cao lên để không che nút Gửi */
+.chat-widget-wrapper.is-on-chat-page:not(.is-open) {
+  bottom: 86px;
+  right: 18px;
+}
+
+/* ========================================================
+   MINI DOCKED TAB (KHI THU GỌN NÉP VÀO MÉP MÀN HÌNH)
+   ======================================================== */
+.copilot-docked-tab {
+  position: fixed;
+  bottom: 96px;
+  right: 0;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #ffffff;
+  padding: 6px 12px 6px 12px;
+  border-top-left-radius: 20px;
+  border-bottom-left-radius: 20px;
+  box-shadow: -2px 4px 14px rgba(37, 99, 235, 0.35);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  user-select: none;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1000;
+}
+
+.copilot-docked-tab:hover {
+  padding-left: 16px;
+  background: linear-gradient(135deg, #1d4ed8, #1e40af);
+  box-shadow: -4px 6px 20px rgba(37, 99, 235, 0.5);
+  transform: translateX(-4px);
+}
+
+.docked-icon {
+  font-size: 14px;
+}
+
+.docked-text {
+  letter-spacing: 0.2px;
+}
+
+.docked-arrow {
+  font-size: 10px;
+  opacity: 0.85;
+  transition: transform 0.2s;
+}
+
+.copilot-docked-tab:hover .docked-arrow {
+  transform: translateX(-2px);
+}
+
+/* Nút X tắt nhanh trên Teaser Pill */
+.btn-teaser-close {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 4px;
+  border-radius: 50%;
+  margin-left: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.btn-teaser-close:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+/* Nút thu gọn nép góc (hiện khi hover vào nút AI) */
+.btn-collapse-trigger {
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #334155;
+  color: #ffffff;
+  border: 1.5px solid #ffffff;
+  font-size: 10px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.chat-floating-btn:hover .btn-collapse-trigger {
+  display: flex;
+}
+
+.btn-collapse-trigger:hover {
+  background: #2563eb;
+  transform: scale(1.15);
 }
 
 /* ========================================================
@@ -507,9 +709,11 @@ onMounted(() => {
 }
 
 .chat-floating-btn.is-active {
+  width: 44px;
+  height: 44px;
   background: #ef4444;
   border-color: #ffffff;
-  box-shadow: 0 8px 20px rgba(239, 68, 68, 0.35);
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35);
 }
 
 .unread-pulse-badge {
@@ -562,21 +766,36 @@ onMounted(() => {
 }
 
 /* ========================================================
-   2. CHAT WINDOW (FLAT LAYOUT - KHÔNG ĐỔ BÓNG)
+   2. CHAT WINDOW (COMPACT ERGONOMIC - VỪA VẶN MÀN HÌNH LAPTOP)
    ======================================================== */
 .chat-window {
-  position: absolute;
-  bottom: 68px;
-  right: 0;
-  width: 390px;
-  height: 560px;
-  max-height: calc(100vh - 110px);
+  position: fixed;
+  bottom: 72px;
+  right: 18px;
+  width: 345px;
+  height: 450px;
+  max-height: calc(100vh - 90px);
   border-radius: 16px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: none !important;
+  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.22) !important;
   animation: popup-flat 0.22s ease-out;
+  z-index: 1001;
+}
+
+@media (max-height: 800px) {
+  .chat-window {
+    height: 400px;
+    bottom: 66px;
+  }
+}
+
+@media (max-height: 650px) {
+  .chat-window {
+    height: 350px;
+    bottom: 60px;
+  }
 }
 
 /* ---------------- THEME: NỀN ĐẬM (DARK MODE - DEFAULT) ---------------- */

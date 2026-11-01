@@ -56,7 +56,36 @@ public class DataInitializer implements CommandLineRunner {
             }
         }
 
-        // 2. Khởi tạo Thông báo / Sự kiện mẫu nếu bảng trống
+        // 2. Khởi tạo tài khoản Nhân viên (STAFF) mẫu để test Chat Real-Time
+        Optional<User> staffOpt = userRepository.findByUsername("nhanvien");
+        if (staffOpt.isEmpty()) {
+            User staff = new User();
+            staff.setUsername("nhanvien");
+            staff.setFullName("Nguyễn Văn A (Kinh doanh)");
+            staff.setPassword(passwordEncoder.encode("password"));
+            staff.setRole(Role.USER);
+            staff.setStatus("ACTIVE");
+            staff.setEmail("nhanvien@erp.com");
+            staff.setPhone("0987654321");
+            staff.setAvatarUrl("https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80");
+            userRepository.save(staff);
+            log.info("Initialized default STAFF account for testing: nhanvien / password");
+        }
+
+        // 3. Đảm bảo tài khoản HIHI (nếu có) có mật khẩu chuẩn là 'password'
+        Optional<User> hihiOpt = userRepository.findByUsername("HIHI");
+        if (hihiOpt.isPresent()) {
+            User hihi = hihiOpt.get();
+            hihi.setPassword(passwordEncoder.encode("password"));
+            hihi.setStatus("ACTIVE");
+            if (hihi.getFullName() == null || hihi.getFullName().isEmpty()) {
+                hihi.setFullName("Trần Thị B (Kế toán)");
+            }
+            userRepository.save(hihi);
+            log.info("Updated HIHI password to: password");
+        }
+
+        // 4. Khởi tạo Thông báo / Sự kiện mẫu nếu bảng trống
         if (announcementRepository.count() == 0) {
             Announcement defaultAnnouncement = new Announcement();
             defaultAnnouncement.setTitle("Chào mừng hệ thống");

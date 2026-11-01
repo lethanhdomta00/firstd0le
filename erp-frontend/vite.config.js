@@ -5,6 +5,9 @@ import path from 'path'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [vue()],
+  define: {
+    global: 'window'
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -15,6 +18,12 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: process.env.VITE_BACKEND_TARGET || 'http://localhost:8080',
+        changeOrigin: true,
+        secure: false
+      },
+      '/ws-chat': {
+        target: process.env.VITE_BACKEND_TARGET || 'http://localhost:8080',
+        ws: true,
         changeOrigin: true,
         secure: false
       }
