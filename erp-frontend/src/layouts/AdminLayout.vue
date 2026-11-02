@@ -435,8 +435,8 @@
       </el-form>
     </BaseDialog>
 
-    <!-- Trợ lý ảo ERP AI Chatbot Widget (Nổi ở góc phải dưới) -->
-    <ChatWidget ref="chatWidgetRef" />
+    <!-- Trợ lý ảo ERP AI Chatbot Widget (Nổi ở góc phải dưới, ẩn khi đang ở trang chat /chat) -->
+    <ChatWidget v-if="route.path !== '/chat'" ref="chatWidgetRef" />
   </el-container>
 </template>
 
@@ -1209,9 +1209,26 @@ onBeforeUnmount(() => {
   color: #ffffff;
   font-size: 11px;
   font-weight: 700;
-  padding: 1px 7px;
-  border-radius: 10px;
-  margin-left: 8px;
+  min-width: 20px;
+  height: 20px;
+  line-height: 20px;
+  border-radius: 9999px;
+  padding: 0 6px;
+  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.4);
+  transition: all 0.25s ease;
+}
+
+:deep(.el-menu-item.is-active) .sidebar-unread-badge,
+.el-menu-item.is-active .sidebar-unread-badge {
+  background: #ffffff !important;
+  color: #2563eb !important;
+  font-weight: 800;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
 }
 
 /* User Profile Trigger */

@@ -56,6 +56,37 @@ public class RealtimeMessage {
     @Builder.Default
     private MessageStatus status = MessageStatus.SENT;
 
+    // --- TÍNH NĂNG REPLY TIN NHẮN ---
+    @Column(name = "reply_to_id")
+    private Long replyToId;
+
+    @Column(name = "reply_to_sender", length = 100)
+    private String replyToSender;
+
+    @Column(name = "reply_to_content", length = 500)
+    private String replyToContent;
+
+    // --- TÍNH NĂNG REACTION EMOJI (LƯU DƯỚI DẠNG JSON) ---
+    // Ví dụ: {"👍":["admin","nhanvien"],"❤️":["nhanvien"]}
+    @Column(name = "reactions_json", columnDefinition = "TEXT")
+    private String reactionsJson;
+
+    // --- TÍNH NĂNG XÓA (THU HỒI) TIN NHẮN ---
+    @Column(name = "is_deleted")
+    @Builder.Default
+    private Boolean isDeleted = false;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
+    // --- TÍNH NĂNG CHỈNH SỬA TIN NHẮN ---
+    @Column(name = "is_edited")
+    @Builder.Default
+    private Boolean isEdited = false;
+
+    @Column(name = "edited_at")
+    private LocalDateTime editedAt;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 

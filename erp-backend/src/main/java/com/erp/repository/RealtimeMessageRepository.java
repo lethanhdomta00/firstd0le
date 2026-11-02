@@ -20,6 +20,12 @@ public interface RealtimeMessageRepository extends JpaRepository<RealtimeMessage
     // Lấy tin nhắn mới nhất có phân trang
     List<RealtimeMessage> findByRoomIdOrderByCreatedAtDesc(String roomId, Pageable pageable);
 
+    // Phân trang lazy loading: lấy tin nhắn mới nhất của phòng (id giảm dần)
+    List<RealtimeMessage> findByRoomIdOrderByIdDesc(String roomId, Pageable pageable);
+
+    // Phân trang lazy loading: lấy tin nhắn cũ hơn một id cụ thể
+    List<RealtimeMessage> findByRoomIdAndIdLessThanOrderByIdDesc(String roomId, Long beforeId, Pageable pageable);
+
     // Lấy tất cả tin nhắn giữa 2 người (chat 1-1)
     @Query("SELECT m FROM RealtimeMessage m WHERE (m.senderUsername = :user1 AND m.recipientUsername = :user2) " +
            "OR (m.senderUsername = :user2 AND m.recipientUsername = :user1) ORDER BY m.createdAt ASC")

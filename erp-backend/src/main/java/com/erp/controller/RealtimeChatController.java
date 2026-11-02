@@ -2,28 +2,33 @@ package com.erp.controller;
 
 import com.erp.dto.RealtimeMessageDto;
 import com.erp.dto.UserResponseDto;
+import com.erp.model.ChatNickname;
 import com.erp.model.MessageStatus;
 import com.erp.model.MessageType;
 import com.erp.model.RealtimeMessage;
 import com.erp.model.User;
+import com.erp.repository.ChatGroupMemberRepository;
+import com.erp.repository.ChatNicknameRepository;
 import com.erp.repository.RealtimeMessageRepository;
 import com.erp.repository.UserRepository;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
-import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController
@@ -31,9 +36,13 @@ import java.util.stream.Collectors;
 @Slf4j
 public class RealtimeChatController {
 
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
     private final SimpMessagingTemplate messagingTemplate;
     private final RealtimeMessageRepository messageRepository;
     private final UserRepository userRepository;
+    private final ChatNicknameRepository nicknameRepository;
+    private final ChatGroupMemberRepository memberRepository;
 
     // =========================================================================
     //                        WEBSOCKET STOMP HANDLERS
@@ -46,24 +55,29 @@ public class RealtimeChatController {
      */
     @MessageMapping("/chat.sendPublic")
     public void sendPublicMessage(@Payload RealtimeMessageDto messageDto, Principal principal) {
-        String senderUsername = principal != null ? principal.getName() : messageDto.getSenderUsername();
+        String senderUsername = (principal != null && StringUtils.hasText(principal.getName()))
+                ? principal.getName()
+                : messageDto.getSenderUsername();
         String roomId = (messageDto.getRoomId() != null && !messageDto.getRoomId().trim().isEmpty())
                 ? messageDto.getRoomId().trim()
                 : "GLOBAL";
 
-        Optional<User> senderOpt = userRepository.findByUsername(senderUsername);
-        String fullName = senderOpt.map(User::getFullName).orElse(senderUsername);
+        Optional<User> senderOpt = (senderUsername != null) ? userRepository.findByUsername(senderUsername) : Optional.empty();
+        String fullName = senderOpt.map(User::getFullName).orElse(senderUsername != null ? senderUsername : "Thành viên");
         String avatarUrl = senderOpt.map(User::getAvatarUrl).orElse(null);
 
         RealtimeMessage entity = RealtimeMessage.builder()
                 .roomId(roomId)
-                .senderUsername(senderUsername)
+                .senderUsername(senderUsername != null ? senderUsername : "system")
                 .senderFullName(fullName)
                 .senderAvatarUrl(avatarUrl)
                 .recipientUsername(null)
                 .content(messageDto.getContent())
                 .type(messageDto.getType() != null ? messageDto.getType() : MessageType.CHAT)
                 .status(MessageStatus.SENT)
+                .replyToId(messageDto.getReplyToId())
+                .replyToSender(messageDto.getReplyToSender())
+                .replyToContent(messageDto.getReplyToContent())
                 .build();
 
         RealtimeMessage saved = messageRepository.save(entity);
@@ -81,7 +95,9 @@ public class RealtimeChatController {
      */
     @MessageMapping("/chat.sendPrivate")
     public void sendPrivateMessage(@Payload RealtimeMessageDto messageDto, Principal principal) {
-        String senderUsername = principal != null ? principal.getName() : messageDto.getSenderUsername();
+        String senderUsername = (principal != null && StringUtils.hasText(principal.getName()))
+                ? principal.getName()
+                : messageDto.getSenderUsername();
         String recipientUsername = messageDto.getRecipientUsername();
 
         if (recipientUsername == null || recipientUsername.trim().isEmpty()) {
@@ -90,6 +106,11 @@ public class RealtimeChatController {
         }
 
         recipientUsername = recipientUsername.trim();
+        if (senderUsername == null || senderUsername.trim().isEmpty()) {
+            senderUsername = "unknown";
+        } else {
+            senderUsername = senderUsername.trim();
+        }
 
         // Tạo Room ID chuẩn giữa 2 người (được sắp xếp theo bảng chữ cái để cả 2 luôn chung 1 phòng)
         String privateRoomId = buildPrivateRoomId(senderUsername, recipientUsername);
@@ -107,16 +128,22 @@ public class RealtimeChatController {
                 .content(messageDto.getContent())
                 .type(messageDto.getType() != null ? messageDto.getType() : MessageType.CHAT)
                 .status(MessageStatus.SENT)
+                .replyToId(messageDto.getReplyToId())
+                .replyToSender(messageDto.getReplyToSender())
+                .replyToContent(messageDto.getReplyToContent())
                 .build();
 
         RealtimeMessage saved = messageRepository.save(entity);
         RealtimeMessageDto responseDto = RealtimeMessageDto.fromEntity(saved);
 
-        // Gửi trực tiếp tới người nhận (Recipient)
+        // Gửi trực tiếp tới người nhận (Recipient) qua User Queue
         messagingTemplate.convertAndSendToUser(recipientUsername, "/queue/messages", responseDto);
 
         // Gửi xác nhận lại cho người gửi (Sender) để cập nhật UI ngay lập tức
         messagingTemplate.convertAndSendToUser(senderUsername, "/queue/messages", responseDto);
+
+        // Kênh bổ trợ phòng riêng: Đảm bảo cả hai bên nhận được ngay lập tức bất kể môi trường mạng
+        messagingTemplate.convertAndSend("/topic/private." + privateRoomId, responseDto);
 
         log.info("WebSocket Private: [{}] -> [{}]: {}", senderUsername, recipientUsername, messageDto.getContent());
     }
@@ -127,18 +154,104 @@ public class RealtimeChatController {
      */
     @MessageMapping("/chat.typing")
     public void sendTypingStatus(@Payload RealtimeMessageDto messageDto, Principal principal) {
-        String senderUsername = principal != null ? principal.getName() : messageDto.getSenderUsername();
+        String senderUsername = (principal != null && StringUtils.hasText(principal.getName()))
+                ? principal.getName()
+                : messageDto.getSenderUsername();
         messageDto.setSenderUsername(senderUsername);
         messageDto.setType(MessageType.TYPING);
 
         if (messageDto.getRecipientUsername() != null && !messageDto.getRecipientUsername().trim().isEmpty()) {
             // Đang gõ trong chat riêng 1-1
             messagingTemplate.convertAndSendToUser(messageDto.getRecipientUsername().trim(), "/queue/typing", messageDto);
+            String privateRoomId = buildPrivateRoomId(senderUsername, messageDto.getRecipientUsername().trim());
+            messagingTemplate.convertAndSend("/topic/private." + privateRoomId + ".typing", messageDto);
         } else {
             // Đang gõ trong phòng chat chung
             String roomId = messageDto.getRoomId() != null ? messageDto.getRoomId() : "GLOBAL";
             messagingTemplate.convertAndSend("/topic/room." + roomId + ".typing", messageDto);
         }
+    }
+
+    /**
+     * 4. Thả cảm xúc (Reaction) tin nhắn qua WebSocket STOMP
+     * Client gửi lên: /app/chat.react
+     */
+    @MessageMapping("/chat.react")
+    public void reactMessageStomp(@Payload Map<String, Object> payload, Principal principal) {
+        Long messageId = payload.get("messageId") != null ? Long.valueOf(payload.get("messageId").toString()) : null;
+        String emoji = (String) payload.get("emoji");
+        String username = (principal != null && StringUtils.hasText(principal.getName()))
+                ? principal.getName()
+                : (String) payload.get("username");
+        processReaction(messageId, emoji, username);
+    }
+
+    /**
+     * Thả cảm xúc qua REST API fallback
+     */
+    @PostMapping("/api/realtime-chat/react")
+    public ResponseEntity<?> reactMessageRest(@RequestBody Map<String, Object> payload) {
+        Long messageId = payload.get("messageId") != null ? Long.valueOf(payload.get("messageId").toString()) : null;
+        String emoji = (String) payload.get("emoji");
+        String username = getCurrentUsername();
+        Map<String, List<String>> updatedReactions = processReaction(messageId, emoji, username);
+        return ResponseEntity.ok(Map.of("messageId", messageId, "reactions", updatedReactions));
+    }
+
+    @Transactional
+    public Map<String, List<String>> processReaction(Long messageId, String emoji, String username) {
+        if (messageId == null || emoji == null || username == null) return Collections.emptyMap();
+
+        Optional<RealtimeMessage> msgOpt = messageRepository.findById(messageId);
+        if (msgOpt.isEmpty()) return Collections.emptyMap();
+
+        RealtimeMessage message = msgOpt.get();
+        Map<String, List<String>> reactions = new HashMap<>();
+
+        if (message.getReactionsJson() != null && !message.getReactionsJson().trim().isEmpty()) {
+            try {
+                reactions = OBJECT_MAPPER.readValue(message.getReactionsJson(), new TypeReference<Map<String, List<String>>>() {});
+            } catch (Exception e) {
+                reactions = new HashMap<>();
+            }
+        }
+
+        List<String> users = reactions.getOrDefault(emoji, new ArrayList<>());
+        // Toggle: nếu đã thả emoji này thì bỏ thả, nếu chưa thì thêm vào
+        if (users.contains(username)) {
+            users.remove(username);
+            if (users.isEmpty()) {
+                reactions.remove(emoji);
+            } else {
+                reactions.put(emoji, users);
+            }
+        } else {
+            users.add(username);
+            reactions.put(emoji, users);
+        }
+
+        try {
+            message.setReactionsJson(OBJECT_MAPPER.writeValueAsString(reactions));
+            messageRepository.save(message);
+        } catch (Exception e) {
+            log.error("Lỗi lưu reactionsJson:", e);
+        }
+
+        Map<String, Object> event = new HashMap<>();
+        event.put("type", "REACTION");
+        event.put("messageId", messageId);
+        event.put("roomId", message.getRoomId());
+        event.put("reactions", reactions);
+
+        // Broadcast sự kiện reaction tới phòng
+        messagingTemplate.convertAndSend("/topic/room." + message.getRoomId(), (Object) event);
+        if (message.getRecipientUsername() != null) {
+            messagingTemplate.convertAndSend("/topic/private." + message.getRoomId(), (Object) event);
+            messagingTemplate.convertAndSendToUser(message.getRecipientUsername(), "/queue/messages", event);
+            messagingTemplate.convertAndSendToUser(message.getSenderUsername(), "/queue/messages", event);
+        }
+
+        return reactions;
     }
 
     // =========================================================================
@@ -158,6 +271,29 @@ public class RealtimeChatController {
     }
 
     /**
+     * Lấy lịch sử tin nhắn phòng chat chung có phân trang (Lazy Loading kéo lên trên)
+     */
+    @GetMapping("/api/realtime-chat/history/{roomId}/page")
+    public ResponseEntity<List<RealtimeMessageDto>> getRoomHistoryPaged(
+            @PathVariable String roomId,
+            @RequestParam(required = false) Long beforeId,
+            @RequestParam(defaultValue = "20") int limit) {
+        Pageable pageable = PageRequest.of(0, Math.min(limit, 50));
+        List<RealtimeMessage> messages;
+        if (beforeId == null) {
+            messages = messageRepository.findByRoomIdOrderByIdDesc(roomId, pageable);
+        } else {
+            messages = messageRepository.findByRoomIdAndIdLessThanOrderByIdDesc(roomId, beforeId, pageable);
+        }
+
+        List<RealtimeMessageDto> result = messages.stream()
+                .sorted((a, b) -> a.getId().compareTo(b.getId()))
+                .map(RealtimeMessageDto::fromEntity)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(result);
+    }
+
+    /**
      * Lấy lịch sử chat riêng 1-1 giữa tôi và đồng nghiệp
      */
     @GetMapping("/api/realtime-chat/private-history/{targetUsername}")
@@ -173,6 +309,32 @@ public class RealtimeChatController {
     }
 
     /**
+     * Lấy lịch sử chat riêng 1-1 có phân trang (Lazy Loading kéo lên trên)
+     */
+    @GetMapping("/api/realtime-chat/private-history/{targetUsername}/page")
+    public ResponseEntity<List<RealtimeMessageDto>> getPrivateHistoryPaged(
+            @PathVariable String targetUsername,
+            @RequestParam(required = false) Long beforeId,
+            @RequestParam(defaultValue = "20") int limit) {
+        String currentUsername = getCurrentUsername();
+        String roomId = buildPrivateRoomId(currentUsername, targetUsername);
+
+        Pageable pageable = PageRequest.of(0, Math.min(limit, 50));
+        List<RealtimeMessage> messages;
+        if (beforeId == null) {
+            messages = messageRepository.findByRoomIdOrderByIdDesc(roomId, pageable);
+        } else {
+            messages = messageRepository.findByRoomIdAndIdLessThanOrderByIdDesc(roomId, beforeId, pageable);
+        }
+
+        List<RealtimeMessageDto> result = messages.stream()
+                .sorted((a, b) -> a.getId().compareTo(b.getId()))
+                .map(RealtimeMessageDto::fromEntity)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(result);
+    }
+
+    /**
      * Đánh dấu đã đọc tất cả tin nhắn trong 1 phòng gửi tới tôi
      */
     @PutMapping("/api/realtime-chat/read/{roomId}")
@@ -180,10 +342,223 @@ public class RealtimeChatController {
     public ResponseEntity<?> markAsRead(@PathVariable String roomId) {
         String currentUsername = getCurrentUsername();
         int updatedCount = messageRepository.markMessagesAsReadInRoom(roomId, currentUsername, MessageStatus.READ);
+        if (updatedCount > 0) {
+            broadcastReadReceipt(roomId, currentUsername);
+        }
         return ResponseEntity.ok(Map.of(
                 "status", "SUCCESS",
                 "markedCount", updatedCount
         ));
+    }
+
+    /**
+     * Đánh dấu đã đọc qua WebSocket STOMP
+     */
+    @MessageMapping("/chat.markRead")
+    @Transactional
+    public void handleMarkReadWs(@Payload Map<String, String> payload, Principal principal) {
+        String currentUsername = (principal != null && StringUtils.hasText(principal.getName()))
+                ? principal.getName()
+                : payload.get("readerUsername");
+        String roomId = payload.get("roomId");
+        if (StringUtils.hasText(roomId) && StringUtils.hasText(currentUsername)) {
+            int updatedCount = messageRepository.markMessagesAsReadInRoom(roomId, currentUsername, MessageStatus.READ);
+            if (updatedCount > 0) {
+                broadcastReadReceipt(roomId, currentUsername);
+            }
+        }
+    }
+
+    private void broadcastReadReceipt(String roomId, String readerUsername) {
+        Map<String, Object> readEvent = new HashMap<>();
+        readEvent.put("type", "READ_RECEIPT");
+        readEvent.put("roomId", roomId);
+        readEvent.put("readerUsername", readerUsername);
+        readEvent.put("readAt", java.time.LocalDateTime.now().toString());
+
+        messagingTemplate.convertAndSend("/topic/room." + roomId, (Object) readEvent);
+        messagingTemplate.convertAndSend("/topic/private." + roomId, (Object) readEvent);
+
+        if (roomId.contains("_") && !roomId.startsWith("GROUP_")) {
+            String[] parts = roomId.split("_");
+            String partner = parts[0].equalsIgnoreCase(readerUsername) ? parts[1] : parts[0];
+            messagingTemplate.convertAndSendToUser(partner, "/queue/messages", readEvent);
+        }
+    }
+
+    // =========================================================================
+    //                        THU HỒI / XÓA TIN NHẮN
+    // =========================================================================
+
+    @MessageMapping("/chat.deleteMessage")
+    @Transactional
+    public void deleteMessageWs(@Payload Map<String, Object> payload, Principal principal) {
+        String currentUsername = (principal != null && StringUtils.hasText(principal.getName()))
+                ? principal.getName()
+                : (String) payload.get("username");
+        Long messageId = payload.get("messageId") != null ? Long.valueOf(payload.get("messageId").toString()) : null;
+        if (messageId != null && currentUsername != null) {
+            executeDeleteMessage(messageId, currentUsername);
+        }
+    }
+
+    @DeleteMapping("/api/realtime-chat/messages/{messageId}")
+    @Transactional
+    public ResponseEntity<?> deleteMessageRest(@PathVariable Long messageId) {
+        String currentUsername = getCurrentUsername();
+        executeDeleteMessage(messageId, currentUsername);
+        return ResponseEntity.ok(Map.of("status", "SUCCESS", "message", "Đã thu hồi tin nhắn"));
+    }
+
+    private void executeDeleteMessage(Long messageId, String currentUsername) {
+        RealtimeMessage message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy tin nhắn!"));
+
+        boolean isSender = message.getSenderUsername().equalsIgnoreCase(currentUsername);
+        boolean isGroupAdmin = false;
+        if (message.getRoomId().startsWith("GROUP_")) {
+            try {
+                Long groupId = Long.valueOf(message.getRoomId().replace("GROUP_", ""));
+                isGroupAdmin = memberRepository.findByGroupId(groupId).stream()
+                        .anyMatch(m -> m.getUsername().equalsIgnoreCase(currentUsername) && "ADMIN".equalsIgnoreCase(m.getRole()));
+            } catch (Exception ignored) {}
+        }
+
+        if (!isSender && !isGroupAdmin) {
+            throw new RuntimeException("Bạn không có quyền thu hồi tin nhắn này!");
+        }
+
+        message.setIsDeleted(true);
+        message.setDeletedAt(java.time.LocalDateTime.now());
+        message.setContent("Tin nhắn đã được thu hồi");
+        messageRepository.save(message);
+
+        Map<String, Object> event = new HashMap<>();
+        event.put("type", "MESSAGE_DELETED");
+        event.put("messageId", messageId);
+        event.put("roomId", message.getRoomId());
+        event.put("deletedBy", currentUsername);
+
+        messagingTemplate.convertAndSend("/topic/room." + message.getRoomId(), (Object) event);
+        messagingTemplate.convertAndSend("/topic/private." + message.getRoomId(), (Object) event);
+        if (message.getRecipientUsername() != null) {
+            messagingTemplate.convertAndSendToUser(message.getRecipientUsername(), "/queue/messages", event);
+            messagingTemplate.convertAndSendToUser(message.getSenderUsername(), "/queue/messages", event);
+        }
+    }
+
+    // =========================================================================
+    //                        CHỈNH SỬA TIN NHẮN
+    // =========================================================================
+
+    @MessageMapping("/chat.editMessage")
+    @Transactional
+    public void editMessageWs(@Payload Map<String, Object> payload, Principal principal) {
+        String currentUsername = (principal != null && StringUtils.hasText(principal.getName()))
+                ? principal.getName()
+                : (String) payload.get("username");
+        Long messageId = payload.get("messageId") != null ? Long.valueOf(payload.get("messageId").toString()) : null;
+        String newContent = (String) payload.get("newContent");
+        if (messageId != null && currentUsername != null && StringUtils.hasText(newContent)) {
+            executeEditMessage(messageId, currentUsername, newContent.trim());
+        }
+    }
+
+    @PutMapping("/api/realtime-chat/messages/{messageId}")
+    @Transactional
+    public ResponseEntity<?> editMessageRest(@PathVariable Long messageId, @RequestBody Map<String, String> body) {
+        String currentUsername = getCurrentUsername();
+        String newContent = body.get("content");
+        if (!StringUtils.hasText(newContent)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Nội dung tin nhắn không được để trống!"));
+        }
+        executeEditMessage(messageId, currentUsername, newContent.trim());
+        return ResponseEntity.ok(Map.of("status", "SUCCESS", "message", "Đã cập nhật tin nhắn"));
+    }
+
+    private void executeEditMessage(Long messageId, String currentUsername, String newContent) {
+        RealtimeMessage message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy tin nhắn!"));
+
+        if (!message.getSenderUsername().equalsIgnoreCase(currentUsername)) {
+            throw new RuntimeException("Bạn chỉ có thể chỉnh sửa tin nhắn của chính mình!");
+        }
+
+        if (Boolean.TRUE.equals(message.getIsDeleted())) {
+            throw new RuntimeException("Không thể chỉnh sửa tin nhắn đã bị thu hồi!");
+        }
+
+        if (message.getType() != MessageType.CHAT) {
+            throw new RuntimeException("Chỉ có thể chỉnh sửa tin nhắn văn bản!");
+        }
+
+        message.setContent(newContent);
+        message.setIsEdited(true);
+        message.setEditedAt(java.time.LocalDateTime.now());
+        messageRepository.save(message);
+
+        Map<String, Object> event = new HashMap<>();
+        event.put("type", "MESSAGE_EDITED");
+        event.put("messageId", messageId);
+        event.put("roomId", message.getRoomId());
+        event.put("newContent", newContent);
+        event.put("editedAt", message.getEditedAt().toString());
+
+        messagingTemplate.convertAndSend("/topic/room." + message.getRoomId(), (Object) event);
+        messagingTemplate.convertAndSend("/topic/private." + message.getRoomId(), (Object) event);
+        if (message.getRecipientUsername() != null) {
+            messagingTemplate.convertAndSendToUser(message.getRecipientUsername(), "/queue/messages", event);
+            messagingTemplate.convertAndSendToUser(message.getSenderUsername(), "/queue/messages", event);
+        }
+    }
+
+    // =========================================================================
+    //                        BIỆT DANH (NICKNAMES)
+    // =========================================================================
+
+    @GetMapping("/api/realtime-chat/rooms/{roomId}/nicknames")
+    public ResponseEntity<Map<String, String>> getNicknames(@PathVariable String roomId) {
+        List<ChatNickname> list = nicknameRepository.findByRoomId(roomId);
+        Map<String, String> map = list.stream()
+                .collect(Collectors.toMap(ChatNickname::getUsername, ChatNickname::getNickname, (a, b) -> b));
+        return ResponseEntity.ok(map);
+    }
+
+    @PostMapping("/api/realtime-chat/rooms/{roomId}/nicknames")
+    @Transactional
+    public ResponseEntity<?> setNickname(@PathVariable String roomId, @RequestBody Map<String, String> body) {
+        String currentUsername = getCurrentUsername();
+        String targetUsername = body.get("username");
+        String nickname = body.get("nickname");
+
+        if (!StringUtils.hasText(targetUsername)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Thiếu username!"));
+        }
+
+        ChatNickname nick = nicknameRepository.findByRoomIdAndUsername(roomId, targetUsername)
+                .orElse(ChatNickname.builder().roomId(roomId).username(targetUsername).build());
+
+        String cleanNick = StringUtils.hasText(nickname) ? nickname.trim() : "";
+        nick.setNickname(cleanNick);
+        nick.setUpdatedBy(currentUsername);
+        nicknameRepository.save(nick);
+
+        Map<String, Object> event = new HashMap<>();
+        event.put("type", "NICKNAME_UPDATED");
+        event.put("roomId", roomId);
+        event.put("username", targetUsername);
+        event.put("nickname", cleanNick);
+        event.put("updatedBy", currentUsername);
+
+        messagingTemplate.convertAndSend("/topic/room." + roomId, (Object) event);
+        messagingTemplate.convertAndSend("/topic/private." + roomId, (Object) event);
+        if (roomId.contains("_") && !roomId.startsWith("GROUP_")) {
+            String[] parts = roomId.split("_");
+            messagingTemplate.convertAndSendToUser(parts[0], "/queue/messages", event);
+            messagingTemplate.convertAndSendToUser(parts[1], "/queue/messages", event);
+        }
+
+        return ResponseEntity.ok(Map.of("status", "SUCCESS", "nickname", cleanNick));
     }
 
     /**
@@ -207,6 +582,38 @@ public class RealtimeChatController {
                 .filter(u -> !"LOCKED".equalsIgnoreCase(u.getStatus()))
                 .map(UserResponseDto::fromEntity)
                 .collect(Collectors.toList());
+
+        for (UserResponseDto dto : colleagues) {
+            String roomId = buildPrivateRoomId(currentUsername, dto.getUsername());
+            List<RealtimeMessage> lastMsgs = messageRepository.findByRoomIdOrderByIdDesc(roomId, PageRequest.of(0, 1));
+            if (!lastMsgs.isEmpty()) {
+                RealtimeMessage m = lastMsgs.get(0);
+                String preview = m.getContent();
+                if (Boolean.TRUE.equals(m.getIsDeleted())) {
+                    preview = "Tin nhắn đã được thu hồi";
+                } else if (m.getType() == MessageType.IMAGE) {
+                    preview = "📷 [Hình ảnh]";
+                } else if (m.getType() == MessageType.VIDEO) {
+                    preview = "🎥 [Video]";
+                }
+                dto.setLastMessageContent(preview);
+                dto.setLastMessageTime(m.getCreatedAt());
+                dto.setLastMessageStatus(m.getStatus() != null ? m.getStatus().name() : "SENT");
+                dto.setLastMessageSender(m.getSenderUsername());
+            }
+        }
+
+        colleagues.sort((a, b) -> {
+            if (a.getLastMessageTime() == null && b.getLastMessageTime() == null) {
+                String nameA = a.getFullName() != null ? a.getFullName() : a.getUsername();
+                String nameB = b.getFullName() != null ? b.getFullName() : b.getUsername();
+                return nameA.compareToIgnoreCase(nameB);
+            }
+            if (a.getLastMessageTime() == null) return 1;
+            if (b.getLastMessageTime() == null) return -1;
+            return b.getLastMessageTime().compareTo(a.getLastMessageTime());
+        });
+
         return ResponseEntity.ok(colleagues);
     }
 

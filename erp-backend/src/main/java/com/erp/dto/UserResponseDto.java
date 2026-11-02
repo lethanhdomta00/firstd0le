@@ -23,6 +23,10 @@ public class UserResponseDto {
     private String bio;
     private Role role;
     private String status;
+    private String lastMessageContent;
+    private LocalDateTime lastMessageTime;
+    private String lastMessageStatus; // "SENT" | "READ"
+    private String lastMessageSender;
     private LocalDateTime createdAt;
 
     public static UserResponseDto fromEntity(User user) {

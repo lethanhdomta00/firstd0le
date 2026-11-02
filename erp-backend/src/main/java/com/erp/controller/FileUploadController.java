@@ -19,10 +19,11 @@ public class FileUploadController {
     @PostMapping("/upload")
     public ResponseEntity<?> uploadImage(@RequestParam("file") MultipartFile file) {
         try {
-            String imageUrl = fileStorageService.uploadImage(file);
+            Map<String, String> result = fileStorageService.uploadMedia(file);
             return ResponseEntity.ok(Map.of(
                     "status", "SUCCESS",
-                    "url", imageUrl
+                    "url", result.get("url"),
+                    "resourceType", result.get("resourceType")
             ));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of(
@@ -32,7 +33,7 @@ public class FileUploadController {
         } catch (IOException e) {
             return ResponseEntity.internalServerError().body(Map.of(
                     "status", "ERROR",
-                    "message", "Lỗi trong quá trình tải ảnh lên Cloud: " + e.getMessage()
+                    "message", "Lỗi trong quá trình tải tệp lên Cloud: " + e.getMessage()
             ));
         }
     }
