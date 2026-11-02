@@ -31,6 +31,11 @@ public interface RealtimeMessageRepository extends JpaRepository<RealtimeMessage
            "OR (m.senderUsername = :user2 AND m.recipientUsername = :user1) ORDER BY m.createdAt ASC")
     List<RealtimeMessage> findPrivateMessagesBetween(@Param("user1") String user1, @Param("user2") String user2);
 
+    // Lấy tin nhắn mới nhất giữa 2 người (chat 1-1)
+    @Query("SELECT m FROM RealtimeMessage m WHERE (m.senderUsername = :user1 AND m.recipientUsername = :user2) " +
+           "OR (m.senderUsername = :user2 AND m.recipientUsername = :user1) ORDER BY m.id DESC")
+    List<RealtimeMessage> findLastMessageBetween(@Param("user1") String user1, @Param("user2") String user2, Pageable pageable);
+
     // Đếm số lượng tin nhắn chưa đọc gửi tới một người
     long countByRecipientUsernameAndStatus(String recipientUsername, MessageStatus status);
 

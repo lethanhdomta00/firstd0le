@@ -299,9 +299,7 @@ public class RealtimeChatController {
     @GetMapping("/api/realtime-chat/private-history/{targetUsername}")
     public ResponseEntity<List<RealtimeMessageDto>> getPrivateHistory(@PathVariable String targetUsername) {
         String currentUsername = getCurrentUsername();
-        String roomId = buildPrivateRoomId(currentUsername, targetUsername);
-
-        List<RealtimeMessageDto> history = messageRepository.findByRoomIdOrderByCreatedAtAsc(roomId)
+        List<RealtimeMessageDto> history = messageRepository.findPrivateMessagesBetween(currentUsername, targetUsername)
                 .stream()
                 .map(RealtimeMessageDto::fromEntity)
                 .collect(Collectors.toList());
@@ -584,8 +582,7 @@ public class RealtimeChatController {
                 .collect(Collectors.toList());
 
         for (UserResponseDto dto : colleagues) {
-            String roomId = buildPrivateRoomId(currentUsername, dto.getUsername());
-            List<RealtimeMessage> lastMsgs = messageRepository.findByRoomIdOrderByIdDesc(roomId, PageRequest.of(0, 1));
+            List<RealtimeMessage> lastMsgs = messageRepository.findLastMessageBetween(currentUsername, dto.getUsername(), PageRequest.of(0, 1));
             if (!lastMsgs.isEmpty()) {
                 RealtimeMessage m = lastMsgs.get(0);
                 String preview = m.getContent();
@@ -634,10 +631,14 @@ public class RealtimeChatController {
      * Ví dụ: giữa "admin" và "john" luôn là "admin_john" bất kể ai là người gửi trước.
      */
     public static String buildPrivateRoomId(String user1, String user2) {
-        if (user1.compareTo(user2) <= 0) {
-            return user1 + "_" + user2;
+        if (user1 == null) user1 = "";
+        if (user2 == null) user2 = "";
+        String u1 = user1.trim().toLowerCase();
+        String u2 = user2.trim().toLowerCase();
+        if (u1.compareTo(u2) <= 0) {
+            return u1 + "_" + u2;
         } else {
-            return user2 + "_" + user1;
+            return u2 + "_" + u1;
         }
     }
 }

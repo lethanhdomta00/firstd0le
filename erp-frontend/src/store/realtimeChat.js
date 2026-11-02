@@ -343,28 +343,42 @@ export const useRealtimeChatStore = defineStore('realtimeChat', {
       }
 
       // --- TRƯỜNG HỢP 6: TIN NHẮN MỚI ---
-      if (!this.messagesByRoom[roomId]) {
-        this.messagesByRoom[roomId] = []
+      let targetRoom = roomId
+      if (targetRoom && targetRoom.includes('_') && !targetRoom.startsWith('GROUP_')) {
+        targetRoom = targetRoom.toLowerCase()
+      }
+
+      if (!this.messagesByRoom[targetRoom]) {
+        this.messagesByRoom[targetRoom] = []
       }
 
       const authStore = useAuthStore()
-      const isMyMessage = messageDto.senderUsername === authStore.user?.username
+      const myUsername = authStore.user?.username
+      const isMyMessage = messageDto.senderUsername?.toLowerCase() === myUsername?.toLowerCase()
 
       // Kiểm tra xem có tin nhắn tạm thời (optimistic update) của chính mình đang chờ server phản hồi không
-      const tempIndex = this.messagesByRoom[roomId].findIndex(m => 
-        typeof m.id === 'string' && m.id.startsWith('temp_') &&
-        m.senderUsername === messageDto.senderUsername &&
-        m.content === messageDto.content
-      )
+      const candidateRooms = Array.from(new Set([targetRoom, this.activeRoomId, roomId].filter(Boolean)))
+      let replaced = false
+      for (const r of candidateRooms) {
+        if (this.messagesByRoom[r]) {
+          const tempIndex = this.messagesByRoom[r].findIndex(m => 
+            typeof m.id === 'string' && m.id.startsWith('temp_') &&
+            m.senderUsername?.toLowerCase() === messageDto.senderUsername?.toLowerCase() &&
+            m.content === messageDto.content
+          )
+          if (tempIndex !== -1) {
+            this.messagesByRoom[r][tempIndex] = { ...messageDto, status: messageDto.status || 'SENT' }
+            replaced = true
+            break
+          }
+        }
+      }
 
-      if (tempIndex !== -1) {
-        // Cập nhật tin nhắn tạm thành tin nhắn chính thức từ DB (có ID thật, createdAt thật)
-        this.messagesByRoom[roomId][tempIndex] = messageDto
-      } else {
+      if (!replaced) {
         // Tránh trùng lặp tin nhắn theo ID
-        const exists = this.messagesByRoom[roomId].some(m => m.id === messageDto.id)
+        const exists = this.messagesByRoom[targetRoom].some(m => m.id === messageDto.id)
         if (!exists) {
-          this.messagesByRoom[roomId].push(messageDto)
+          this.messagesByRoom[targetRoom].push(messageDto)
         }
       }
 
@@ -1194,11 +1208,13 @@ export const useRealtimeChatStore = defineStore('realtimeChat', {
     },
 
     /**
-     * Sinh Room ID 1-1 cố định theo thứ tự bảng chữ cái
+     * Sinh Room ID 1-1 cố định theo thứ tự bảng chữ cái (luôn chuẩn hóa chữ thường để đồng bộ 100% với Backend)
      */
     getPrivateRoomId(u1, u2) {
       if (!u1 || !u2) return 'PRIVATE'
-      return u1.localeCompare(u2) <= 0 ? `${u1}_${u2}` : `${u2}_${u1}`
+      const s1 = u1.trim().toLowerCase()
+      const s2 = u2.trim().toLowerCase()
+      return s1 <= s2 ? `${s1}_${s2}` : `${s2}_${s1}`
     }
   }
 })
