@@ -615,10 +615,14 @@ function handleUserMenuCommand(command) {
       cancelButtonText: 'Hủy',
       type: 'warning'
     }).then(() => {
-      chatStore.disconnect()
+      try {
+        chatStore.disconnect()
+      } catch (e) {
+        console.warn('Lỗi khi ngắt kết nối chat:', e)
+      }
       authStore.logout()
       ElMessage.success('Đã đăng xuất an toàn.')
-      router.push('/login')
+      window.location.replace('/login')
     }).catch(() => {})
   } else if (command === 'profile') {
     profileForm.fullName = authStore.user?.fullName || ''

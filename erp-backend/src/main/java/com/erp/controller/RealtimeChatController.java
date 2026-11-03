@@ -500,7 +500,7 @@ public class RealtimeChatController {
         event.put("messageId", messageId);
         event.put("roomId", message.getRoomId());
         event.put("newContent", newContent);
-        event.put("editedAt", message.getEditedAt().toString());
+        event.put("editedAt", message.getEditedAt() != null ? message.getEditedAt().toString() : null);
 
         messagingTemplate.convertAndSend("/topic/room." + message.getRoomId(), (Object) event);
         messagingTemplate.convertAndSend("/topic/private." + message.getRoomId(), (Object) event);
@@ -508,6 +508,107 @@ public class RealtimeChatController {
             messagingTemplate.convertAndSendToUser(message.getRecipientUsername(), "/queue/messages", event);
             messagingTemplate.convertAndSendToUser(message.getSenderUsername(), "/queue/messages", event);
         }
+    }
+
+    // =========================================================================
+    //                        GHIM TIN NHẮN (PIN / UNPIN)
+    // =========================================================================
+
+    /**
+     * Lấy danh sách tin nhắn đã ghim trong một phòng
+     */
+    @GetMapping("/api/realtime-chat/rooms/{roomId}/pinned")
+    public ResponseEntity<List<RealtimeMessageDto>> getPinnedMessages(@PathVariable String roomId) {
+        List<RealtimeMessage> pinned;
+        if ("GLOBAL".equalsIgnoreCase(roomId) || roomId.startsWith("GROUP_")) {
+            pinned = messageRepository.findByRoomIdAndIsPinnedTrueOrderByPinnedAtDesc(roomId);
+        } else {
+            // Chat riêng 1-1
+            String[] parts = roomId.split("_");
+            if (parts.length >= 2) {
+                pinned = messageRepository.findPinnedMessagesBetween(roomId, parts[0], parts[1]);
+            } else {
+                pinned = messageRepository.findByRoomIdAndIsPinnedTrueOrderByPinnedAtDesc(roomId);
+            }
+        }
+        List<RealtimeMessageDto> dtos = pinned.stream()
+                .map(RealtimeMessageDto::fromEntity)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(dtos);
+    }
+
+    /**
+     * WebSocket: Ghim hoặc Bỏ ghim tin nhắn
+     */
+    @MessageMapping("/chat.pinMessage")
+    @Transactional
+    public void pinMessageWs(@Payload Map<String, Object> payload, Principal principal) {
+        String currentUsername = (principal != null && StringUtils.hasText(principal.getName()))
+                ? principal.getName()
+                : (String) payload.get("username");
+        Long messageId = payload.get("messageId") != null ? Long.valueOf(payload.get("messageId").toString()) : null;
+        Boolean isPinned = payload.containsKey("isPinned") && payload.get("isPinned") != null 
+                ? Boolean.valueOf(payload.get("isPinned").toString()) 
+                : null;
+        if (messageId != null && currentUsername != null) {
+            executeTogglePin(messageId, currentUsername, isPinned);
+        }
+    }
+
+    /**
+     * REST: Ghim hoặc Bỏ ghim tin nhắn
+     */
+    @PutMapping("/api/realtime-chat/messages/{messageId}/pin")
+    @Transactional
+    public ResponseEntity<?> togglePinMessageRest(@PathVariable Long messageId, @RequestBody(required = false) Map<String, Object> body) {
+        String currentUsername = getCurrentUsername();
+        Boolean targetPinned = null;
+        if (body != null && body.containsKey("isPinned") && body.get("isPinned") != null) {
+            targetPinned = Boolean.valueOf(body.get("isPinned").toString());
+        }
+        RealtimeMessageDto updated = executeTogglePin(messageId, currentUsername, targetPinned);
+        return ResponseEntity.ok(Map.of(
+                "status", "SUCCESS",
+                "message", Boolean.TRUE.equals(updated.getIsPinned()) ? "Đã ghim tin nhắn" : "Đã bỏ ghim tin nhắn",
+                "data", updated
+        ));
+    }
+
+    private RealtimeMessageDto executeTogglePin(Long messageId, String currentUsername, Boolean targetPinned) {
+        RealtimeMessage message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy tin nhắn!"));
+
+        if (Boolean.TRUE.equals(message.getIsDeleted())) {
+            throw new RuntimeException("Không thể ghim tin nhắn đã bị thu hồi!");
+        }
+
+        boolean newPinState = targetPinned != null ? targetPinned : !Boolean.TRUE.equals(message.getIsPinned());
+        message.setIsPinned(newPinState);
+        message.setPinnedAt(newPinState ? java.time.LocalDateTime.now() : null);
+        message.setPinnedBy(newPinState ? currentUsername : null);
+        RealtimeMessage saved = messageRepository.save(message);
+
+        RealtimeMessageDto dto = RealtimeMessageDto.fromEntity(saved);
+
+        Map<String, Object> event = new HashMap<>();
+        event.put("type", newPinState ? "MESSAGE_PINNED" : "MESSAGE_UNPINNED");
+        event.put("messageId", messageId);
+        event.put("roomId", message.getRoomId());
+        event.put("isPinned", newPinState);
+        event.put("pinnedBy", currentUsername);
+        event.put("pinnedAt", saved.getPinnedAt() != null ? saved.getPinnedAt().toString() : null);
+        event.put("message", dto);
+
+        messagingTemplate.convertAndSend("/topic/room." + message.getRoomId(), (Object) event);
+        messagingTemplate.convertAndSend("/topic/private." + message.getRoomId(), (Object) event);
+        if (message.getRecipientUsername() != null) {
+            messagingTemplate.convertAndSendToUser(message.getRecipientUsername(), "/queue/messages", event);
+            messagingTemplate.convertAndSendToUser(message.getSenderUsername(), "/queue/messages", event);
+        }
+
+        log.info("Message Pin: [{}] đã {} tin nhắn #{} trong phòng [{}]", 
+                currentUsername, newPinState ? "GHIM" : "BỎ GHIM", messageId, message.getRoomId());
+        return dto;
     }
 
     // =========================================================================
@@ -559,6 +660,85 @@ public class RealtimeChatController {
         return ResponseEntity.ok(Map.of("status", "SUCCESS", "nickname", cleanNick));
     }
 
+    // =========================================================================
+    //                        THĂM DÒ Ý KIẾN (POLL VOTE)
+    // =========================================================================
+
+    @PostMapping("/api/realtime-chat/messages/{messageId}/poll/vote")
+    @Transactional
+    public ResponseEntity<?> votePoll(@PathVariable Long messageId, @RequestBody Map<String, Object> body) {
+        String currentUsername = getCurrentUsername();
+        RealtimeMessage message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy tin nhắn bình chọn!"));
+
+        if (message.getType() != MessageType.POLL || !StringUtils.hasText(message.getContent())) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Tin nhắn không phải bình chọn!"));
+        }
+
+        Integer optionId = body.get("optionId") != null ? Integer.valueOf(body.get("optionId").toString()) : null;
+        if (optionId == null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Thiếu optionId!"));
+        }
+
+        try {
+            Map<String, Object> pollData = OBJECT_MAPPER.readValue(message.getContent(), new TypeReference<Map<String, Object>>() {});
+            List<Map<String, Object>> options = (List<Map<String, Object>>) pollData.get("options");
+            boolean isMultiple = Boolean.TRUE.equals(pollData.get("isMultiple"));
+
+            if (!isMultiple) {
+                // Đơn chọn: Hủy vote ở các option khác trước
+                for (Map<String, Object> opt : options) {
+                    Integer optId = opt.get("id") != null ? Integer.valueOf(opt.get("id").toString()) : null;
+                    if (!Objects.equals(optId, optionId)) {
+                        List<String> votes = (List<String>) opt.get("votes");
+                        if (votes != null) {
+                            votes.remove(currentUsername);
+                        }
+                    }
+                }
+            }
+
+            for (Map<String, Object> opt : options) {
+                Integer optId = opt.get("id") != null ? Integer.valueOf(opt.get("id").toString()) : null;
+                if (Objects.equals(optId, optionId)) {
+                    List<String> votes = (List<String>) opt.get("votes");
+                    if (votes == null) {
+                        votes = new ArrayList<>();
+                        opt.put("votes", votes);
+                    }
+                    if (votes.contains(currentUsername)) {
+                        votes.remove(currentUsername);
+                    } else {
+                        votes.add(currentUsername);
+                    }
+                }
+            }
+
+            String updatedJson = OBJECT_MAPPER.writeValueAsString(pollData);
+            message.setContent(updatedJson);
+            messageRepository.save(message);
+
+            Map<String, Object> event = new HashMap<>();
+            event.put("type", "POLL_VOTED");
+            event.put("messageId", messageId);
+            event.put("roomId", message.getRoomId());
+            event.put("pollData", pollData);
+            event.put("votedBy", currentUsername);
+
+            messagingTemplate.convertAndSend("/topic/room." + message.getRoomId(), (Object) event);
+            messagingTemplate.convertAndSend("/topic/private." + message.getRoomId(), (Object) event);
+            if (message.getRecipientUsername() != null) {
+                messagingTemplate.convertAndSendToUser(message.getRecipientUsername(), "/queue/messages", event);
+                messagingTemplate.convertAndSendToUser(message.getSenderUsername(), "/queue/messages", event);
+            }
+
+            return ResponseEntity.ok(pollData);
+        } catch (Exception e) {
+            log.error("Lỗi khi xử lý vote poll: {}", e.getMessage());
+            return ResponseEntity.internalServerError().body(Map.of("message", "Lỗi xử lý bình chọn: " + e.getMessage()));
+        }
+    }
+
     /**
      * Đếm tổng số tin nhắn chưa đọc của tôi
      */
@@ -582,6 +762,10 @@ public class RealtimeChatController {
                 .collect(Collectors.toList());
 
         for (UserResponseDto dto : colleagues) {
+            String privateRoomId = buildPrivateRoomId(currentUsername, dto.getUsername());
+            nicknameRepository.findByRoomIdAndUsername(privateRoomId, dto.getUsername())
+                    .ifPresent(n -> dto.setNickname(n.getNickname()));
+
             List<RealtimeMessage> lastMsgs = messageRepository.findLastMessageBetween(currentUsername, dto.getUsername(), PageRequest.of(0, 1));
             if (!lastMsgs.isEmpty()) {
                 RealtimeMessage m = lastMsgs.get(0);
@@ -592,6 +776,12 @@ public class RealtimeChatController {
                     preview = "📷 [Hình ảnh]";
                 } else if (m.getType() == MessageType.VIDEO) {
                     preview = "🎥 [Video]";
+                } else if (m.getType() == MessageType.VOICE) {
+                    preview = "🎙️ [Tin nhắn thoại]";
+                } else if (m.getType() == MessageType.POLL) {
+                    preview = "📊 [Bình chọn]";
+                } else if (m.getType() == MessageType.FILE) {
+                    preview = "📎 [Tệp đính kèm]";
                 }
                 dto.setLastMessageContent(preview);
                 dto.setLastMessageTime(m.getCreatedAt());

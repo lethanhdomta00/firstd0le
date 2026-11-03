@@ -23,6 +23,7 @@ public class UserResponseDto {
     private String bio;
     private Role role;
     private String status;
+    private String nickname;
     private String lastMessageContent;
     private LocalDateTime lastMessageTime;
     private String lastMessageStatus; // "SENT" | "READ"

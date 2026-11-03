@@ -87,13 +87,24 @@ public class RealtimeMessage {
     @Column(name = "edited_at")
     private LocalDateTime editedAt;
 
+    // --- TÍNH NĂNG GHIM TIN NHẮN (PINNED) ---
+    @Column(name = "is_pinned")
+    @Builder.Default
+    private Boolean isPinned = false;
+
+    @Column(name = "pinned_at")
+    private LocalDateTime pinnedAt;
+
+    @Column(name = "pinned_by", length = 50)
+    private String pinnedBy;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
     @PrePersist
     protected void onCreate() {
         if (this.createdAt == null) {
-            this.createdAt = LocalDateTime.now();
+            this.createdAt = java.time.LocalDateTime.now();
         }
         if (this.roomId == null || this.roomId.trim().isEmpty()) {
             this.roomId = "GLOBAL";
@@ -103,6 +114,9 @@ public class RealtimeMessage {
         }
         if (this.status == null) {
             this.status = MessageStatus.SENT;
+        }
+        if (this.isPinned == null) {
+            this.isPinned = false;
         }
     }
 }

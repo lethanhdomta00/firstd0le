@@ -4,7 +4,7 @@
     <div class="chat-card-container">
       
       <!-- CỘT TRÁI: DANH BẠ KÊNH & ĐỒNG NGHIỆP -->
-      <aside class="chat-sidebar">
+      <aside class="chat-sidebar" :class="{ 'is-mobile-hidden': showMobileChat }">
         <!-- Header danh bạ -->
         <div class="sidebar-header">
           <div class="sidebar-header-top">
@@ -183,7 +183,7 @@
 
             <div class="item-info">
               <div class="item-top-row">
-                <span class="item-name">{{ chatStore.getNickname(colleague.username, colleague.fullName || colleague.username) }}</span>
+                <span class="item-name">{{ getColleagueDisplayName(colleague) }}</span>
                 <span v-if="colleague.lastMessageTime" class="item-time">{{ formatSidebarTime(colleague.lastMessageTime) }}</span>
                 <span v-else class="role-badge" :class="colleague.role === 'ADMIN' ? 'role-admin' : 'role-user'">
                   {{ colleague.role === 'ADMIN' ? 'ADMIN' : 'STAFF' }}
@@ -236,11 +236,18 @@
       </aside>
 
       <!-- CỘT PHẢI: KHUNG HỘI THOẠI TRỰC TUYẾN CHÍNH -->
-      <main class="chat-main">
+      <main class="chat-main" :class="{ 'is-mobile-hidden': !showMobileChat }" :style="chatMainStyle">
         
         <!-- Header khung hội thoại -->
         <header class="main-header">
           <div class="current-room-info">
+            <!-- Nút quay lại danh bạ trên giao diện Mobile -->
+            <button type="button" class="btn-mobile-back" title="Quay lại danh sách chat" @click="backToSidebar">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg>
+            </button>
+
             <!-- Icon/Avatar phòng đang mở -->
             <div v-if="chatStore.activeChatType === 'PUBLIC'" class="header-room-avatar channel-avatar">
               <span class="hash-tag">#</span>
@@ -278,80 +285,237 @@
             </div>
           </div>
 
-          <!-- Nút hành động nhanh trên Header -->
+          <!-- Nút hành động nhanh trên Header (Đã thu gọn cực kỳ tinh tế & gọn gàng) -->
           <div class="header-actions">
-            <!-- Nút Quản lý Thành viên Nhóm -->
+            <!-- Nút Tìm kiếm tin nhắn trong đoạn chat -->
             <button 
-              v-if="chatStore.activeChatType === 'GROUP'"
-              class="btn-group-manage-action"
-              title="Xem và quản lý thành viên nhóm"
-              @click="openGroupMembersModal"
-            >
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                <circle cx="9" cy="7" r="4"></circle>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-              </svg>
-              <span>Thành viên ({{ chatStore.activeGroup?.memberCount }})</span>
-            </button>
-
-            <!-- Nút Đặt Biệt danh cho cuộc trò chuyện -->
-            <button 
-              v-if="chatStore.activeChatType !== 'PUBLIC'"
               class="btn-icon-action" 
-              title="Đặt biệt danh trong cuộc trò chuyện"
-              @click="openNicknameModal"
+              :class="{ 'is-search-active': isSearchOpen }"
+              title="Tìm kiếm tin nhắn trong cuộc trò chuyện (Ctrl+F)"
+              @click="toggleSearchBar"
             >
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
-                <line x1="7" y1="7" x2="7.01" y2="7"></line>
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
               </svg>
             </button>
 
-            <!-- Nút Bật/Tắt âm thanh thông báo -->
+            <!-- Nút Ngăn lưu trữ Media & Tài liệu (Shared Drawer) -->
             <button 
               class="btn-icon-action" 
-              :class="{ 'is-muted': !chatStore.isSoundEnabled }"
-              :title="chatStore.isSoundEnabled ? 'Âm thanh thông báo: BẬT (Bấm để tắt)' : 'Âm thanh thông báo: TẮT (Bấm để bật)'"
-              @click="handleToggleSound"
-            >
-              <svg v-if="chatStore.isSoundEnabled" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-                <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-              </svg>
-              <svg v-else viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-                <line x1="23" y1="9" x2="17" y2="15"></line>
-                <line x1="17" y1="9" x2="23" y2="15"></line>
-              </svg>
-            </button>
-
-            <!-- Nút Bật thông báo Desktop màn hình -->
-            <button 
-              class="btn-icon-action" 
-              :class="{ 'is-notif-active': chatStore.isNotificationEnabled }"
-              :title="chatStore.isNotificationEnabled ? 'Thông báo Desktop: ĐANG BẬT' : 'Bật thông báo Desktop khi rời tab'"
-              @click="handleToggleNotification"
+              :class="{ 'is-drawer-open': showMediaDrawer }"
+              title="Media, Tệp tin & Liên kết đã chia sẻ"
+              @click="showMediaDrawer = !showMediaDrawer"
             >
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="15" y1="3" x2="15" y2="21"></line>
               </svg>
-              <span v-if="chatStore.isNotificationEnabled" class="notif-active-dot"></span>
             </button>
 
-            <button 
-              class="btn-icon-action" 
-              title="Tải lại lịch sử tin nhắn"
-              @click="refreshCurrentHistory"
-            >
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            </button>
+            <!-- Menu Tùy chọn Cuộc trò chuyện (Consolidated Dropdown Menu) -->
+            <div class="header-more-menu-wrapper">
+              <button 
+                type="button" 
+                class="btn-icon-action btn-header-more"
+                :class="{ 'is-active': isHeaderMenuOpen }"
+                title="Tùy chọn cuộc trò chuyện"
+                @click.stop="isHeaderMenuOpen = !isHeaderMenuOpen"
+              >
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                  <circle cx="12" cy="5" r="2"></circle>
+                  <circle cx="12" cy="12" r="2"></circle>
+                  <circle cx="12" cy="19" r="2"></circle>
+                </svg>
+              </button>
+
+              <!-- Dropdown Menu Header -->
+              <transition name="popover-fade">
+                <div v-if="isHeaderMenuOpen" class="header-dropdown-menu" @click.stop>
+                  <!-- 1. Đổi màu chủ đề -->
+                  <button type="button" class="header-menu-item" @click="openThemePicker(); isHeaderMenuOpen = false">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="13.5" cy="6.5" r=".5" fill="currentColor"></circle>
+                      <circle cx="17.5" cy="10.5" r=".5" fill="currentColor"></circle>
+                      <circle cx="8.5" cy="7.5" r=".5" fill="currentColor"></circle>
+                      <circle cx="6.5" cy="12.5" r=".5" fill="currentColor"></circle>
+                      <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"></path>
+                    </svg>
+                    <span>Màu chủ đề đoạn chat</span>
+                  </button>
+
+                  <!-- 2. Tin nhắn đã lưu -->
+                  <button type="button" class="header-menu-item" @click="openSavedMessagesModal(); isHeaderMenuOpen = false">
+                    <svg viewBox="0 0 24 24" width="16" height="16" :fill="chatStore.savedMessages.length > 0 ? '#f59e0b' : 'none'" stroke="currentColor" stroke-width="2">
+                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                    </svg>
+                    <span>Tin nhắn đã lưu ({{ chatStore.savedMessages.length }})</span>
+                  </button>
+
+                  <!-- 3. Đặt biệt danh (khi chat 1-1 hoặc nhóm) -->
+                  <button 
+                    v-if="chatStore.activeChatType !== 'PUBLIC'"
+                    type="button" 
+                    class="header-menu-item" 
+                    @click="openNicknameModal(); isHeaderMenuOpen = false"
+                  >
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+                      <line x1="7" y1="7" x2="7.01" y2="7"></line>
+                    </svg>
+                    <span>Đặt biệt danh</span>
+                  </button>
+
+                  <!-- 4. Quản lý thành viên nhóm (nếu là nhóm) -->
+                  <button 
+                    v-if="chatStore.activeChatType === 'GROUP'"
+                    type="button" 
+                    class="header-menu-item" 
+                    @click="openGroupMembersModal(); isHeaderMenuOpen = false"
+                  >
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                      <circle cx="9" cy="7" r="4"></circle>
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                    <span>Thành viên nhóm ({{ chatStore.activeGroup?.memberCount }})</span>
+                  </button>
+
+                  <div class="dropdown-menu-divider"></div>
+
+                  <!-- 5. Âm thanh thông báo -->
+                  <button type="button" class="header-menu-item" @click="handleToggleSound">
+                    <svg v-if="chatStore.isSoundEnabled" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                      <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                    </svg>
+                    <svg v-else viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                      <line x1="23" y1="9" x2="17" y2="15"></line>
+                      <line x1="17" y1="9" x2="23" y2="15"></line>
+                    </svg>
+                    <span>Âm thanh: {{ chatStore.isSoundEnabled ? 'BẬT' : 'TẮT' }}</span>
+                  </button>
+
+                  <!-- 6. Thông báo Desktop -->
+                  <button type="button" class="header-menu-item" @click="handleToggleNotification">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                      <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                    </svg>
+                    <span>Thông báo đẩy: {{ chatStore.isNotificationEnabled ? 'BẬT' : 'TẮT' }}</span>
+                  </button>
+
+                  <!-- 7. Tải lại lịch sử chat -->
+                  <button type="button" class="header-menu-item" @click="refreshCurrentHistory(); isHeaderMenuOpen = false">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <span>Tải lại tin nhắn</span>
+                  </button>
+                </div>
+              </transition>
+            </div>
           </div>
         </header>
+
+        <!-- THANH TÌM KIẾM TIN NHẮN TRONG PHÒNG (IN-CHAT SEARCH) -->
+        <transition name="search-expand">
+          <div v-if="isSearchOpen" class="in-chat-search-bar">
+            <div class="search-input-box">
+              <svg class="search-icon-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input 
+                ref="searchInputRef"
+                v-model="searchQuery" 
+                type="text" 
+                class="search-text-input" 
+                placeholder="Tìm tin nhắn trong cuộc trò chuyện này... (Enter để tìm tiếp, ESC để đóng)"
+                @keydown.enter.prevent="handleSearchNext"
+                @keydown.esc="closeSearch"
+              />
+              <span v-if="searchQuery.trim()" class="search-counter-badge" :class="{ 'has-matches': searchMatchCount > 0 }">
+                {{ searchMatchCount > 0 ? `${currentMatchIndex + 1}/${searchMatchCount}` : '0 kết quả' }}
+              </span>
+            </div>
+            <div class="search-nav-controls">
+              <button 
+                class="btn-search-step" 
+                :disabled="searchMatchCount === 0" 
+                title="Kết quả trước (Shift+Enter)" 
+                @click="handleSearchPrev"
+              >
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="18 15 12 9 6 15"></polyline>
+                </svg>
+              </button>
+              <button 
+                class="btn-search-step" 
+                :disabled="searchMatchCount === 0" 
+                title="Kết quả tiếp theo (Enter)" 
+                @click="handleSearchNext"
+              >
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </button>
+              <button class="btn-search-exit" title="Đóng tìm kiếm (ESC)" @click="closeSearch">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </transition>
+
+        <!-- THANH TIN NHẮN ĐÃ GHIM (PINNED MESSAGE BANNER) -->
+        <transition name="pinned-fade">
+          <div v-if="currentPinnedList && currentPinnedList.length > 0" class="pinned-message-banner">
+            <div class="pinned-banner-main" @click="scrollToPinnedMessage">
+              <div class="pinned-icon-badge">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+                  <path d="M16 4l1 1v2l-3 3v5l-2 2-2-2V10L7 7V5l1-1h8m0-2H8c-1.1 0-2 .9-2 2v2.59L8.41 9H8v5.59L6 16.59V18h5v5l1 1 1-1v-5h5v-1.41l-2-2V9h-.41L18 6.59V4c0-1.1-.9-2-2-2z"/>
+                </svg>
+              </div>
+              <div class="pinned-text-column">
+                <div class="pinned-author-line">
+                  <span class="pinned-badge-title">Tin nhắn đã ghim</span>
+                  <span v-if="currentPinnedList.length > 1" class="pinned-counter-tag">{{ activePinnedIndex + 1 }}/{{ currentPinnedList.length }}</span>
+                  <span class="pinned-author-name">• {{ chatStore.getNickname(currentActivePinnedMessage.senderUsername, currentActivePinnedMessage.senderFullName || currentActivePinnedMessage.senderUsername) }}</span>
+                </div>
+                <div class="pinned-preview-snippet">
+                  {{ getPinnedSnippet(currentActivePinnedMessage) }}
+                </div>
+              </div>
+            </div>
+            <div class="pinned-banner-actions">
+              <button 
+                v-if="currentPinnedList.length > 1" 
+                class="btn-pinned-action" 
+                title="Xem tin ghim tiếp theo" 
+                @click.stop="cyclePinnedMessage"
+              >
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+              </button>
+              <button 
+                class="btn-pinned-action btn-unpin-trigger" 
+                title="Bỏ ghim tin nhắn này" 
+                @click.stop="handleUnpinMessage(currentActivePinnedMessage.id)"
+              >
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </transition>
 
         <!-- Vùng hiển thị tin nhắn (Scroll container) -->
         <div ref="messagesScrollRef" class="messages-viewport" @scroll="handleScroll">
@@ -432,7 +596,10 @@
                   :class="{ 
                     'is-image-bubble': msg.type === 'IMAGE', 
                     'is-video-bubble': msg.type === 'VIDEO', 
-                    'is-deleted-bubble': msg.isDeleted 
+                    'is-file-bubble': msg.type === 'FILE',
+                    'is-deleted-bubble': msg.isDeleted,
+                    'is-pinned-bubble': msg.isPinned,
+                    'is-search-matched': highlightedMessageId === msg.id
                   }"
                 >
                   
@@ -484,12 +651,120 @@
                       <video :src="msg.content" controls playsinline class="bubble-video" preload="metadata"></video>
                     </div>
 
+                    <!-- Trường hợp: Tin nhắn Tệp tin / Tài liệu (FILE) -->
+                    <div v-else-if="msg.type === 'FILE'" class="bubble-file-wrapper">
+                      <div class="file-card-box">
+                        <div class="file-icon-square" :class="getFileThemeClass(getFileExt(msg.content))">
+                          <svg v-if="isPdf(msg.content)" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                          </svg>
+                          <svg v-else-if="isZip(msg.content)" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3"></path>
+                            <line x1="10" y1="3" x2="10" y2="12"></line>
+                            <line x1="10" y1="7" x2="14" y2="7"></line>
+                            <line x1="10" y1="10" x2="14" y2="10"></line>
+                          </svg>
+                          <svg v-else viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+                            <polyline points="13 2 13 9 20 9"></polyline>
+                          </svg>
+                        </div>
+                        <div class="file-details">
+                          <div class="file-card-title" :title="getFileName(msg.content)">{{ getFileName(msg.content) }}</div>
+                          <div class="file-card-badges">
+                            <span class="file-ext-chip">{{ getFileExt(msg.content).toUpperCase() }}</span>
+                            <span v-if="getFileSize(msg.content)" class="file-size-chip">{{ formatFileSize(getFileSize(msg.content)) }}</span>
+                          </div>
+                        </div>
+                        <a 
+                          :href="getFileUrl(msg.content)" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          :download="getFileName(msg.content)"
+                          class="btn-file-dl" 
+                          title="Tải về tệp tin"
+                          @click.stop
+                        >
+                          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                          </svg>
+                        </a>
+                      </div>
+                    </div>
+
+                    <!-- Trường hợp: Tin nhắn thoại (VOICE) -->
+                    <div v-else-if="msg.type === 'VOICE'" class="bubble-voice-wrapper">
+                      <button type="button" class="btn-voice-play" @click.stop="togglePlayVoice(msg)">
+                        <svg v-if="playingVoiceMsgId === msg.id" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                          <rect x="6" y="4" width="4" height="16"></rect>
+                          <rect x="14" y="4" width="4" height="16"></rect>
+                        </svg>
+                        <svg v-else viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                          <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                        </svg>
+                      </button>
+                      <div class="voice-waveform-box">
+                        <div class="voice-bars">
+                          <span v-for="n in 18" :key="n" class="waveform-bar" :class="{ 'is-animating': playingVoiceMsgId === msg.id }"></span>
+                        </div>
+                        <div class="voice-duration">
+                          {{ playingVoiceMsgId === msg.id ? formatVoiceTime(currentVoiceProgress) : formatVoiceTime(getVoiceDuration(msg.content)) }}
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Trường hợp: Cuộc bình chọn / Thăm dò ý kiến (POLL) -->
+                    <div v-else-if="msg.type === 'POLL'" class="bubble-poll-wrapper">
+                      <div class="poll-header">
+                        <div class="poll-icon-box">📊</div>
+                        <div class="poll-title-col">
+                          <h5 class="poll-question">{{ getPollData(msg.content).question }}</h5>
+                          <span class="poll-type-badge">{{ getPollData(msg.content).isMultiple ? 'Nhiều lựa chọn' : 'Một lựa chọn' }}</span>
+                        </div>
+                      </div>
+                      <div class="poll-options-list">
+                        <div 
+                          v-for="opt in (getPollData(msg.content).options || [])" 
+                          :key="opt.id"
+                          class="poll-option-row"
+                          :class="{ 'has-voted': (opt.votes || []).includes(authStore.user?.username) }"
+                          @click.stop="handleVotePoll(msg.id, opt.id)"
+                        >
+                          <div class="poll-option-progress-bg" :style="{ width: getVotePercent(getPollData(msg.content), opt) + '%' }"></div>
+                          <div class="poll-option-content">
+                            <div class="poll-check-icon">
+                              <svg v-if="(opt.votes || []).includes(authStore.user?.username)" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                              </svg>
+                              <span v-else class="poll-empty-circle"></span>
+                            </div>
+                            <span class="poll-option-text">{{ opt.text }}</span>
+                            <span class="poll-vote-count">{{ (opt.votes || []).length }} ({{ getVotePercent(getPollData(msg.content), opt) }}%)</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="poll-footer">
+                        <span class="poll-total-votes">{{ getTotalVotes(getPollData(msg.content)) }} người đã bình chọn</span>
+                      </div>
+                    </div>
+
                     <!-- Trường hợp: Tin nhắn văn bản thông thường -->
-                    <div v-else class="bubble-text">{{ msg.content }}</div>
+                    <div v-else class="bubble-text" v-html="formatMessageWithMentions(msg.content)"></div>
                   </template>
                   
                   <!-- Thời gian & trạng thái gửi -->
                   <div class="bubble-meta">
+                    <span v-if="msg.isPinned" class="meta-pinned-tag" title="Tin nhắn đã ghim">
+                      <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor">
+                        <path d="M16 4l1 1v2l-3 3v5l-2 2-2-2V10L7 7V5l1-1h8m0-2H8c-1.1 0-2 .9-2 2v2.59L8.41 9H8v5.59L6 16.59V18h5v5l1 1 1-1v-5h5v-1.41l-2-2V9h-.41L18 6.59V4c0-1.1-.9-2-2-2z"/>
+                      </svg>
+                      Đã ghim
+                    </span>
                     <span v-if="msg.isEdited && !msg.isDeleted" class="meta-edited-tag" title="Tin nhắn đã chỉnh sửa">(đã chỉnh sửa)</span>
                     <span class="meta-time">{{ formatTime(msg.createdAt) }}</span>
                     <span v-if="isMyMessage(msg) && !msg.isDeleted" class="meta-status-check">
@@ -527,55 +802,116 @@
                   </div>
                 </div>
 
-                <!-- Thanh thao tác nhanh khi Hover lên bong bóng (Reply, Reaction, Edit, Delete) -->
+                <!-- Thanh thao tác nhanh khi Hover: 2 emojis + Nút 3 chấm gọn gàng -->
                 <div v-if="!msg.isDeleted" class="message-actions-hover">
                   <button 
-                    v-for="emoji in ['👍', '❤️', '😂', '🔥']" 
+                    v-for="emoji in ['👍', '❤️']" 
                     :key="emoji"
                     type="button" 
                     class="btn-hover-reaction" 
                     :title="`Thả ${emoji}`"
-                    @click="chatStore.toggleReaction(msg.id, emoji)"
+                    @click.stop="chatStore.toggleReaction(msg.id, emoji)"
                   >
                     {{ emoji }}
                   </button>
-                  <button 
-                    type="button" 
-                    class="btn-hover-reply" 
-                    title="Trả lời tin nhắn này"
-                    @click="handleStartReply(msg)"
-                  >
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-                      <polyline points="9 14 4 9 9 4"></polyline>
-                      <path d="M20 20v-7a4 4 0 0 0-4-4H4"></path>
-                    </svg>
-                  </button>
-                  <!-- Nút Chỉnh sửa (chỉ tin nhắn văn bản của chính mình) -->
-                  <button 
-                    v-if="isMyMessage(msg) && msg.type === 'CHAT'" 
-                    type="button" 
-                    class="btn-hover-edit" 
-                    title="Chỉnh sửa tin nhắn"
-                    @click="handleStartEdit(msg)"
-                  >
-                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                    </svg>
-                  </button>
-                  <!-- Nút Thu hồi / Xóa (tin nhắn của mình hoặc Admin nhóm) -->
-                  <button 
-                    v-if="isMyMessage(msg) || isCurrentUserGroupAdmin" 
-                    type="button" 
-                    class="btn-hover-delete" 
-                    title="Thu hồi tin nhắn"
-                    @click="handleDeleteMessage(msg)"
-                  >
-                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
-                      <polyline points="3 6 5 6 21 6"></polyline>
-                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                    </svg>
-                  </button>
+
+                  <!-- Nút menu 3 chấm mở rộng -->
+                  <div class="msg-more-menu-container">
+                    <button 
+                      type="button" 
+                      class="btn-hover-more"
+                      :class="{ 'is-active': activeMenuMessageId === msg.id }"
+                      title="Thao tác khác"
+                      @click.stop="toggleMessageMenu(msg.id, $event)"
+                    >
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                        <circle cx="12" cy="12" r="2"></circle>
+                        <circle cx="19" cy="12" r="2"></circle>
+                        <circle cx="5" cy="12" r="2"></circle>
+                      </svg>
+                    </button>
+
+                    <!-- Dropdown menu phân trang gọn gàng: Tránh che khuất & tràn màn hình -->
+                    <div 
+                      v-if="activeMenuMessageId === msg.id" 
+                      :class="['msg-dropdown-menu', 'is-' + messageMenuDirection]" 
+                      @click.stop
+                    >
+                      <!-- TRANG 1: Các thao tác thường dùng nhất (3-4 mục) -->
+                      <div v-if="messageMenuPage === 1" class="menu-page-pane">
+                        <button type="button" class="dropdown-item" @click="handleStartReply(msg); closeMessageMenu()">
+                          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="9 14 4 9 9 4"></polyline>
+                            <path d="M20 20v-7a4 4 0 0 0-4-4H4"></path>
+                          </svg>
+                          <span>Trả lời</span>
+                        </button>
+
+                        <button v-if="msg.type === 'CHAT'" type="button" class="dropdown-item" @click="copyText(msg.content); closeMessageMenu()">
+                          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                          </svg>
+                          <span>Sao chép</span>
+                        </button>
+
+                        <button type="button" class="dropdown-item" @click="handleBookmark(msg); closeMessageMenu()">
+                          <svg viewBox="0 0 24 24" width="14" height="14" :fill="chatStore.isBookmarked(msg.id) ? '#f59e0b' : 'none'" stroke="currentColor" stroke-width="2">
+                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                          </svg>
+                          <span>{{ chatStore.isBookmarked(msg.id) ? 'Bỏ lưu ⭐' : 'Lưu tin nhắn ⭐' }}</span>
+                        </button>
+
+                        <div class="dropdown-menu-divider"></div>
+
+                        <!-- Nút chuyển sang trang 2 -->
+                        <button type="button" class="dropdown-item is-more-step" @click.stop="messageMenuPage = 2">
+                          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="1"></circle>
+                            <circle cx="19" cy="12" r="1"></circle>
+                            <circle cx="5" cy="12" r="1"></circle>
+                          </svg>
+                          <span>Xem thêm...</span>
+                          <svg class="chevron-step" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                          </svg>
+                        </button>
+                      </div>
+
+                      <!-- TRANG 2: Thao tác nâng cao (Ghim, Sửa, Thu hồi) -->
+                      <div v-else class="menu-page-pane">
+                        <button type="button" class="dropdown-item is-back-step" @click.stop="messageMenuPage = 1">
+                          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="15 18 9 12 15 6"></polyline>
+                          </svg>
+                          <span>Quay lại</span>
+                        </button>
+
+                        <button type="button" class="dropdown-item" @click="handleTogglePin(msg); closeMessageMenu()">
+                          <svg viewBox="0 0 24 24" width="14" height="14" :fill="msg.isPinned ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
+                            <path d="M16 4l1 1v2l-3 3v5l-2 2-2-2V10L7 7V5l1-1h8m0-2H8c-1.1 0-2 .9-2 2v2.59L8.41 9H8v5.59L6 16.59V18h5v5l1 1 1-1v-5h5v-1.41l-2-2V9h-.41L18 6.59V4c0-1.1-.9-2-2-2z"/>
+                          </svg>
+                          <span>{{ msg.isPinned ? 'Bỏ ghim' : 'Ghim tin nhắn' }}</span>
+                        </button>
+
+                        <button v-if="isMyMessage(msg) && msg.type === 'CHAT'" type="button" class="dropdown-item" @click="handleStartEdit(msg); closeMessageMenu()">
+                          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                          </svg>
+                          <span>Chỉnh sửa</span>
+                        </button>
+
+                        <button v-if="isMyMessage(msg) || isCurrentUserGroupAdmin" type="button" class="dropdown-item is-danger" @click="handleDeleteMessage(msg); closeMessageMenu()">
+                          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                          </svg>
+                          <span>Thu hồi</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -657,60 +993,292 @@
             <button type="button" class="btn-cancel-edit" title="Hủy chỉnh sửa (ESC)" @click="cancelEdit">✕</button>
           </div>
 
+          <!-- POPUP AUTOCOMPLETE MENTION / NHẮC TÊN THÀNH VIÊN (@username) -->
+          <transition name="mention-popup">
+            <div v-if="mentionState.isOpen && filteredMentionMembers.length > 0" class="mention-autocomplete-card">
+              <div class="mention-card-header">
+                <span class="mention-card-title">Nhắc tên đồng nghiệp</span>
+                <span class="mention-kbd-guide">↑↓ chọn • Enter chèn</span>
+              </div>
+              <ul class="mention-items-list">
+                <li 
+                  v-for="(member, idx) in filteredMentionMembers" 
+                  :key="member.username"
+                  class="mention-choice-row"
+                  :class="{ 'is-focused': idx === mentionState.selectedIndex }"
+                  @mouseenter="mentionState.selectedIndex = idx"
+                  @mousedown.prevent="selectMentionMember(member)"
+                >
+                  <div class="mention-avatar-circle" :style="getAvatarBg(member.fullName || member.username)">
+                    <img v-if="member.avatarUrl" :src="member.avatarUrl" class="mention-avatar-image" />
+                    <span v-else>{{ getAvatarInitials(member.fullName || member.username) }}</span>
+                  </div>
+                  <div class="mention-user-details">
+                    <span class="mention-name-text">{{ member.fullName || member.username }}</span>
+                    <span class="mention-handle-text">@{{ member.username }}</span>
+                  </div>
+                </li>
+              </ul>
+            </div>
+          </transition>
+
           <form class="chat-input-form" @submit.prevent="handleSendMessage">
-            <!-- Input file ẩn để đính kèm hình ảnh hoặc video -->
+            <!-- Input file ẩn để đính kèm hình ảnh, video hoặc tài liệu -->
             <input 
               ref="imageFileInputRef" 
               type="file" 
-              accept="image/*,video/*" 
+              accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.7z,.txt,.csv" 
               class="hidden-file-input" 
               @change="handleMediaSelected"
             />
 
-            <!-- Nút đính kèm ảnh hoặc video -->
-            <button 
-              type="button" 
-              class="btn-attach-image" 
-              :class="{ 'is-uploading': isUploadingImage }"
-              :disabled="isUploadingImage || !chatStore.isConnected"
-              :title="isUploadingImage ? 'Đang tải tệp lên Cloud...' : 'Đính kèm hình ảnh hoặc video (hoặc Ctrl+V)'"
-              @click="triggerImageSelect"
-            >
-              <svg v-if="!isUploadingImage" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                <polyline points="21 15 16 10 5 21"></polyline>
-              </svg>
-              <span v-else class="upload-spinner-icon"></span>
-            </button>
+            <!-- Thanh công cụ đính kèm cạnh ô nhập -->
+            <div class="input-tools-left">
+              <!-- Nút đính kèm ảnh, video hoặc tài liệu -->
+              <button 
+                type="button" 
+                class="btn-attach-image" 
+                :class="{ 'is-uploading': isUploadingImage }"
+                :disabled="isUploadingImage || !chatStore.isConnected || isRecordingVoice"
+                :title="isUploadingImage ? 'Đang tải tệp lên Cloud...' : 'Đính kèm tệp tin, hình ảnh hoặc video (hoặc dán Ctrl+V)'"
+                @click="triggerImageSelect"
+              >
+                <svg v-if="!isUploadingImage" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                </svg>
+                <span v-else class="upload-spinner-icon"></span>
+              </button>
 
-            <textarea
-              ref="inputTextareaRef"
-              v-model="inputContent"
-              class="chat-textarea"
-              :placeholder="editingMessage ? 'Nhập nội dung chỉnh sửa... (Nhấn Enter để lưu, ESC để hủy)' : 'Nhập nội dung tin nhắn hoặc dán ảnh/video (Ctrl+V)... (Enter gửi, Shift+Enter xuống dòng)'"
-              rows="2"
-              @keydown.enter.exact.prevent="handleSendMessage"
-              @keydown.esc="cancelEdit"
-              @input="handleTyping"
-              @paste="handlePaste"
-            ></textarea>
+              <!-- Nút Ghi âm Tin nhắn thoại (Voice note) -->
+              <button 
+                type="button" 
+                class="btn-attach-voice" 
+                :class="{ 'is-recording-active': isRecordingVoice, 'is-uploading': isUploadingVoice }"
+                :disabled="!chatStore.isConnected || isUploadingVoice"
+                :title="isRecordingVoice ? 'Đang ghi âm (Bấm để gửi)' : 'Ghi âm tin nhắn thoại'"
+                @click="toggleVoiceRecording"
+              >
+                <svg v-if="!isUploadingVoice" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                  <line x1="12" y1="19" x2="12" y2="23"></line>
+                  <line x1="8" y1="23" x2="16" y2="23"></line>
+                </svg>
+                <span v-else class="upload-spinner-icon"></span>
+              </button>
 
-            <button 
-              type="submit" 
-              class="btn-send-message"
-              :disabled="!inputContent.trim() || !chatStore.isConnected"
-            >
-              <span>{{ editingMessage ? 'Lưu' : 'Gửi' }}</span>
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="22" y1="2" x2="11" y2="13"></line>
-                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-              </svg>
-            </button>
+              <!-- Nút Tạo bình chọn (Poll) -->
+              <button 
+                type="button" 
+                class="btn-attach-poll" 
+                :disabled="!chatStore.isConnected || isRecordingVoice"
+                title="Tạo cuộc thăm dò ý kiến / bình chọn"
+                @click="openCreatePollDialog"
+              >
+                <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="18" y1="20" x2="18" y2="10"></line>
+                  <line x1="12" y1="20" x2="12" y2="4"></line>
+                  <line x1="6" y1="20" x2="6" y2="14"></line>
+                </svg>
+              </button>
+            </div>
+
+            <!-- Giao diện đang ghi âm thoại -->
+            <div v-if="isRecordingVoice" class="voice-recording-inline-bar">
+              <span class="recording-pulse-dot"></span>
+              <span class="recording-timer-text">{{ formatVoiceTimer(recordingSeconds) }}</span>
+              <div class="recording-waves-animation">
+                <span v-for="w in 14" :key="w" class="wave-stick"></span>
+              </div>
+              <span class="recording-status-msg">Đang thu âm...</span>
+              <div class="recording-btn-group">
+                <button type="button" class="btn-cancel-recording" title="Hủy bỏ ghi âm" @click="cancelVoiceRecording">
+                  ✕ Hủy
+                </button>
+                <button type="button" class="btn-send-recording" title="Hoàn tất và gửi" @click="finishAndSendVoice">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                  </svg>
+                  <span>Gửi</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Ô nhập văn bản thông thường -->
+            <template v-else>
+              <textarea
+                ref="inputTextareaRef"
+                v-model="inputContent"
+                class="chat-textarea"
+                :placeholder="editingMessage ? 'Nhập nội dung chỉnh sửa... (Nhấn Enter để lưu, ESC để hủy)' : 'Nhập tin nhắn, gõ @ để nhắc tên, dán ảnh/tệp (Ctrl+V)... (Enter gửi, Shift+Enter xuống dòng)'"
+                rows="2"
+                @keydown="handleTextareaKeydown"
+                @input="handleInputWithMention"
+                @paste="handlePaste"
+              ></textarea>
+
+              <button 
+                type="submit" 
+                class="btn-send-message"
+                :disabled="!inputContent.trim() || !chatStore.isConnected"
+              >
+                <span>{{ editingMessage ? 'Lưu' : 'Gửi' }}</span>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="22" y1="2" x2="11" y2="13"></line>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+              </button>
+            </template>
           </form>
         </footer>
 
       </main>
+
+      <!-- CỘT PHẢI THỨ 3 (SLIDING RIGHT DRAWER): TÀI NGUYÊN MEDIA, TỆP TIN & LIÊN KẾT -->
+      <transition name="drawer-slide">
+        <aside v-if="showMediaDrawer" class="chat-right-drawer">
+          <div class="drawer-header">
+            <div class="drawer-title-group">
+              <h4 class="drawer-title">Tài nguyên phòng chat</h4>
+              <span class="drawer-subtitle">{{ activeTitle }}</span>
+            </div>
+            <button type="button" class="btn-close-drawer" title="Đóng ngăn lưu trữ" @click="showMediaDrawer = false">✕</button>
+          </div>
+
+          <div class="drawer-nav-tabs">
+            <button 
+              type="button" 
+              class="drawer-tab" 
+              :class="{ 'is-active': mediaActiveTab === 'media' }"
+              @click="mediaActiveTab = 'media'"
+            >
+              Media ({{ currentRoomMediaList.length }})
+            </button>
+            <button 
+              type="button" 
+              class="drawer-tab" 
+              :class="{ 'is-active': mediaActiveTab === 'files' }"
+              @click="mediaActiveTab = 'files'"
+            >
+              Tệp ({{ currentRoomFilesList.length }})
+            </button>
+            <button 
+              type="button" 
+              class="drawer-tab" 
+              :class="{ 'is-active': mediaActiveTab === 'links' }"
+              @click="mediaActiveTab = 'links'"
+            >
+              Link ({{ currentRoomLinksList.length }})
+            </button>
+            <button 
+              type="button" 
+              class="drawer-tab" 
+              :class="{ 'is-active': mediaActiveTab === 'pinned' }"
+              @click="mediaActiveTab = 'pinned'"
+            >
+              Ghim ({{ currentPinnedList.length }})
+            </button>
+          </div>
+
+          <div class="drawer-content-scroll">
+            <!-- TAB 1: MEDIA (IMAGES & VIDEOS) -->
+            <div v-if="mediaActiveTab === 'media'" class="drawer-media-grid">
+              <div v-if="currentRoomMediaList.length === 0" class="drawer-empty-hint">
+                <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="#94a3b8" stroke-width="1.5">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                  <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                  <polyline points="21 15 16 10 5 21"></polyline>
+                </svg>
+                <p>Chưa có hình ảnh hoặc video nào</p>
+              </div>
+              <div 
+                v-for="m in currentRoomMediaList" 
+                :key="m.id" 
+                class="drawer-media-cell"
+                @click="m.type === 'IMAGE' ? openImageLightbox(m.content) : null"
+              >
+                <img v-if="m.type === 'IMAGE'" :src="m.content" class="drawer-thumb-img" loading="lazy" />
+                <video v-else-if="m.type === 'VIDEO'" :src="m.content" class="drawer-thumb-video"></video>
+                <span v-if="m.type === 'VIDEO'" class="video-play-indicator">▶</span>
+              </div>
+            </div>
+
+            <!-- TAB 2: TỆP TIN & TÀI LIỆU -->
+            <div v-else-if="mediaActiveTab === 'files'" class="drawer-files-list">
+              <div v-if="currentRoomFilesList.length === 0" class="drawer-empty-hint">
+                <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="#94a3b8" stroke-width="1.5">
+                  <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+                  <polyline points="13 2 13 9 20 9"></polyline>
+                </svg>
+                <p>Chưa có tệp tài liệu nào được gửi</p>
+              </div>
+              <a 
+                v-for="f in currentRoomFilesList" 
+                :key="f.id"
+                :href="getFileUrl(f.content)"
+                target="_blank"
+                rel="noopener noreferrer"
+                :download="getFileName(f.content)"
+                class="drawer-file-item"
+              >
+                <div class="drawer-file-icon-box">📎</div>
+                <div class="drawer-file-text-col">
+                  <span class="drawer-file-name" :title="getFileName(f.content)">{{ getFileName(f.content) }}</span>
+                  <span class="drawer-file-meta">{{ formatSidebarTime(f.createdAt) }} • {{ formatFileSize(getFileSize(f.content)) }}</span>
+                </div>
+              </a>
+            </div>
+
+            <!-- TAB 3: LIÊN KẾT (LINKS) -->
+            <div v-else-if="mediaActiveTab === 'links'" class="drawer-links-list">
+              <div v-if="currentRoomLinksList.length === 0" class="drawer-empty-hint">
+                <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="#94a3b8" stroke-width="1.5">
+                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                </svg>
+                <p>Chưa có liên kết trang web nào</p>
+              </div>
+              <a 
+                v-for="(link, lIdx) in currentRoomLinksList" 
+                :key="lIdx"
+                :href="link.url"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="drawer-link-item"
+              >
+                <div class="drawer-link-icon-box">🔗</div>
+                <div class="drawer-link-text-col">
+                  <span class="drawer-link-url">{{ link.url }}</span>
+                  <span class="drawer-link-meta">{{ link.sender }} • {{ formatSidebarTime(link.time) }}</span>
+                </div>
+              </a>
+            </div>
+
+            <!-- TAB 4: TIN NHẮN ĐÃ GHIM -->
+            <div v-else-if="mediaActiveTab === 'pinned'" class="drawer-pinned-list">
+              <div v-if="currentPinnedList.length === 0" class="drawer-empty-hint">
+                <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="#94a3b8" stroke-width="1.5">
+                  <path d="M16 4l1 1v2l-3 3v5l-2 2-2-2V10L7 7V5l1-1h8m0-2H8c-1.1 0-2 .9-2 2v2.59L8.41 9H8v5.59L6 16.59V18h5v5l1 1 1-1v-5h5v-1.41l-2-2V9h-.41L18 6.59V4c0-1.1-.9-2-2-2z"/>
+                </svg>
+                <p>Không có tin nhắn nào được ghim trong phòng này</p>
+              </div>
+              <div 
+                v-for="p in currentPinnedList" 
+                :key="p.id"
+                class="drawer-pinned-item"
+                @click="scrollToMessage(p.id)"
+              >
+                <div class="drawer-pinned-header">
+                  <span class="drawer-pinned-author">{{ chatStore.getNickname(p.senderUsername, p.senderFullName || p.senderUsername) }}</span>
+                  <span class="drawer-pinned-time">{{ formatSidebarTime(p.createdAt) }}</span>
+                </div>
+                <p class="drawer-pinned-snippet">{{ getPinnedSnippet(p) }}</p>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </transition>
     </div>
 
     <!-- MODAL LIGHTBOX XEM ẢNH FULLSIZE -->
@@ -995,6 +1563,178 @@
         </div>
       </div>
     </Teleport>
+
+    <!-- MODAL TẠO CUỘC BÌNH CHỌN (POLL CREATION) -->
+    <Teleport to="body">
+      <div v-if="showCreatePollDialog" class="modal-backdrop-overlay" @click.self="showCreatePollDialog = false">
+        <div class="custom-modal-card">
+          <div class="modal-card-header">
+            <div class="header-icon-title">
+              <div class="modal-header-icon">📊</div>
+              <h3 class="modal-card-title">Tạo cuộc thăm dò ý kiến</h3>
+            </div>
+            <button type="button" class="btn-close-modal" @click="showCreatePollDialog = false">✕</button>
+          </div>
+
+          <div class="modal-card-body">
+            <div class="form-group-field">
+              <label class="field-label">Câu hỏi bình chọn <span class="required-star">*</span></label>
+              <input 
+                v-model="pollQuestion" 
+                type="text" 
+                class="form-text-input" 
+                placeholder="Ví dụ: Lịch họp dự án tuần sau vào mấy giờ?"
+              />
+            </div>
+
+            <div class="form-group-field">
+              <label class="field-label">Các lựa chọn bình chọn <span class="required-star">*</span></label>
+              <div class="poll-options-inputs">
+                <div v-for="(opt, oIdx) in pollOptions" :key="oIdx" class="poll-input-row">
+                  <span class="poll-opt-index">{{ oIdx + 1 }}.</span>
+                  <input 
+                    v-model="pollOptions[oIdx]" 
+                    type="text" 
+                    class="form-text-input" 
+                    :placeholder="`Lựa chọn ${oIdx + 1}`"
+                  />
+                  <button 
+                    v-if="pollOptions.length > 2" 
+                    type="button" 
+                    class="btn-remove-opt" 
+                    title="Xóa lựa chọn"
+                    @click="pollOptions.splice(oIdx, 1)"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+              <button 
+                v-if="pollOptions.length < 8" 
+                type="button" 
+                class="btn-add-poll-option" 
+                @click="pollOptions.push('')"
+              >
+                + Thêm lựa chọn
+              </button>
+            </div>
+
+            <div class="form-group-field">
+              <label class="poll-checkbox-label">
+                <input type="checkbox" v-model="pollIsMultiple" class="check-box-input" />
+                <span>Cho phép chọn nhiều phương án</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="modal-card-footer">
+            <button type="button" class="btn-modal-cancel" @click="showCreatePollDialog = false">Hủy</button>
+            <button 
+              type="button" 
+              class="btn-modal-primary" 
+              :disabled="!isPollValid"
+              @click="handleCreatePollSubmit"
+            >
+              Tạo bình chọn
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- MODAL TIN NHẮN ĐÃ LƯU (SAVED MESSAGES) -->
+    <Teleport to="body">
+      <div v-if="showSavedMessagesModal" class="modal-backdrop-overlay" @click.self="showSavedMessagesModal = false">
+        <div class="custom-modal-card modal-large">
+          <div class="modal-card-header">
+            <div class="header-icon-title">
+              <div class="modal-header-icon">⭐</div>
+              <div class="modal-title-group">
+                <h3 class="modal-card-title">Tin nhắn đã lưu của tôi</h3>
+                <span class="modal-card-desc">Sổ tay cá nhân lưu trữ các thông tin, ghi chú quan trọng ({{ chatStore.savedMessages.length }} tin nhắn)</span>
+              </div>
+            </div>
+            <button type="button" class="btn-close-modal" @click="showSavedMessagesModal = false">✕</button>
+          </div>
+
+          <div class="modal-card-body">
+            <div v-if="chatStore.savedMessages.length === 0" class="saved-empty-box">
+              <div class="empty-star-icon">⭐</div>
+              <h4>Chưa có tin nhắn nào được lưu</h4>
+              <p>Rê chuột vào bất kỳ tin nhắn nào và chọn menu ⋯ &gt; "Lưu tin nhắn ⭐" để đưa vào sổ tay cá nhân này.</p>
+            </div>
+
+            <div v-else class="saved-messages-list-scroll">
+              <div v-for="sm in chatStore.savedMessages" :key="sm.id" class="saved-message-card">
+                <div class="saved-card-top">
+                  <span class="saved-author-name">{{ sm.senderFullName || sm.senderUsername }}</span>
+                  <span class="saved-time-tag">{{ formatSidebarTime(sm.createdAt) }}</span>
+                </div>
+                <div class="saved-card-body">
+                  <p v-if="sm.type === 'CHAT'" class="saved-content-text">{{ sm.content }}</p>
+                  <span v-else-if="sm.type === 'IMAGE'" class="saved-type-tag">📷 [Hình ảnh]</span>
+                  <span v-else-if="sm.type === 'VIDEO'" class="saved-type-tag">🎥 [Video]</span>
+                  <span v-else-if="sm.type === 'FILE'" class="saved-type-tag">📎 [Tệp tin]</span>
+                  <span v-else-if="sm.type === 'VOICE'" class="saved-type-tag">🎙️ [Tin nhắn thoại]</span>
+                  <span v-else-if="sm.type === 'POLL'" class="saved-type-tag">📊 [Bình chọn]</span>
+                </div>
+                <div class="saved-card-actions">
+                  <button type="button" class="btn-saved-action" title="Sao chép nội dung" @click="copyText(sm.content)">
+                    📋 Sao chép
+                  </button>
+                  <button type="button" class="btn-saved-action is-remove" title="Xóa khỏi mục đã lưu" @click="chatStore.toggleBookmarkMessage(sm)">
+                    🗑️ Bỏ lưu
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-card-footer">
+            <button type="button" class="btn-modal-cancel" @click="showSavedMessagesModal = false">Đóng</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- MODAL CHỌN MÀU CHỦ ĐỀ ĐOẠN CHAT (CHAT THEME PICKER) -->
+    <Teleport to="body">
+      <div v-if="showThemeModal" class="modal-backdrop-overlay" @click.self="showThemeModal = false">
+        <div class="custom-modal-card">
+          <div class="modal-card-header">
+            <div class="header-icon-title">
+              <div class="modal-header-icon">🎨</div>
+              <h3 class="modal-card-title">Đổi màu chủ đề cuộc trò chuyện</h3>
+            </div>
+            <button type="button" class="btn-close-modal" @click="showThemeModal = false">✕</button>
+          </div>
+
+          <div class="modal-card-body">
+            <p class="theme-picker-desc">Màu sắc bong bóng tin nhắn gửi đi được lưu riêng cho từng cuộc trò chuyện trên thiết bị của bạn.</p>
+            <div class="theme-presets-grid">
+              <div 
+                v-for="th in colorThemes" 
+                :key="th.key"
+                class="theme-preset-card"
+                :class="{ 'is-selected': currentRoomThemeKey === th.key }"
+                @click="changeTheme(th.key)"
+              >
+                <div class="theme-swatch-circle" :style="{ background: th.gradient }">
+                  <svg v-if="currentRoomThemeKey === th.key" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#ffffff" stroke-width="3">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </div>
+                <span class="theme-preset-name">{{ th.name }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-card-footer">
+            <button type="button" class="btn-modal-primary" @click="showThemeModal = false">Hoàn tất</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -1015,10 +1755,402 @@ const messagesScrollRef = ref(null)
 const inputTextareaRef = ref(null)
 const showScrollToBottom = ref(false)
 
+// State Tìm kiếm tin nhắn trong phòng (In-Chat Search)
+const isSearchOpen = ref(false)
+const searchQuery = ref('')
+const currentMatchIndex = ref(0)
+const searchInputRef = ref(null)
+const highlightedMessageId = ref(null)
+
+// State Ghim tin nhắn (Pinned Messages)
+const activePinnedIndex = ref(0)
+
+// State Nhắc tên thành viên (Mention / Tag)
+const mentionState = ref({
+  isOpen: false,
+  query: '',
+  selectedIndex: 0,
+  atIndex: -1
+})
+
 // State đính kèm hình ảnh / video & Lightbox
 const imageFileInputRef = ref(null)
 const isUploadingImage = ref(false)
 const previewImageUrl = ref(null)
+
+// State Responsive Mobile
+const showMobileChat = ref(true)
+const backToSidebar = () => {
+  showMobileChat.value = false
+}
+
+// State Menu 3 chấm thao tác tin nhắn (Phân trang gọn gàng & vị trí thông minh)
+const activeMenuMessageId = ref(null)
+const messageMenuPage = ref(1)
+const messageMenuDirection = ref('up')
+
+const toggleMessageMenu = (id, event) => {
+  if (activeMenuMessageId.value === id) {
+    activeMenuMessageId.value = null
+    messageMenuPage.value = 1
+    return
+  }
+  activeMenuMessageId.value = id
+  messageMenuPage.value = 1
+  if (event?.currentTarget) {
+    const rect = event.currentTarget.getBoundingClientRect()
+    // Nếu nút gần cạnh trên màn hình (< 260px), xổ xuống dưới để không bị che khuất bởi header
+    messageMenuDirection.value = rect.top < 260 ? 'down' : 'up'
+  }
+}
+
+const closeMessageMenu = () => {
+  activeMenuMessageId.value = null
+  messageMenuPage.value = 1
+}
+
+// State Menu 3 chấm mở rộng trên Chat Header
+const isHeaderMenuOpen = ref(false)
+
+const closeAllFloatingMenus = () => {
+  closeMessageMenu()
+  isHeaderMenuOpen.value = false
+}
+
+// State Chủ đề màu sắc đoạn chat (Theme Color)
+const showThemeModal = ref(false)
+const openThemePicker = () => {
+  showThemeModal.value = true
+}
+
+const colorThemes = [
+  { key: 'blue', name: 'Xanh dương tiêu chuẩn', primary: '#2563eb', gradient: 'linear-gradient(135deg, #2563eb, #1d4ed8)' },
+  { key: 'emerald', name: 'Xanh lục bảo', primary: '#059669', gradient: 'linear-gradient(135deg, #059669, #047857)' },
+  { key: 'purple', name: 'Tím hoàng gia', primary: '#7c3aed', gradient: 'linear-gradient(135deg, #7c3aed, #6d28d9)' },
+  { key: 'orange', name: 'Cam hoàng hôn', primary: '#ea580c', gradient: 'linear-gradient(135deg, #ea580c, #c2410c)' },
+  { key: 'pink', name: 'Hồng ngọc', primary: '#e11d48', gradient: 'linear-gradient(135deg, #e11d48, #be123c)' },
+  { key: 'slate', name: 'Ghi than tối giản', primary: '#334155', gradient: 'linear-gradient(135deg, #334155, #1e293b)' }
+]
+
+const currentRoomThemeKey = ref(localStorage.getItem(`erp_chat_theme_${chatStore.activeRoomId}`) || 'blue')
+
+watch(() => chatStore.activeRoomId, (newId) => {
+  currentRoomThemeKey.value = localStorage.getItem(`erp_chat_theme_${newId}`) || 'blue'
+})
+
+const currentThemeObject = computed(() => {
+  return colorThemes.find(t => t.key === currentRoomThemeKey.value) || colorThemes[0]
+})
+
+const chatMainStyle = computed(() => ({
+  '--chat-theme-primary': currentThemeObject.value.primary,
+  '--chat-theme-gradient': currentThemeObject.value.gradient
+}))
+
+const changeTheme = (key) => {
+  currentRoomThemeKey.value = key
+  localStorage.setItem(`erp_chat_theme_${chatStore.activeRoomId}`, key)
+  ElMessage.success('Đã áp dụng chủ đề màu cho cuộc trò chuyện!')
+}
+
+// State Ngăn lưu trữ Media & Tài liệu (Right Drawer)
+const showMediaDrawer = ref(false)
+const mediaActiveTab = ref('media')
+
+const currentRoomMediaList = computed(() => {
+  return chatStore.currentMessages.filter(m => (m.type === 'IMAGE' || m.type === 'VIDEO') && !m.isDeleted)
+})
+
+const currentRoomFilesList = computed(() => {
+  return chatStore.currentMessages.filter(m => m.type === 'FILE' && !m.isDeleted)
+})
+
+const currentRoomLinksList = computed(() => {
+  const links = []
+  const urlRegex = /(https?:\/\/[^\s]+)/g
+  chatStore.currentMessages.forEach(m => {
+    if (m.type === 'CHAT' && !m.isDeleted && m.content) {
+      const matches = m.content.match(urlRegex)
+      if (matches) {
+        matches.forEach(url => {
+          links.push({
+            url,
+            sender: chatStore.getNickname(m.senderUsername, m.senderFullName || m.senderUsername),
+            time: m.createdAt
+          })
+        })
+      }
+    }
+  })
+  return links
+})
+
+// State Tin nhắn đã lưu (Saved/Bookmarks)
+const showSavedMessagesModal = ref(false)
+const openSavedMessagesModal = () => {
+  showSavedMessagesModal.value = true
+}
+
+const handleBookmark = (msg) => {
+  const saved = chatStore.toggleBookmarkMessage(msg)
+  if (saved) {
+    ElMessage.success('Đã lưu tin nhắn vào sổ tay ⭐')
+  } else {
+    ElMessage.info('Đã bỏ lưu tin nhắn')
+  }
+}
+
+const copyText = (text) => {
+  if (!text) return
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text)
+    ElMessage.success('Đã sao chép nội dung!')
+  }
+}
+
+// State Ghi âm Tin nhắn thoại (Voice Message)
+const isRecordingVoice = ref(false)
+const recordingSeconds = ref(0)
+let recordingTimer = null
+let mediaRecorder = null
+let audioChunks = []
+const isUploadingVoice = ref(false)
+
+const startVoiceRecording = async () => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    audioChunks = []
+    mediaRecorder = new MediaRecorder(stream)
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) audioChunks.push(e.data)
+    }
+    mediaRecorder.onstop = () => {
+      stream.getTracks().forEach(t => t.stop())
+    }
+    mediaRecorder.start()
+    isRecordingVoice.value = true
+    recordingSeconds.value = 0
+    recordingTimer = setInterval(() => {
+      recordingSeconds.value++
+    }, 1000)
+  } catch (err) {
+    ElMessage.error('Không thể truy cập Microphone. Vui lòng cấp quyền ghi âm trên trình duyệt!')
+  }
+}
+
+const cancelVoiceRecording = () => {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop()
+  }
+  clearInterval(recordingTimer)
+  isRecordingVoice.value = false
+  audioChunks = []
+  recordingSeconds.value = 0
+}
+
+const finishAndSendVoice = async () => {
+  if (!mediaRecorder) return
+  clearInterval(recordingTimer)
+  const duration = recordingSeconds.value
+  isRecordingVoice.value = false
+
+  mediaRecorder.onstop = async () => {
+    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' })
+    const file = new File([audioBlob], `voice_${Date.now()}.webm`, { type: 'audio/webm' })
+    isUploadingVoice.value = true
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await api.post('/files/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+      const audioUrl = res.data?.url
+      if (audioUrl) {
+        if (chatStore.activeChatType === 'PUBLIC' || chatStore.activeChatType === 'GROUP') {
+          chatStore.sendPublicVoice(audioUrl, duration, chatStore.activeRoomId)
+        } else if (chatStore.activePartner) {
+          chatStore.sendPrivateVoice(chatStore.activePartner.username, audioUrl, duration)
+        }
+      }
+    } catch (err) {
+      ElMessage.error('Gửi tin nhắn thoại thất bại: ' + (err.response?.data?.message || err.message))
+    } finally {
+      isUploadingVoice.value = false
+      audioChunks = []
+      recordingSeconds.value = 0
+    }
+  }
+  mediaRecorder.stop()
+}
+
+const toggleVoiceRecording = () => {
+  if (isRecordingVoice.value) {
+    finishAndSendVoice()
+  } else {
+    startVoiceRecording()
+  }
+}
+
+const formatVoiceTimer = (secs) => {
+  const m = Math.floor(secs / 60)
+  const s = secs % 60
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+}
+
+// Audio Player cho bong bóng thoại
+const playingVoiceMsgId = ref(null)
+const currentVoiceProgress = ref(0)
+let currentAudio = null
+let voiceProgressTimer = null
+
+const togglePlayVoice = (msg) => {
+  if (playingVoiceMsgId.value === msg.id) {
+    if (currentAudio) {
+      currentAudio.pause()
+    }
+    playingVoiceMsgId.value = null
+    clearInterval(voiceProgressTimer)
+    return
+  }
+
+  if (currentAudio) {
+    currentAudio.pause()
+    clearInterval(voiceProgressTimer)
+  }
+
+  let voiceUrl = ''
+  try {
+    const parsed = JSON.parse(msg.content)
+    voiceUrl = parsed.url
+  } catch (e) {
+    voiceUrl = msg.content
+  }
+
+  if (!voiceUrl) return
+
+  currentAudio = new Audio(voiceUrl)
+  playingVoiceMsgId.value = msg.id
+  currentVoiceProgress.value = 0
+
+  currentAudio.play().catch(e => {
+    ElMessage.error('Không thể phát tin nhắn thoại này!')
+    playingVoiceMsgId.value = null
+  })
+
+  voiceProgressTimer = setInterval(() => {
+    if (currentAudio) {
+      currentVoiceProgress.value = Math.floor(currentAudio.currentTime)
+    }
+  }, 500)
+
+  currentAudio.onended = () => {
+    playingVoiceMsgId.value = null
+    clearInterval(voiceProgressTimer)
+    currentVoiceProgress.value = 0
+  }
+}
+
+const getVoiceDuration = (content) => {
+  try {
+    const parsed = JSON.parse(content)
+    return parsed.duration || 0
+  } catch (e) {
+    return 0
+  }
+}
+
+const formatVoiceTime = (secs) => {
+  const m = Math.floor(secs / 60)
+  const s = secs % 60
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
+// State Thăm dò ý kiến / Bình chọn (Polls)
+const showCreatePollDialog = ref(false)
+const pollQuestion = ref('')
+const pollOptions = ref(['', ''])
+const pollIsMultiple = ref(false)
+
+const isPollValid = computed(() => {
+  const validOpts = pollOptions.value.filter(o => o.trim())
+  return pollQuestion.value.trim().length > 0 && validOpts.length >= 2
+})
+
+const openCreatePollDialog = () => {
+  pollQuestion.value = ''
+  pollOptions.value = ['', '']
+  pollIsMultiple.value = false
+  showCreatePollDialog.value = true
+}
+
+const handleCreatePollSubmit = () => {
+  if (!isPollValid.value) return
+  const validOpts = pollOptions.value
+    .map(o => o.trim())
+    .filter(Boolean)
+    .map((text, idx) => ({ id: idx + 1, text, votes: [] }))
+
+  const pollData = {
+    question: pollQuestion.value.trim(),
+    options: validOpts,
+    isMultiple: pollIsMultiple.value
+  }
+
+  if (chatStore.activeChatType === 'PUBLIC' || chatStore.activeChatType === 'GROUP') {
+    chatStore.sendPublicPoll(pollData, chatStore.activeRoomId)
+  } else if (chatStore.activePartner) {
+    chatStore.sendPrivatePoll(chatStore.activePartner.username, pollData)
+  }
+
+  showCreatePollDialog.value = false
+  nextTick(() => scrollToBottom(true))
+}
+
+const handleVotePoll = async (msgId, optId) => {
+  try {
+    await chatStore.votePoll(msgId, optId)
+  } catch (err) {
+    ElMessage.error('Bình chọn thất bại!')
+  }
+}
+
+const getPollData = (content) => {
+  try {
+    if (typeof content === 'string' && content.startsWith('{')) {
+      return JSON.parse(content)
+    }
+    return content || { question: 'Bình chọn', options: [] }
+  } catch (e) {
+    return { question: 'Bình chọn', options: [] }
+  }
+}
+
+const getTotalVotes = (poll) => {
+  if (!poll || !poll.options) return 0
+  const uniqueUsers = new Set()
+  poll.options.forEach(o => {
+    (o.votes || []).forEach(u => uniqueUsers.add(u))
+  })
+  return uniqueUsers.size
+}
+
+const getVotePercent = (poll, opt) => {
+  const total = getTotalVotes(poll)
+  if (total === 0) return 0
+  const votes = (opt.votes || []).length
+  return Math.round((votes / total) * 100)
+}
+
+// Helper lấy tên hiển thị của đồng nghiệp theo biệt danh phòng riêng
+const getColleagueDisplayName = (colleague) => {
+  if (!colleague) return ''
+  const myUsername = authStore.user?.username
+  const privateRoomId = chatStore.getPrivateRoomId(myUsername, colleague.username)
+  return chatStore.roomNicknames[privateRoomId]?.[colleague.username] 
+    || colleague.nickname 
+    || colleague.fullName 
+    || colleague.username
+}
 
 // State Chỉnh sửa tin nhắn
 const editingMessage = ref(null)
@@ -1167,6 +2299,7 @@ const getPrivateUnreadCount = (partnerUsername) => {
 
 // Chuyển sang phòng chung
 const selectPublicRoom = () => {
+  showMobileChat.value = true
   chatStore.selectRoom('PUBLIC')
   nextTick(() => {
     scrollToBottom(false)
@@ -1176,6 +2309,7 @@ const selectPublicRoom = () => {
 
 // Chuyển sang chat 1-1 với đồng nghiệp
 const selectPrivatePartner = (partner) => {
+  showMobileChat.value = true
   chatStore.selectRoom('PRIVATE', partner)
   nextTick(() => {
     scrollToBottom(false)
@@ -1185,6 +2319,7 @@ const selectPrivatePartner = (partner) => {
 
 // Chuyển sang phòng nhóm
 const selectGroupRoom = (group) => {
+  showMobileChat.value = true
   chatStore.selectRoom('GROUP', group)
   nextTick(() => {
     scrollToBottom(false)
@@ -1452,11 +2587,18 @@ const handleScroll = async () => {
   }
 }
 
+// Phân giải chuỗi ISO thời gian chuẩn hóa
+const parseMessageDate = (isoString) => {
+  if (!isoString) return new Date()
+  if (isoString instanceof Date) return isoString
+  return new Date(isoString)
+}
+
 // Format thời gian hiển thị
 const formatTime = (isoString) => {
   if (!isoString) return ''
   try {
-    const d = new Date(isoString)
+    const d = parseMessageDate(isoString)
     const hours = String(d.getHours()).padStart(2, '0')
     const mins = String(d.getMinutes()).padStart(2, '0')
     return `${hours}:${mins}`
@@ -1469,7 +2611,7 @@ const formatTime = (isoString) => {
 const formatSidebarTime = (isoString) => {
   if (!isoString) return ''
   try {
-    const d = new Date(isoString)
+    const d = parseMessageDate(isoString)
     const now = new Date()
     const isToday = d.toDateString() === now.toDateString()
     if (isToday) {
@@ -1546,19 +2688,70 @@ const triggerImageSelect = () => {
   imageFileInputRef.value?.click()
 }
 
-// Hàm upload và gửi media (ảnh & video)
+// =========================================================================
+//                   XỬ LÝ TỆP TIN & TÀI LIỆU ĐÍNH KÈM
+// =========================================================================
+
+const parseFileContent = (content) => {
+  if (!content) return { url: '', name: 'Tài liệu đính kèm', size: 0, ext: 'FILE' }
+  try {
+    if (typeof content === 'string' && content.startsWith('{') && content.endsWith('}')) {
+      const parsed = JSON.parse(content)
+      const name = parsed.name || parsed.fileName || 'Tài liệu đính kèm'
+      const ext = name.includes('.') ? name.split('.').pop().toLowerCase() : 'file'
+      return {
+        url: parsed.url || '',
+        name: name,
+        size: parsed.size || parsed.fileSize || 0,
+        ext: ext
+      }
+    }
+  } catch (e) {}
+  const parts = String(content).split('/')
+  const rawName = decodeURIComponent(parts[parts.length - 1] || 'Tài liệu đính kèm')
+  const ext = rawName.includes('.') ? rawName.split('.').pop().toLowerCase() : 'file'
+  return {
+    url: content,
+    name: rawName,
+    size: 0,
+    ext: ext
+  }
+}
+
+const getFileName = (content) => parseFileContent(content).name
+const getFileUrl = (content) => parseFileContent(content).url
+const getFileSize = (content) => parseFileContent(content).size
+const getFileExt = (content) => parseFileContent(content).ext
+
+const formatFileSize = (bytes) => {
+  if (!bytes || bytes <= 0) return ''
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+}
+
+const isPdf = (content) => getFileExt(content) === 'pdf'
+const isZip = (content) => ['zip', 'rar', '7z', 'tar', 'gz'].includes(getFileExt(content))
+
+const getFileThemeClass = (ext) => {
+  const e = (ext || '').toLowerCase()
+  if (e === 'pdf') return 'theme-pdf'
+  if (['doc', 'docx', 'txt', 'rtf'].includes(e)) return 'theme-word'
+  if (['xls', 'xlsx', 'csv'].includes(e)) return 'theme-excel'
+  if (['ppt', 'pptx'].includes(e)) return 'theme-ppt'
+  if (['zip', 'rar', '7z', 'tar', 'gz'].includes(e)) return 'theme-zip'
+  return 'theme-generic'
+}
+
+// Hàm upload và gửi media (ảnh, video, tài liệu)
 const uploadAndSendMedia = async (file) => {
   if (!file) return
 
   const isVideo = file.type.startsWith('video/')
   const isImage = file.type.startsWith('image/')
+  const isDoc = !isImage && !isVideo
 
-  if (!isImage && !isVideo) {
-    ElMessage.warning('Vui lòng chỉ chọn tệp định dạng hình ảnh hoặc video!')
-    return
-  }
-
-  // Validate dung lượng: Ảnh < 15MB, Video < 100MB
+  // Validate dung lượng: Ảnh < 15MB, Video < 100MB, Tài liệu < 50MB
   if (isImage && file.size > 15 * 1024 * 1024) {
     ElMessage.warning('Kích thước ảnh tối đa cho phép là 15MB!')
     return
@@ -1567,23 +2760,45 @@ const uploadAndSendMedia = async (file) => {
     ElMessage.warning('Kích thước video tối đa cho phép là 100MB!')
     return
   }
+  if (isDoc && file.size > 50 * 1024 * 1024) {
+    ElMessage.warning('Kích thước tệp tài liệu tối đa cho phép là 50MB!')
+    return
+  }
 
   isUploadingImage.value = true
   const formData = new FormData()
   formData.append('file', file)
 
   try {
-    ElMessage.info(isVideo ? 'Đang tải video lên Cloud...' : 'Đang tải ảnh lên Cloud...')
+    let loadingText = 'Đang tải tệp lên Cloud...'
+    if (isImage) loadingText = 'Đang tải ảnh lên Cloud...'
+    else if (isVideo) loadingText = 'Đang tải video lên Cloud...'
+    else loadingText = `Đang tải tệp "${file.name}" lên Cloud...`
+
+    ElMessage.info(loadingText)
     // Không truyền thủ công Content-Type để Axios tự sinh boundary multipart chuẩn
     const res = await api.post('/files/upload', formData)
 
     const mediaUrl = res.data?.url
-    const resourceType = res.data?.resourceType || (isVideo ? 'VIDEO' : 'IMAGE')
+    const resourceType = res.data?.resourceType || (isVideo ? 'VIDEO' : (isImage ? 'IMAGE' : 'FILE'))
+    const fileName = res.data?.fileName || file.name
+    const fileSize = res.data?.fileSize || file.size
+
     if (!mediaUrl) {
-      throw new Error('Không nhận được đường dẫn tệp từ Cloudinary')
+      throw new Error('Không nhận được đường dẫn tệp từ máy chủ')
     }
 
-    if (resourceType === 'VIDEO') {
+    if (resourceType === 'FILE') {
+      const fileData = { url: mediaUrl, name: fileName, size: fileSize }
+      if (chatStore.activeChatType === 'PUBLIC') {
+        chatStore.sendPublicFile(fileData, 'GLOBAL')
+      } else if (chatStore.activeChatType === 'GROUP' && chatStore.activeGroup) {
+        chatStore.sendPublicFile(fileData, `GROUP_${chatStore.activeGroup.id}`)
+      } else if (chatStore.activePartner) {
+        chatStore.sendPrivateFile(chatStore.activePartner.username, fileData)
+      }
+      ElMessage.success(`Đã gửi tệp "${fileName}" thành công!`)
+    } else if (resourceType === 'VIDEO') {
       if (chatStore.activeChatType === 'PUBLIC') {
         chatStore.sendPublicVideo(mediaUrl, 'GLOBAL')
       } else if (chatStore.activeChatType === 'GROUP' && chatStore.activeGroup) {
@@ -1623,14 +2838,14 @@ const handleMediaSelected = async (event) => {
   event.target.value = ''
 }
 
-// Xử lý dán (Paste / Ctrl+V) hình ảnh / video trực tiếp vào ô chat
+// Xử lý dán (Paste / Ctrl+V) hình ảnh, video hoặc file trực tiếp vào ô chat
 const handlePaste = async (event) => {
   const items = (event.clipboardData || window.clipboardData)?.items
   if (!items) return
 
   for (let i = 0; i < items.length; i++) {
     const item = items[i]
-    if (item.type.indexOf('image') !== -1 || item.type.indexOf('video') !== -1) {
+    if (item.kind === 'file') {
       event.preventDefault()
       const file = item.getAsFile()
       if (file) {
@@ -1638,6 +2853,271 @@ const handlePaste = async (event) => {
         return
       }
     }
+  }
+}
+
+// =========================================================================
+//                   ĐỊNH DẠNG TIN NHẮN & NHẮC TÊN (MENTION)
+// =========================================================================
+
+const escapeHtml = (unsafe) => {
+  if (!unsafe) return ''
+  return unsafe
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
+const formatMessageWithMentions = (content) => {
+  if (!content) return ''
+  let text = escapeHtml(content)
+  // Xuống dòng
+  text = text.replace(/\n/g, '<br>')
+
+  // Chuyển link HTTP/HTTPS thành clickable
+  text = text.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer" class="chat-inline-link">$1</a>')
+
+  // Định dạng Mention @username
+  const myUsername = authStore.user?.username?.toLowerCase()
+  text = text.replace(/@([a-zA-Z0-9_\u00C0-\u024F\u1E00-\u1EFF]+)/g, (match, uname) => {
+    const isMe = myUsername && uname.toLowerCase() === myUsername
+    return `<span class="mention-tag ${isMe ? 'is-me' : ''}">@${uname}</span>`
+  })
+
+  // Highlight kết quả tìm kiếm nếu đang mở thanh tìm kiếm
+  if (isSearchOpen.value && searchQuery.value.trim()) {
+    const q = searchQuery.value.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const regex = new RegExp(`(${q})`, 'gi')
+    text = text.replace(regex, '<mark class="search-highlight">$1</mark>')
+  }
+
+  return text
+}
+
+// Danh sách thành viên có thể tag trong phòng hiện tại
+const currentRoomMembersList = computed(() => {
+  if (chatStore.activeChatType === 'GROUP' && chatStore.activeGroup) {
+    return chatStore.activeGroup.members || []
+  }
+  if (chatStore.activeChatType === 'PRIVATE' && chatStore.activePartner) {
+    const list = [chatStore.activePartner]
+    if (authStore.user) list.push(authStore.user)
+    return list
+  }
+  return chatStore.colleagues || []
+})
+
+const filteredMentionMembers = computed(() => {
+  const q = mentionState.value.query.trim().toLowerCase()
+  const members = currentRoomMembersList.value
+  if (!q) return members.slice(0, 8)
+  return members.filter(m => 
+    (m.username || '').toLowerCase().includes(q) ||
+    (m.fullName || '').toLowerCase().includes(q)
+  ).slice(0, 8)
+})
+
+const handleInputWithMention = () => {
+  handleTyping()
+  checkMentionTrigger()
+}
+
+const checkMentionTrigger = () => {
+  const el = inputTextareaRef.value
+  if (!el) return
+  const cursor = el.selectionStart
+  const text = inputContent.value.substring(0, cursor)
+  const match = text.match(/@([a-zA-Z0-9_\u00C0-\u024F\u1E00-\u1EFF]*)$/)
+  if (match) {
+    mentionState.value = {
+      isOpen: true,
+      query: match[1],
+      selectedIndex: 0,
+      atIndex: match.index
+    }
+  } else {
+    mentionState.value.isOpen = false
+  }
+}
+
+const handleTextareaKeydown = (e) => {
+  if (mentionState.value.isOpen && filteredMentionMembers.value.length > 0) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      mentionState.value.selectedIndex = (mentionState.value.selectedIndex + 1) % filteredMentionMembers.value.length
+      return
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      mentionState.value.selectedIndex = (mentionState.value.selectedIndex - 1 + filteredMentionMembers.value.length) % filteredMentionMembers.value.length
+      return
+    }
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault()
+      const selected = filteredMentionMembers.value[mentionState.value.selectedIndex]
+      if (selected) {
+        selectMentionMember(selected)
+      }
+      return
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      mentionState.value.isOpen = false
+      return
+    }
+  }
+
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault()
+    handleSendMessage()
+  } else if (e.key === 'Escape') {
+    cancelEdit()
+  }
+}
+
+const selectMentionMember = (member) => {
+  const el = inputTextareaRef.value
+  const cursor = el ? el.selectionStart : inputContent.value.length
+  const beforeAt = inputContent.value.substring(0, mentionState.value.atIndex)
+  const afterCursor = inputContent.value.substring(cursor)
+  inputContent.value = `${beforeAt}@${member.username} ${afterCursor}`
+  mentionState.value.isOpen = false
+  nextTick(() => {
+    if (el) {
+      el.focus()
+      const newPos = beforeAt.length + member.username.length + 2
+      el.setSelectionRange(newPos, newPos)
+    }
+  })
+}
+
+// =========================================================================
+//                   TÌM KIẾM TIN NHẮN TRONG PHÒNG (IN-CHAT SEARCH)
+// =========================================================================
+
+const toggleSearchBar = () => {
+  isSearchOpen.value = !isSearchOpen.value
+  if (isSearchOpen.value) {
+    currentMatchIndex.value = 0
+    nextTick(() => {
+      searchInputRef.value?.focus()
+    })
+  } else {
+    searchQuery.value = ''
+    highlightedMessageId.value = null
+  }
+}
+
+const closeSearch = () => {
+  isSearchOpen.value = false
+  searchQuery.value = ''
+  highlightedMessageId.value = null
+}
+
+const searchMatchingMessages = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  if (!q) return []
+  const msgs = chatStore.currentMessages || []
+  return msgs.filter(m => {
+    if (m.isDeleted) return false
+    if (m.type === 'CHAT') {
+      return (m.content || '').toLowerCase().includes(q)
+    }
+    if (m.type === 'FILE') {
+      const p = parseFileContent(m.content)
+      return (p.name || '').toLowerCase().includes(q)
+    }
+    return false
+  })
+})
+
+const searchMatchCount = computed(() => searchMatchingMessages.value.length)
+
+watch(searchQuery, () => {
+  currentMatchIndex.value = 0
+  if (searchMatchingMessages.value.length > 0) {
+    jumpToSearchMatch(0)
+  } else {
+    highlightedMessageId.value = null
+  }
+})
+
+const handleSearchNext = () => {
+  if (searchMatchCount.value === 0) return
+  currentMatchIndex.value = (currentMatchIndex.value + 1) % searchMatchCount.value
+  jumpToSearchMatch(currentMatchIndex.value)
+}
+
+const handleSearchPrev = () => {
+  if (searchMatchCount.value === 0) return
+  currentMatchIndex.value = (currentMatchIndex.value - 1 + searchMatchCount.value) % searchMatchCount.value
+  jumpToSearchMatch(currentMatchIndex.value)
+}
+
+const jumpToSearchMatch = (idx) => {
+  const target = searchMatchingMessages.value[idx]
+  if (target) {
+    highlightedMessageId.value = target.id
+    scrollToMessage(target.id)
+  }
+}
+
+// =========================================================================
+//                   GHIM TIN NHẮN (PINNED MESSAGES)
+// =========================================================================
+
+const currentPinnedList = computed(() => {
+  return chatStore.currentPinnedMessages || []
+})
+
+const currentActivePinnedMessage = computed(() => {
+  if (!currentPinnedList.value.length) return null
+  const idx = activePinnedIndex.value % currentPinnedList.value.length
+  return currentPinnedList.value[idx] || currentPinnedList.value[0]
+})
+
+const cyclePinnedMessage = () => {
+  if (currentPinnedList.value.length <= 1) return
+  activePinnedIndex.value = (activePinnedIndex.value + 1) % currentPinnedList.value.length
+}
+
+const getPinnedSnippet = (msg) => {
+  if (!msg) return ''
+  if (msg.isDeleted) return 'Tin nhắn đã được thu hồi'
+  if (msg.type === 'IMAGE') return '📷 [Hình ảnh]'
+  if (msg.type === 'VIDEO') return '🎥 [Video]'
+  if (msg.type === 'FILE') {
+    const p = parseFileContent(msg.content)
+    return `📎 [Tệp] ${p.name}`
+  }
+  return msg.content || ''
+}
+
+const scrollToPinnedMessage = () => {
+  if (!currentActivePinnedMessage.value) return
+  scrollToMessage(currentActivePinnedMessage.value.id)
+}
+
+const handleTogglePin = async (msg) => {
+  if (!msg || !msg.id) return
+  try {
+    const isCurrentlyPinned = Boolean(msg.isPinned)
+    await chatStore.togglePinMessage(msg.id, !isCurrentlyPinned)
+    ElMessage.success(isCurrentlyPinned ? 'Đã bỏ ghim tin nhắn' : 'Đã ghim tin nhắn lên đầu cuộc trò chuyện!')
+  } catch (err) {
+    ElMessage.error(err.response?.data?.message || err.message || 'Không thể thao tác ghim tin nhắn!')
+  }
+}
+
+const handleUnpinMessage = async (messageId) => {
+  if (!messageId) return
+  try {
+    await chatStore.togglePinMessage(messageId, false)
+    ElMessage.success('Đã bỏ ghim tin nhắn')
+  } catch (err) {
+    ElMessage.error('Không thể bỏ ghim tin nhắn')
   }
 }
 
@@ -1649,7 +3129,7 @@ const handleStartReply = (msg) => {
   })
 }
 
-// Cuộn đến tin nhắn gốc khi bấm vào quote Reply
+// Cuộn đến tin nhắn gốc khi bấm vào quote Reply hoặc kết quả tìm kiếm / ghim
 const scrollToMessage = (messageId) => {
   if (!messageId) return
   const el = document.getElementById(`msg-${messageId}`)
@@ -1658,9 +3138,9 @@ const scrollToMessage = (messageId) => {
     el.classList.add('is-highlighted')
     setTimeout(() => {
       el.classList.remove('is-highlighted')
-    }, 2000)
+    }, 2500)
   } else {
-    ElMessage.info('Tin nhắn này ở xa hơn trong lịch sử.')
+    ElMessage.info('Tin nhắn này ở xa hơn trong lịch sử cuộn.')
   }
 }
 
@@ -1669,12 +3149,41 @@ const openImageLightbox = (url) => {
   previewImageUrl.value = url
 }
 
-// Phím tắt ESC đóng lightbox
+// Phím tắt bàn phím: ESC đóng lightbox/tìm kiếm/mention, Ctrl+F mở tìm kiếm
 const handleKeydown = (e) => {
-  if (e.key === 'Escape' && previewImageUrl.value) {
-    previewImageUrl.value = null
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
+    e.preventDefault()
+    toggleSearchBar()
+    return
+  }
+  if (e.key === 'Escape') {
+    if (previewImageUrl.value) {
+      previewImageUrl.value = null
+      return
+    }
+    if (isSearchOpen.value) {
+      closeSearch()
+      return
+    }
+    if (mentionState.value.isOpen) {
+      mentionState.value.isOpen = false
+      return
+    }
   }
 }
+
+// Watch chuyển đổi phòng để reset search & ghim
+watch(
+  () => chatStore.activeRoomId,
+  (newRoomId) => {
+    activePinnedIndex.value = 0
+    closeSearch()
+    mentionState.value.isOpen = false
+    if (newRoomId) {
+      chatStore.fetchPinnedMessages(newRoomId)
+    }
+  }
+)
 
 // Watch số lượng tin nhắn để tự động cuộn (chỉ khi có tin nhắn mới, không cuộn khi lazy load tin cũ)
 watch(
@@ -1703,17 +3212,30 @@ onMounted(() => {
   chatStore.fetchMyGroups()
   // Mở mặc định phòng chung
   selectPublicRoom()
-  // Lắng nghe sự kiện ESC để đóng lightbox
+  // Lắng nghe sự kiện ESC để đóng lightbox/menu
   window.addEventListener('keydown', handleKeydown)
   // Lắng nghe sự kiện quay lại tab hoặc focus cửa sổ để cập nhật đã đọc
   window.addEventListener('focus', handleWindowFocus)
   document.addEventListener('visibilitychange', handleWindowFocus)
+  // Đóng các menu nổi (thao tác tin nhắn, menu header) khi click ra ngoài
+  document.addEventListener('click', closeAllFloatingMenus)
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
   window.removeEventListener('focus', handleWindowFocus)
   document.removeEventListener('visibilitychange', handleWindowFocus)
+  document.removeEventListener('click', closeAllFloatingMenus)
+  if (currentAudio) {
+    currentAudio.pause()
+    currentAudio = null
+  }
+  if (voiceProgressTimer) {
+    clearInterval(voiceProgressTimer)
+  }
+  if (recordingTimer) {
+    clearInterval(recordingTimer)
+  }
 })
 </script>
 
@@ -1925,8 +3447,24 @@ onUnmounted(() => {
 }
 
 .directory-item.is-active {
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
+  background: linear-gradient(90deg, #eff6ff 0%, #dbeafe 100%) !important;
+  border: 1px solid #93c5fd !important;
+  border-left: 4px solid #2563eb !important;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.12) !important;
+  transform: translateX(2px);
+}
+
+.directory-item.is-active .item-name {
+  color: #1d4ed8 !important;
+  font-weight: 700 !important;
+}
+
+.directory-item.is-active .item-sub {
+  color: #2563eb !important;
+}
+
+.directory-item.is-active .item-avatar {
+  box-shadow: 0 0 0 2px #2563eb !important;
 }
 
 .item-avatar-wrapper {
@@ -2275,6 +3813,7 @@ onUnmounted(() => {
 .bubble-content-col {
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .sender-name-row {
@@ -2303,6 +3842,8 @@ onUnmounted(() => {
   line-height: 1.5;
   word-break: break-word;
   position: relative;
+  min-width: 60px;
+  max-width: 100%;
 }
 
 /* Tin nhắn của người khác (Incoming) */
@@ -2316,10 +3857,10 @@ onUnmounted(() => {
 
 /* Tin nhắn của mình (Outgoing) */
 .is-outgoing .message-bubble {
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  background: var(--chat-theme-gradient, linear-gradient(135deg, #2563eb, #1d4ed8));
   color: #ffffff;
   border-top-right-radius: 4px;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
 .bubble-text {
@@ -3999,9 +5540,1678 @@ onUnmounted(() => {
   cursor: not-allowed;
 }
 
+/* =========================================================================
+   IN-CHAT SEARCH BAR (TÌM KIẾM TIN NHẮN TRONG PHÒNG)
+   ========================================================================= */
+.btn-icon-action.is-search-active {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.in-chat-search-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 18px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+  z-index: 10;
+  animation: searchSlideDown 0.2s ease-out;
+}
+
+@keyframes searchSlideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.search-input-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 6px 12px;
+  transition: all 0.15s ease;
+}
+
+.search-input-box:focus-within {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+.search-icon-svg {
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.search-text-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 13px;
+  color: #1e293b;
+  background: transparent;
+}
+
+.search-counter-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: #f1f5f9;
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.search-counter-badge.has-matches {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.search-nav-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-search-step, .btn-search-exit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-search-step:hover:not(:disabled), .btn-search-exit:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+.btn-search-step:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-search-exit:hover {
+  background: #fee2e2;
+  color: #dc2626;
+  border-color: #fca5a5;
+}
+
+/* Highlight từ khóa tìm kiếm trong bubble */
+.search-highlight {
+  background: #fef08a !important;
+  color: #854d0e !important;
+  padding: 1px 3px;
+  border-radius: 3px;
+  font-weight: 700;
+}
+
+/* =========================================================================
+   PINNED MESSAGE BANNER (THANH TIN NHẮN ĐÃ GHIM)
+   ========================================================================= */
+.pinned-message-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 18px;
+  background: #eff6ff;
+  border-bottom: 1px solid #dbeafe;
+  z-index: 9;
+  animation: pinnedFadeIn 0.2s ease-out;
+}
+
+@keyframes pinnedFadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.pinned-banner-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.pinned-banner-main:hover {
+  background: rgba(219, 234, 254, 0.45);
+}
+
+.pinned-icon-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: #3b82f6;
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+.pinned-text-column {
+  flex: 1;
+  min-width: 0;
+}
+
+.pinned-author-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.pinned-badge-title {
+  font-weight: 700;
+  color: #1d4ed8;
+}
+
+.pinned-counter-tag {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 8px;
+  background: #bfdbfe;
+  color: #1e40af;
+}
+
+.pinned-author-name {
+  color: #475569;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.pinned-preview-snippet {
+  font-size: 12px;
+  color: #334155;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+.pinned-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.btn-pinned-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 5px;
+  border: 1px solid #bfdbfe;
+  background: #ffffff;
+  color: #2563eb;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-pinned-action:hover {
+  background: #dbeafe;
+}
+
+.btn-unpin-trigger:hover {
+  background: #fee2e2;
+  color: #dc2626;
+  border-color: #fca5a5;
+}
+
+/* Nút ghim trên hover actions */
+.btn-hover-pin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-hover-pin:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+.btn-hover-pin.is-pinned-active {
+  color: #2563eb;
+  background: #eff6ff;
+}
+
+.meta-pinned-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #eab308;
+  margin-right: 4px;
+}
+
+/* =========================================================================
+   FILE & DOCUMENT CARD (THẺ HIỂN THỊ TỆP TIN / TÀI LIỆU)
+   ========================================================================= */
+.bubble-file-wrapper {
+  max-width: 360px;
+  width: 100%;
+}
+
+.file-card-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  transition: background 0.15s;
+}
+
+.is-my-message .file-card-box {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.file-icon-square {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.file-icon-square.theme-pdf {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.file-icon-square.theme-word {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.file-icon-square.theme-excel {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.file-icon-square.theme-ppt {
+  background: #ffedd5;
+  color: #ea580c;
+}
+
+.file-icon-square.theme-zip {
+  background: #f3e8ff;
+  color: #9333ea;
+}
+
+.file-icon-square.theme-generic {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.file-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.file-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: inherit;
+}
+
+.file-card-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+}
+
+.file-ext-chip {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.08);
+  letter-spacing: 0.5px;
+}
+
+.is-my-message .file-ext-chip {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.file-size-chip {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.btn-file-dl {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #2563eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  flex-shrink: 0;
+  transition: transform 0.15s, background 0.15s;
+  text-decoration: none;
+}
+
+.btn-file-dl:hover {
+  transform: scale(1.08);
+  background: #eff6ff;
+}
+
+.is-my-message .btn-file-dl {
+  background: #ffffff;
+  color: #1d4ed8;
+}
+
+/* =========================================================================
+   MENTION AUTOCOMPLETE POPUP (GỢI Ý NHẮC TÊN @username)
+   ========================================================================= */
+.mention-autocomplete-card {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 18px;
+  width: 320px;
+  max-width: calc(100% - 36px);
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  z-index: 50;
+  animation: mentionPopupIn 0.15s ease-out;
+}
+
+@keyframes mentionPopupIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.mention-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.mention-card-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.mention-kbd-guide {
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+.mention-items-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.mention-choice-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.mention-choice-row:hover,
+.mention-choice-row.is-focused {
+  background: #eff6ff;
+}
+
+.mention-avatar-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.mention-avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mention-user-details {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.mention-name-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mention-handle-text {
+  font-size: 11px;
+  color: #3b82f6;
+}
+
+/* =========================================================================
+   MENTION TAG TRONG TIN NHẮN (TAG BADGE)
+   ========================================================================= */
+.mention-tag {
+  display: inline-block;
+  padding: 0 5px;
+  margin: 0 1px;
+  border-radius: 4px;
+  font-weight: 600;
+  background: rgba(59, 130, 246, 0.14);
+  color: #1d4ed8;
+}
+
+.is-my-message .mention-tag {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+.mention-tag.is-me {
+  background: #fef08a !important;
+  color: #854d0e !important;
+  font-weight: 700 !important;
+  box-shadow: 0 0 0 1px #facc15;
+}
+
+/* Đường link trong tin nhắn */
+.chat-inline-link {
+  color: #2563eb;
+  text-decoration: underline;
+  word-break: break-all;
+}
+
+.is-my-message .chat-inline-link {
+  color: #ffffff;
+  text-decoration: underline;
+}
+
+/* Hiệu ứng chớp sáng khi cuộn đến tin nhắn ghim / tìm kiếm */
+.message-item.is-highlighted .message-bubble,
+.message-bubble.is-search-matched {
+  animation: glowPulse 2.5s ease-out !important;
+}
+
+@keyframes glowPulse {
+  0% {
+    box-shadow: 0 0 0 4px #3b82f6, 0 0 15px rgba(59, 130, 246, 0.5);
+    transform: scale(1.02);
+  }
+  50% {
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.4), 0 0 10px rgba(59, 130, 246, 0.3);
+  }
+  100% {
+    box-shadow: none;
+    transform: scale(1);
+  }
+}
+
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+/* =========================================================================
+   COMPACT MESSAGE 3-DOTS MENU & DROPDOWN
+   ========================================================================= */
+.msg-more-menu-container {
+  position: relative;
+  display: inline-flex;
+}
+
+.btn-hover-more {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  padding: 3px 5px;
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.btn-hover-more:hover,
+.btn-hover-more.is-active {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.msg-dropdown-menu {
+  position: absolute;
+  right: 0;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
+  min-width: 165px;
+  padding: 6px;
+  z-index: 100;
+  animation: popoverFadeIn 0.15s ease-out;
+}
+
+.msg-dropdown-menu.is-up {
+  bottom: calc(100% + 6px);
+  top: auto;
+}
+
+.msg-dropdown-menu.is-down {
+  top: calc(100% + 6px);
+  bottom: auto;
+}
+
+.is-incoming .msg-dropdown-menu {
+  right: auto;
+  left: 0;
+}
+
+.menu-page-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dropdown-item.is-more-step {
+  color: #2563eb;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dropdown-item.is-more-step .chevron-step {
+  margin-left: auto;
+}
+
+.dropdown-item.is-back-step {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 500;
+  border-bottom: 1px dashed #e2e8f0;
+  padding-bottom: 6px;
+  margin-bottom: 4px;
+}
+
+.dropdown-item.is-back-step:hover {
+  color: #0f172a;
+}
+
+.dropdown-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #334155;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.12s ease;
+}
+
+.dropdown-item:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.dropdown-item.is-danger {
+  color: #ef4444;
+}
+
+.dropdown-item.is-danger:hover {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.dropdown-menu-divider {
+  height: 1px;
+  background: #e2e8f0;
+  margin: 4px 0;
+}
+
+@keyframes popoverFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* =========================================================================
+   CONSOLIDATED HEADER MORE MENU (TÙY CHỌN HEADER GỌN GÀNG)
+   ========================================================================= */
+.header-more-menu-wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+.btn-header-more.is-active {
+  background: #eff6ff;
+  color: #2563eb;
+  border-color: #bfdbfe;
+}
+
+.header-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 235px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
+  padding: 6px;
+  z-index: 120;
+  animation: popoverFadeIn 0.15s ease-out;
+}
+
+.header-menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.header-menu-item:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.header-menu-item svg {
+  flex-shrink: 0;
+  color: #64748b;
+  transition: color 0.15s ease;
+}
+
+.header-menu-item:hover svg {
+  color: #2563eb;
+}
+
+.popover-fade-enter-active,
+.popover-fade-leave-active {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.popover-fade-enter-from,
+.popover-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+/* =========================================================================
+   VOICE MESSAGE BUBBLE & AUDIO PLAYER
+   ========================================================================= */
+.bubble-voice-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 6px;
+  min-width: 210px;
+}
+
+.btn-voice-play {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.07);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: inherit;
+  transition: transform 0.1s ease, background 0.15s ease;
+  flex-shrink: 0;
+}
+
+.is-outgoing .btn-voice-play {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+.btn-voice-play:hover {
+  transform: scale(1.06);
+}
+
+.voice-waveform-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.voice-bars {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 20px;
+}
+
+.waveform-bar {
+  width: 3px;
+  height: 8px;
+  background: currentColor;
+  opacity: 0.5;
+  border-radius: 2px;
+  transition: height 0.2s ease, opacity 0.2s ease;
+}
+
+.waveform-bar:nth-child(2n) { height: 14px; }
+.waveform-bar:nth-child(3n) { height: 18px; }
+.waveform-bar:nth-child(4n) { height: 10px; }
+
+.waveform-bar.is-animating {
+  opacity: 1;
+  animation: wavePulse 0.8s ease-in-out infinite alternate;
+}
+
+.waveform-bar.is-animating:nth-child(2n) { animation-delay: 0.15s; }
+.waveform-bar.is-animating:nth-child(3n) { animation-delay: 0.3s; }
+.waveform-bar.is-animating:nth-child(4n) { animation-delay: 0.45s; }
+
+@keyframes wavePulse {
+  0% { height: 4px; }
+  100% { height: 20px; }
+}
+
+.voice-duration {
+  font-size: 11px;
+  opacity: 0.8;
+  font-variant-numeric: tabular-nums;
+}
+
+/* =========================================================================
+   POLL MESSAGE BUBBLE
+   ========================================================================= */
+.bubble-poll-wrapper {
+  min-width: 250px;
+  max-width: 380px;
+  padding: 4px 2px;
+}
+
+.poll-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed rgba(0, 0, 0, 0.1);
+}
+
+.is-outgoing .poll-header {
+  border-bottom-color: rgba(255, 255, 255, 0.2);
+}
+
+.poll-icon-box {
+  font-size: 22px;
+}
+
+.poll-title-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.poll-question {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: inherit;
+  line-height: 1.4;
+}
+
+.poll-type-badge {
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+.poll-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 8px;
+}
+
+.poll-option-row {
+  position: relative;
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: all 0.15s ease;
+}
+
+.is-outgoing .poll-option-row {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.poll-option-row:hover {
+  background: rgba(0, 0, 0, 0.07);
+}
+
+.is-outgoing .poll-option-row:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.poll-option-row.has-voted {
+  border-color: #3b82f6;
+  font-weight: 600;
+}
+
+.is-outgoing .poll-option-row.has-voted {
+  border-color: #ffffff;
+}
+
+.poll-option-progress-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  background: rgba(59, 130, 246, 0.18);
+  border-radius: 7px;
+  transition: width 0.3s ease;
+  z-index: 1;
+}
+
+.is-outgoing .poll-option-progress-bg {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.poll-option-content {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 2;
+  font-size: 13px;
+}
+
+.poll-check-icon {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.poll-empty-circle {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  opacity: 0.5;
+}
+
+.poll-option-text {
+  flex: 1;
+  word-break: break-word;
+}
+
+.poll-vote-count {
+  font-size: 11px;
+  opacity: 0.8;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.poll-footer {
+  font-size: 11px;
+  opacity: 0.75;
+  text-align: right;
+}
+
+/* =========================================================================
+   INPUT TOOLS & LIVE VOICE RECORDING BAR
+   ========================================================================= */
+.input-tools-left {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-attach-voice,
+.btn-attach-poll {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-attach-voice:hover,
+.btn-attach-poll:hover {
+  background: #f1f5f9;
+  color: #2563eb;
+}
+
+.btn-attach-voice.is-recording-active {
+  background: #fee2e2;
+  color: #dc2626;
+  animation: recordPulse 1s infinite alternate;
+}
+
+@keyframes recordPulse {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.1); }
+}
+
+.voice-recording-inline-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  padding: 8px 16px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+}
+
+.recording-pulse-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ef4444;
+  animation: pulseDot 1s infinite;
+  flex-shrink: 0;
+}
+
+@keyframes pulseDot {
+  0% { transform: scale(0.8); opacity: 0.6; }
+  50% { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(0.8); opacity: 0.6; }
+}
+
+.recording-timer-text {
+  font-size: 13px;
+  font-weight: 700;
+  color: #b91c1c;
+  font-variant-numeric: tabular-nums;
+}
+
+.recording-waves-animation {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 20px;
+  flex: 1;
+}
+
+.wave-stick {
+  width: 3px;
+  height: 6px;
+  background: #ef4444;
+  border-radius: 2px;
+  animation: waveStick 0.6s infinite alternate ease-in-out;
+}
+
+.wave-stick:nth-child(2n) { animation-delay: 0.1s; height: 12px; }
+.wave-stick:nth-child(3n) { animation-delay: 0.2s; height: 18px; }
+.wave-stick:nth-child(4n) { animation-delay: 0.3s; height: 9px; }
+
+@keyframes waveStick {
+  0% { height: 4px; }
+  100% { height: 22px; }
+}
+
+.recording-status-msg {
+  font-size: 12px;
+  color: #991b1b;
+  white-space: nowrap;
+}
+
+.recording-btn-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-cancel-recording {
+  background: #ffffff;
+  border: 1px solid #fca5a5;
+  color: #dc2626;
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-cancel-recording:hover {
+  background: #fee2e2;
+}
+
+.btn-send-recording {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  border: none;
+  color: #ffffff;
+  padding: 5px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.35);
+  transition: all 0.15s ease;
+}
+
+.btn-send-recording:hover {
+  background: #b91c1c;
+}
+
+/* =========================================================================
+   CỘT PHẢI SLIDING DRAWER (MEDIA, TỆP TIN & LIÊN KẾT)
+   ========================================================================= */
+.chat-right-drawer {
+  width: 340px;
+  background: #ffffff;
+  border-left: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  z-index: 15;
+}
+
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.drawer-title-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.drawer-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.drawer-subtitle {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.btn-close-drawer {
+  background: transparent;
+  border: none;
+  font-size: 16px;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.btn-close-drawer:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.drawer-nav-tabs {
+  display: flex;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 4px;
+}
+
+.drawer-tab {
+  flex: 1;
+  padding: 8px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.drawer-tab:hover {
+  color: #1e293b;
+}
+
+.drawer-tab.is-active {
+  background: #ffffff;
+  color: #2563eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.drawer-content-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.drawer-empty-hint {
+  text-align: center;
+  padding: 40px 16px;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.drawer-media-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.drawer-media-cell {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f1f5f9;
+  cursor: pointer;
+  border: 1px solid #e2e8f0;
+}
+
+.drawer-thumb-img,
+.drawer-thumb-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.15s ease;
+}
+
+.drawer-media-cell:hover .drawer-thumb-img {
+  transform: scale(1.06);
+}
+
+.video-play-indicator {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.3);
+  color: #ffffff;
+  font-size: 16px;
+}
+
+.drawer-files-list,
+.drawer-links-list,
+.drawer-pinned-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.drawer-file-item,
+.drawer-link-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.15s ease;
+}
+
+.drawer-file-item:hover,
+.drawer-link-item:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.drawer-file-icon-box,
+.drawer-link-icon-box {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.drawer-file-text-col,
+.drawer-link-text-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.drawer-file-name,
+.drawer-link-url {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.drawer-file-meta,
+.drawer-link-meta {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.drawer-pinned-item {
+  padding: 10px 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.drawer-pinned-item:hover {
+  background: #f1f5f9;
+  border-color: #93c5fd;
+}
+
+.drawer-pinned-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.drawer-pinned-author {
+  font-size: 12px;
+  font-weight: 700;
+  color: #2563eb;
+}
+
+.drawer-pinned-time {
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+.drawer-pinned-snippet {
+  margin: 0;
+  font-size: 12px;
+  color: #334155;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* =========================================================================
+   THEME COLOR PRESETS GRID
+   ========================================================================= */
+.theme-picker-desc {
+  font-size: 13px;
+  color: #64748b;
+  margin-bottom: 16px;
+}
+
+.theme-presets-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.theme-preset-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.theme-preset-card:hover {
+  border-color: #94a3b8;
+}
+
+.theme-preset-card.is-selected {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.theme-swatch-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+}
+
+.theme-preset-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+/* =========================================================================
+   SAVED MESSAGES MODAL
+   ========================================================================= */
+.saved-empty-box {
+  text-align: center;
+  padding: 40px 16px;
+}
+
+.empty-star-icon {
+  font-size: 36px;
+  margin-bottom: 12px;
+}
+
+.saved-empty-box h4 {
+  margin: 0 0 6px 0;
+  font-size: 16px;
+  color: #0f172a;
+}
+
+.saved-empty-box p {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+  max-width: 360px;
+  margin: 0 auto;
+}
+
+.saved-messages-list-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 480px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.saved-message-card {
+  padding: 12px 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all 0.15s ease;
+}
+
+.saved-message-card:hover {
+  border-color: #cbd5e1;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.saved-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.saved-author-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #2563eb;
+}
+
+.saved-time-tag {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.saved-content-text {
+  margin: 0;
+  font-size: 13px;
+  color: #1e293b;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.saved-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.btn-saved-action {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-saved-action:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.btn-saved-action.is-remove {
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+.btn-saved-action.is-remove:hover {
+  background: #fee2e2;
+}
+
+/* =========================================================================
+   POLL CREATION MODAL INPUTS
+   ========================================================================= */
+.poll-options-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.poll-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.poll-opt-index {
+  font-size: 13px;
+  font-weight: 700;
+  color: #64748b;
+  width: 18px;
+}
+
+.btn-remove-opt {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px;
+}
+
+.btn-remove-opt:hover {
+  color: #ef4444;
+}
+
+.btn-add-poll-option {
+  background: transparent;
+  border: 1px dashed #cbd5e1;
+  color: #2563eb;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+  transition: all 0.15s ease;
+}
+
+.btn-add-poll-option:hover {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+.poll-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #334155;
+  cursor: pointer;
+}
+
+/* =========================================================================
+   RESPONSIVE DESIGN (MÀN HÌNH NHỎ & MOBILE VIEW)
+   ========================================================================= */
+.btn-mobile-back {
+  display: none;
+  background: transparent;
+  border: none;
+  color: #475569;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  margin-right: 6px;
+  transition: all 0.15s ease;
+}
+
+.btn-mobile-back:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+@media (max-width: 900px) {
+  .realtime-chat-page {
+    padding: 0;
+    height: calc(100vh - 64px);
+  }
+
+  .chat-card-container {
+    border-radius: 0;
+    border: none;
+  }
+
+  .btn-mobile-back {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .chat-sidebar {
+    width: 100%;
+  }
+
+  .chat-sidebar.is-mobile-hidden {
+    display: none;
+  }
+
+  .chat-main {
+    width: 100%;
+  }
+
+  .chat-main.is-mobile-hidden {
+    display: none;
+  }
+
+  .message-bubble-row {
+    max-width: 88%;
+  }
+
+  .chat-right-drawer {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 100%;
+    z-index: 50;
+  }
+
+  .header-dropdown-menu {
+    right: 0;
+    width: 215px;
+  }
 }
 </style>
 

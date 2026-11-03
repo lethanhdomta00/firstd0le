@@ -19,11 +19,13 @@ public class FileUploadController {
     @PostMapping("/upload")
     public ResponseEntity<?> uploadImage(@RequestParam("file") MultipartFile file) {
         try {
-            Map<String, String> result = fileStorageService.uploadMedia(file);
+            Map<String, Object> result = fileStorageService.uploadMedia(file);
             return ResponseEntity.ok(Map.of(
                     "status", "SUCCESS",
                     "url", result.get("url"),
-                    "resourceType", result.get("resourceType")
+                    "resourceType", result.get("resourceType"),
+                    "fileName", result.get("fileName") != null ? result.get("fileName") : "",
+                    "fileSize", result.get("fileSize") != null ? result.get("fileSize") : 0
             ));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of(

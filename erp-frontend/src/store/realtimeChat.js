@@ -48,6 +48,12 @@ export const useRealtimeChatStore = defineStore('realtimeChat', {
     // Biệt danh theo phòng: { [roomId]: { [username]: string } }
     roomNicknames: {},
 
+    // Tin nhắn đã ghim theo phòng: { [roomId]: Array<RealtimeMessageDto> }
+    pinnedMessagesByRoom: {},
+
+    // Tin nhắn đã lưu / đánh dấu sao của người dùng
+    savedMessages: JSON.parse(localStorage.getItem('erp_chat_bookmarks') || '[]'),
+
     // Ai đang gõ phím: { [roomId]: Array<string> }
     typingUsers: {},
 
@@ -59,10 +65,15 @@ export const useRealtimeChatStore = defineStore('realtimeChat', {
 
   getters: {
     currentMessages: (state) => state.messagesByRoom[state.activeRoomId] || [],
+    currentPinnedMessages: (state) => state.pinnedMessagesByRoom[state.activeRoomId] || [],
     currentTypingUsers: (state) => state.typingUsers[state.activeRoomId] || [],
     getNickname: (state) => (username, defaultName = '') => {
       if (!username) return defaultName || ''
-      return state.roomNicknames[state.activeRoomId]?.[username] || defaultName || username
+      const inRoom = state.roomNicknames[state.activeRoomId]?.[username]
+      if (inRoom) return inRoom
+      const c = state.colleagues.find(col => col.username?.toLowerCase() === username?.toLowerCase())
+      if (c?.nickname) return c.nickname
+      return defaultName || username
     }
   },
 
@@ -124,6 +135,27 @@ export const useRealtimeChatStore = defineStore('realtimeChat', {
       })
 
       this.client.activate()
+    },
+
+    /**
+     * Ngắt kết nối STOMP an toàn (dùng khi logout hoặc đổi phiên làm việc)
+     */
+    disconnect() {
+      if (this.client) {
+        try {
+          this.client.deactivate()
+        } catch (e) {
+          console.warn('Lỗi khi ngắt kết nối STOMP:', e)
+        }
+      }
+      this.isConnected = false
+      this.isConnecting = false
+      this.subscriptions.forEach(sub => {
+        try { sub.unsubscribe() } catch (e) {}
+      })
+      this.subscriptions = []
+      this.privateRoomSub = null
+      this.groupSubscriptions = {}
     },
 
     /**
@@ -339,10 +371,61 @@ export const useRealtimeChatStore = defineStore('realtimeChat', {
           this.roomNicknames[targetRoom] = {}
         }
         this.roomNicknames[targetRoom][messageDto.username] = messageDto.nickname
+        const col = this.colleagues.find(c => c.username === messageDto.username)
+        if (col) {
+          col.nickname = messageDto.nickname
+        }
         return
       }
 
-      // --- TRƯỜNG HỢP 6: TIN NHẮN MỚI ---
+      // --- TRƯỜNG HỢP 6: GHIM / BỎ GHIM TIN NHẮN (PIN / UNPIN) ---
+      if (messageDto.type === 'MESSAGE_PINNED' || messageDto.type === 'MESSAGE_UNPINNED') {
+        const targetRoom = messageDto.roomId || roomId
+        const msgId = messageDto.messageId
+        const isPinned = messageDto.isPinned
+        const candidateRooms = Array.from(new Set([targetRoom, this.activeRoomId, roomId].filter(Boolean)))
+        for (const r of candidateRooms) {
+          if (this.messagesByRoom[r]) {
+            const found = this.messagesByRoom[r].find(m => m.id === msgId)
+            if (found) {
+              found.isPinned = isPinned
+              found.pinnedBy = messageDto.pinnedBy
+              found.pinnedAt = messageDto.pinnedAt
+            }
+          }
+        }
+        if (!this.pinnedMessagesByRoom[targetRoom]) {
+          this.pinnedMessagesByRoom[targetRoom] = []
+        }
+        if (isPinned) {
+          const idx = this.pinnedMessagesByRoom[targetRoom].findIndex(m => m.id === msgId)
+          if (idx !== -1) {
+            this.pinnedMessagesByRoom[targetRoom][idx] = messageDto.message || { id: msgId, isPinned: true }
+          } else {
+            this.pinnedMessagesByRoom[targetRoom].unshift(messageDto.message || { id: msgId, isPinned: true })
+          }
+        } else {
+          this.pinnedMessagesByRoom[targetRoom] = this.pinnedMessagesByRoom[targetRoom].filter(m => m.id !== msgId)
+        }
+        return
+      }
+
+      // --- TRƯỜNG HỢP 7: CẬP NHẬT KẾT QUẢ BÌNH CHỌN (POLL_VOTED) ---
+      if (messageDto.type === 'POLL_VOTED') {
+        const targetRoom = messageDto.roomId || roomId
+        const candidateRooms = Array.from(new Set([targetRoom, this.activeRoomId, roomId].filter(Boolean)))
+        for (const r of candidateRooms) {
+          if (this.messagesByRoom[r]) {
+            const msg = this.messagesByRoom[r].find(m => m.id === messageDto.messageId)
+            if (msg) {
+              msg.content = typeof messageDto.pollData === 'string' ? messageDto.pollData : JSON.stringify(messageDto.pollData)
+            }
+          }
+        }
+        return
+      }
+
+      // --- TRƯỜNG HỢP 8: TIN NHẮN MỚI ---
       let targetRoom = roomId
       if (targetRoom && targetRoom.includes('_') && !targetRoom.startsWith('GROUP_')) {
         targetRoom = targetRoom.toLowerCase()
@@ -750,6 +833,7 @@ export const useRealtimeChatStore = defineStore('realtimeChat', {
         await this.loadRoomHistory('GLOBAL')
         this.markAsRead('GLOBAL')
         this.fetchNicknames('GLOBAL')
+        this.fetchPinnedMessages('GLOBAL')
       } else if (type === 'PRIVATE' && target) {
         this.activePartner = target
         this.activeGroup = null
@@ -759,6 +843,7 @@ export const useRealtimeChatStore = defineStore('realtimeChat', {
         await this.loadPrivateHistory(target.username)
         this.markAsRead(this.activeRoomId)
         this.fetchNicknames(this.activeRoomId)
+        this.fetchPinnedMessages(this.activeRoomId)
       } else if (type === 'GROUP' && target) {
         this.activeGroup = target
         this.activePartner = null
@@ -771,6 +856,7 @@ export const useRealtimeChatStore = defineStore('realtimeChat', {
         await this.loadRoomHistory(this.activeRoomId)
         this.markAsRead(this.activeRoomId)
         this.fetchNicknames(this.activeRoomId)
+        this.fetchPinnedMessages(this.activeRoomId)
       }
     },
 
@@ -982,6 +1068,26 @@ export const useRealtimeChatStore = defineStore('realtimeChat', {
         preview = '📷 [Hình ảnh]'
       } else if (messageDto.type === 'VIDEO') {
         preview = '🎥 [Video]'
+      } else if (messageDto.type === 'FILE') {
+        let fileName = 'Tài liệu'
+        try {
+          if (messageDto.content && messageDto.content.startsWith('{')) {
+            const parsed = JSON.parse(messageDto.content)
+            fileName = parsed.name || 'Tài liệu'
+          }
+        } catch (e) {}
+        preview = `📎 [Tệp] ${fileName}`
+      } else if (messageDto.type === 'VOICE') {
+        preview = '🎙️ [Tin nhắn thoại]'
+      } else if (messageDto.type === 'POLL') {
+        let q = 'Bình chọn'
+        try {
+          if (messageDto.content && messageDto.content.startsWith('{')) {
+            const p = JSON.parse(messageDto.content)
+            q = p.question || 'Bình chọn'
+          }
+        } catch (e) {}
+        preview = `📊 [Bình chọn] ${q}`
       }
 
       const time = messageDto.createdAt || new Date().toISOString()
@@ -1171,6 +1277,159 @@ export const useRealtimeChatStore = defineStore('realtimeChat', {
     },
 
     /**
+     * Gửi Tệp tin / Tài liệu phòng chung hoặc nhóm
+     */
+    sendPublicFile(fileData, roomId = null) {
+      if (!this.client || !this.isConnected || !fileData?.url) return
+      const authStore = useAuthStore()
+      const targetRoomId = roomId || this.activeRoomId || 'GLOBAL'
+
+      const contentJson = JSON.stringify({
+        url: fileData.url,
+        name: fileData.name || fileData.fileName || 'Tài liệu',
+        size: fileData.size || fileData.fileSize || 0
+      })
+
+      const tempId = 'temp_' + Date.now()
+      const optimisticMsg = {
+        id: tempId,
+        roomId: targetRoomId,
+        senderUsername: authStore.user?.username,
+        senderFullName: authStore.user?.fullName || authStore.user?.username,
+        senderAvatarUrl: authStore.user?.avatarUrl,
+        recipientUsername: null,
+        content: contentJson,
+        type: 'FILE',
+        status: 'SENDING',
+        createdAt: new Date().toISOString(),
+        reactions: {}
+      }
+
+      if (!this.messagesByRoom[targetRoomId]) this.messagesByRoom[targetRoomId] = []
+      this.messagesByRoom[targetRoomId].push(optimisticMsg)
+      this.replyingTo = null
+
+      if (targetRoomId.startsWith('GROUP_')) {
+        this.bumpConversationToTop(targetRoomId, optimisticMsg)
+      }
+
+      this.client.publish({
+        destination: '/app/chat.sendPublic',
+        body: JSON.stringify({
+          roomId: targetRoomId,
+          senderUsername: authStore.user?.username,
+          content: contentJson,
+          type: 'FILE'
+        })
+      })
+    },
+
+    /**
+     * Gửi Tệp tin / Tài liệu chat riêng 1-1
+     */
+    sendPrivateFile(recipientUsername, fileData) {
+      if (!this.client || !this.isConnected || !fileData?.url || !recipientUsername) return
+      const authStore = useAuthStore()
+      const myUsername = authStore.user?.username
+      const roomId = this.getPrivateRoomId(myUsername, recipientUsername)
+
+      const contentJson = JSON.stringify({
+        url: fileData.url,
+        name: fileData.name || fileData.fileName || 'Tài liệu',
+        size: fileData.size || fileData.fileSize || 0
+      })
+
+      const tempId = 'temp_' + Date.now()
+      const optimisticMsg = {
+        id: tempId,
+        roomId,
+        senderUsername: myUsername,
+        senderFullName: authStore.user?.fullName || myUsername,
+        senderAvatarUrl: authStore.user?.avatarUrl,
+        recipientUsername: recipientUsername.trim(),
+        content: contentJson,
+        type: 'FILE',
+        status: 'SENDING',
+        createdAt: new Date().toISOString(),
+        reactions: {}
+      }
+
+      if (!this.messagesByRoom[roomId]) this.messagesByRoom[roomId] = []
+      this.messagesByRoom[roomId].push(optimisticMsg)
+      this.replyingTo = null
+
+      this.bumpConversationToTop(roomId, optimisticMsg)
+
+      this.client.publish({
+        destination: '/app/chat.sendPrivate',
+        body: JSON.stringify({
+          recipientUsername: recipientUsername.trim(),
+          senderUsername: myUsername,
+          content: contentJson,
+          type: 'FILE'
+        })
+      })
+    },
+
+    /**
+     * Tải danh sách tin nhắn đã ghim của phòng
+     */
+    async fetchPinnedMessages(roomId) {
+      if (!roomId) return []
+      try {
+        const res = await api.get(`/realtime-chat/rooms/${roomId}/pinned`)
+        const list = res.data || []
+        this.pinnedMessagesByRoom[roomId] = list
+        return list
+      } catch (err) {
+        console.warn('Lỗi khi tải danh sách tin nhắn ghim:', err)
+        return []
+      }
+    },
+
+    /**
+     * Thao tác Ghim / Bỏ ghim tin nhắn
+     */
+    async togglePinMessage(messageId, isPinned = null) {
+      if (!messageId) return
+      try {
+        const body = isPinned !== null ? { isPinned } : {}
+        const res = await api.put(`/realtime-chat/messages/${messageId}/pin`, body)
+        const updated = res.data?.data
+        if (updated && updated.roomId) {
+          const room = updated.roomId
+          // Cập nhật messagesByRoom
+          if (this.messagesByRoom[room]) {
+            const found = this.messagesByRoom[room].find(m => m.id === messageId)
+            if (found) {
+              found.isPinned = updated.isPinned
+              found.pinnedBy = updated.pinnedBy
+              found.pinnedAt = updated.pinnedAt
+            }
+          }
+          // Cập nhật pinnedMessagesByRoom
+          if (!this.pinnedMessagesByRoom[room]) {
+            this.pinnedMessagesByRoom[room] = []
+          }
+          if (updated.isPinned) {
+            const idx = this.pinnedMessagesByRoom[room].findIndex(m => m.id === messageId)
+            if (idx !== -1) {
+              this.pinnedMessagesByRoom[room][idx] = updated
+            } else {
+              this.pinnedMessagesByRoom[room].unshift(updated)
+            }
+          } else {
+            this.pinnedMessagesByRoom[room] = this.pinnedMessagesByRoom[room].filter(m => m.id !== messageId)
+          }
+        }
+        return res.data
+      } catch (err) {
+        console.error('Lỗi khi thao tác ghim tin nhắn:', err)
+        throw err
+      }
+    },
+
+    /**
      * Tải danh sách biệt danh của phòng
      */
     async fetchNicknames(roomId) {
@@ -1200,11 +1459,273 @@ export const useRealtimeChatStore = defineStore('realtimeChat', {
           this.roomNicknames[roomId] = {}
         }
         this.roomNicknames[roomId][targetUsername] = nickname
+        const col = this.colleagues.find(c => c.username === targetUsername)
+        if (col) {
+          col.nickname = nickname
+        }
         return res.data
       } catch (err) {
         console.error('Lỗi đặt biệt danh:', err)
         throw err
       }
+    },
+
+    /**
+     * Gửi tin nhắn thoại phòng chung hoặc nhóm
+     */
+    sendPublicVoice(audioUrl, duration, roomId = null) {
+      if (!this.client || !this.isConnected || !audioUrl) return
+      const authStore = useAuthStore()
+      const targetRoomId = roomId || this.activeRoomId || 'GLOBAL'
+
+      const contentJson = JSON.stringify({
+        url: audioUrl,
+        duration: Math.round(duration) || 0
+      })
+
+      const tempId = 'temp_' + Date.now()
+      const optimisticMsg = {
+        id: tempId,
+        roomId: targetRoomId,
+        senderUsername: authStore.user?.username,
+        senderFullName: authStore.user?.fullName || authStore.user?.username,
+        senderAvatarUrl: authStore.user?.avatarUrl,
+        recipientUsername: null,
+        content: contentJson,
+        type: 'VOICE',
+        status: 'SENDING',
+        createdAt: new Date().toISOString(),
+        reactions: {}
+      }
+
+      if (!this.messagesByRoom[targetRoomId]) this.messagesByRoom[targetRoomId] = []
+      this.messagesByRoom[targetRoomId].push(optimisticMsg)
+      this.replyingTo = null
+
+      if (targetRoomId.startsWith('GROUP_')) {
+        this.bumpConversationToTop(targetRoomId, optimisticMsg)
+      }
+
+      this.client.publish({
+        destination: '/app/chat.sendPublic',
+        body: JSON.stringify({
+          roomId: targetRoomId,
+          senderUsername: authStore.user?.username,
+          content: contentJson,
+          type: 'VOICE'
+        })
+      })
+    },
+
+    /**
+     * Gửi tin nhắn thoại chat riêng 1-1
+     */
+    sendPrivateVoice(recipientUsername, audioUrl, duration) {
+      if (!this.client || !this.isConnected || !audioUrl || !recipientUsername) return
+      const authStore = useAuthStore()
+      const myUsername = authStore.user?.username
+      const roomId = this.getPrivateRoomId(myUsername, recipientUsername)
+
+      const contentJson = JSON.stringify({
+        url: audioUrl,
+        duration: Math.round(duration) || 0
+      })
+
+      const tempId = 'temp_' + Date.now()
+      const optimisticMsg = {
+        id: tempId,
+        roomId,
+        senderUsername: myUsername,
+        senderFullName: authStore.user?.fullName || myUsername,
+        senderAvatarUrl: authStore.user?.avatarUrl,
+        recipientUsername: recipientUsername.trim(),
+        content: contentJson,
+        type: 'VOICE',
+        status: 'SENDING',
+        createdAt: new Date().toISOString(),
+        reactions: {}
+      }
+
+      if (!this.messagesByRoom[roomId]) this.messagesByRoom[roomId] = []
+      this.messagesByRoom[roomId].push(optimisticMsg)
+      this.replyingTo = null
+
+      this.bumpConversationToTop(roomId, optimisticMsg)
+
+      this.client.publish({
+        destination: '/app/chat.sendPrivate',
+        body: JSON.stringify({
+          recipientUsername: recipientUsername.trim(),
+          senderUsername: myUsername,
+          content: contentJson,
+          type: 'VOICE'
+        })
+      })
+    },
+
+    /**
+     * Gửi cuộc bình chọn (Poll) phòng chung hoặc nhóm
+     */
+    sendPublicPoll(pollData, roomId = null) {
+      if (!this.client || !this.isConnected || !pollData) return
+      const authStore = useAuthStore()
+      const targetRoomId = roomId || this.activeRoomId || 'GLOBAL'
+      const contentJson = typeof pollData === 'string' ? pollData : JSON.stringify(pollData)
+
+      const tempId = 'temp_' + Date.now()
+      const optimisticMsg = {
+        id: tempId,
+        roomId: targetRoomId,
+        senderUsername: authStore.user?.username,
+        senderFullName: authStore.user?.fullName || authStore.user?.username,
+        senderAvatarUrl: authStore.user?.avatarUrl,
+        recipientUsername: null,
+        content: contentJson,
+        type: 'POLL',
+        status: 'SENDING',
+        createdAt: new Date().toISOString(),
+        reactions: {}
+      }
+
+      if (!this.messagesByRoom[targetRoomId]) this.messagesByRoom[targetRoomId] = []
+      this.messagesByRoom[targetRoomId].push(optimisticMsg)
+      this.replyingTo = null
+
+      if (targetRoomId.startsWith('GROUP_')) {
+        this.bumpConversationToTop(targetRoomId, optimisticMsg)
+      }
+
+      this.client.publish({
+        destination: '/app/chat.sendPublic',
+        body: JSON.stringify({
+          roomId: targetRoomId,
+          senderUsername: authStore.user?.username,
+          content: contentJson,
+          type: 'POLL'
+        })
+      })
+    },
+
+    /**
+     * Gửi cuộc bình chọn (Poll) chat riêng 1-1
+     */
+    sendPrivatePoll(recipientUsername, pollData) {
+      if (!this.client || !this.isConnected || !pollData || !recipientUsername) return
+      const authStore = useAuthStore()
+      const myUsername = authStore.user?.username
+      const roomId = this.getPrivateRoomId(myUsername, recipientUsername)
+      const contentJson = typeof pollData === 'string' ? pollData : JSON.stringify(pollData)
+
+      const tempId = 'temp_' + Date.now()
+      const optimisticMsg = {
+        id: tempId,
+        roomId,
+        senderUsername: myUsername,
+        senderFullName: authStore.user?.fullName || myUsername,
+        senderAvatarUrl: authStore.user?.avatarUrl,
+        recipientUsername: recipientUsername.trim(),
+        content: contentJson,
+        type: 'POLL',
+        status: 'SENDING',
+        createdAt: new Date().toISOString(),
+        reactions: {}
+      }
+
+      if (!this.messagesByRoom[roomId]) this.messagesByRoom[roomId] = []
+      this.messagesByRoom[roomId].push(optimisticMsg)
+      this.replyingTo = null
+
+      this.bumpConversationToTop(roomId, optimisticMsg)
+
+      this.client.publish({
+        destination: '/app/chat.sendPrivate',
+        body: JSON.stringify({
+          recipientUsername: recipientUsername.trim(),
+          senderUsername: myUsername,
+          content: contentJson,
+          type: 'POLL'
+        })
+      })
+    },
+
+    /**
+     * Tham gia bỏ phiếu trong cuộc bình chọn
+     */
+    async votePoll(messageId, optionId) {
+      if (!messageId || optionId === undefined) return
+      const authStore = useAuthStore()
+      const username = authStore.user?.username
+
+      // Optimistic update poll trong UI
+      const candidateRooms = Array.from(new Set([this.activeRoomId]))
+      for (const r of candidateRooms) {
+        if (this.messagesByRoom[r]) {
+          const msg = this.messagesByRoom[r].find(m => m.id === messageId)
+          if (msg && msg.type === 'POLL') {
+            try {
+              const pollObj = JSON.parse(msg.content)
+              const isMultiple = Boolean(pollObj.isMultiple)
+              pollObj.options.forEach(opt => {
+                if (!isMultiple && opt.id !== optionId) {
+                  opt.votes = (opt.votes || []).filter(u => u !== username)
+                }
+                if (opt.id === optionId) {
+                  opt.votes = opt.votes || []
+                  if (opt.votes.includes(username)) {
+                    opt.votes = opt.votes.filter(u => u !== username)
+                  } else {
+                    opt.votes.push(username)
+                  }
+                }
+              })
+              msg.content = JSON.stringify(pollObj)
+            } catch (e) {}
+          }
+        }
+      }
+
+      try {
+        const res = await api.post(`/realtime-chat/messages/${messageId}/poll/vote`, { optionId })
+        return res.data
+      } catch (err) {
+        console.error('Lỗi khi gửi bình chọn:', err)
+        throw err
+      }
+    },
+
+    /**
+     * Đánh dấu / Bỏ đánh dấu sao tin nhắn (Lưu trữ cá nhân)
+     */
+    toggleBookmarkMessage(message) {
+      if (!message || !message.id) return false
+      const idx = this.savedMessages.findIndex(m => m.id === message.id)
+      let bookmarked = false
+      if (idx !== -1) {
+        this.savedMessages.splice(idx, 1)
+        bookmarked = false
+      } else {
+        this.savedMessages.unshift({
+          id: message.id,
+          roomId: message.roomId || this.activeRoomId,
+          senderUsername: message.senderUsername,
+          senderFullName: message.senderFullName,
+          senderAvatarUrl: message.senderAvatarUrl,
+          content: message.content,
+          type: message.type,
+          createdAt: message.createdAt,
+          savedAt: new Date().toISOString()
+        })
+        bookmarked = true
+      }
+      localStorage.setItem('erp_chat_bookmarks', JSON.stringify(this.savedMessages))
+      return bookmarked
+    },
+
+    /**
+     * Kiểm tra tin nhắn đã được lưu hay chưa
+     */
+    isBookmarked(messageId) {
+      return this.savedMessages.some(m => m.id === messageId)
     },
 
     /**

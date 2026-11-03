@@ -6,6 +6,9 @@ public enum MessageType {
     LEAVE,
     TYPING,
     IMAGE,
-    VIDEO
+    VIDEO,
+    FILE,
+    VOICE,
+    POLL
 }
 

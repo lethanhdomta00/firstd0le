@@ -358,13 +358,24 @@ const formatMessage = (rawText) => {
   return escaped
 }
 
+const parseMessageDate = (isoString) => {
+  if (!isoString) return new Date()
+  if (isoString instanceof Date) return isoString
+  let s = String(isoString).trim()
+  if (s.includes('T') && !s.endsWith('Z') && !/[+-]\d{2}(:\d{2})?$/.test(s)) {
+    s += 'Z'
+  }
+  const d = new Date(s)
+  return isNaN(d.getTime()) ? new Date(isoString) : d
+}
+
 const formatTime = (timeStr) => {
   if (!timeStr) {
     const now = new Date()
     return now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
   }
   try {
-    const d = new Date(timeStr)
+    const d = parseMessageDate(timeStr)
     return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
   } catch (e) {
     return ''

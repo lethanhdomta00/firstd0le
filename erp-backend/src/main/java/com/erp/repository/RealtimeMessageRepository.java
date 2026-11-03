@@ -42,6 +42,17 @@ public interface RealtimeMessageRepository extends JpaRepository<RealtimeMessage
     // Đếm số lượng tin nhắn chưa đọc trong 1 phòng cụ thể gửi tới một người
     long countByRoomIdAndRecipientUsernameAndStatus(String roomId, String recipientUsername, MessageStatus status);
 
+    // Lấy danh sách tin nhắn được ghim trong phòng
+    List<RealtimeMessage> findByRoomIdAndIsPinnedTrueOrderByPinnedAtDesc(String roomId);
+
+    // Lấy tin nhắn được ghim giữa 2 người (chat 1-1)
+    @Query("SELECT m FROM RealtimeMessage m WHERE ((m.roomId = :roomId) OR " +
+           "(m.senderUsername = :user1 AND m.recipientUsername = :user2) OR " +
+           "(m.senderUsername = :user2 AND m.recipientUsername = :user1)) AND m.isPinned = true ORDER BY m.pinnedAt DESC")
+    List<RealtimeMessage> findPinnedMessagesBetween(@Param("roomId") String roomId, 
+                                                    @Param("user1") String user1, 
+                                                    @Param("user2") String user2);
+
     // Đánh dấu tất cả tin nhắn trong phòng gửi tới một người là ĐÃ ĐỌC (READ)
     @Modifying
     @Query("UPDATE RealtimeMessage m SET m.status = :readStatus WHERE m.roomId = :roomId AND m.recipientUsername = :recipientUsername AND m.status != :readStatus")
