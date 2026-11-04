@@ -178,7 +178,11 @@
               <div v-else class="item-avatar default-avatar" :style="getAvatarBg(colleague.fullName || colleague.username)">
                 {{ getAvatarInitials(colleague.fullName || colleague.username) }}
               </div>
-              <span class="online-indicator-dot"></span>
+              <span 
+                v-if="chatStore.isUserOnline(colleague.username)" 
+                class="online-indicator-dot is-online"
+                title="Đang trực tuyến"
+              ></span>
             </div>
 
             <div class="item-info">
@@ -269,7 +273,11 @@
               <div v-else class="header-room-avatar default-avatar" :style="getAvatarBg(activeTitle)">
                 {{ getAvatarInitials(activeTitle) }}
               </div>
-              <span class="online-indicator-dot"></span>
+              <span 
+                v-if="chatStore.activeChatType === 'PRIVATE' && chatStore.isUserOnline(chatStore.activePartner?.username)" 
+                class="online-indicator-dot is-online"
+                title="Đang trực tuyến"
+              ></span>
             </div>
 
             <div class="header-title-group">
@@ -277,6 +285,15 @@
                 <h3 class="current-chat-name">{{ activeTitle }}</h3>
                 <span v-if="chatStore.activeChatType === 'PUBLIC'" class="badge-tag-channel">Phòng chung</span>
                 <span v-else-if="chatStore.activeChatType === 'GROUP'" class="badge-tag-group">Nhóm ({{ chatStore.activeGroup?.memberCount }} tv)</span>
+                <!-- Bổ sung Status Badge cho chat 1-1 -->
+                <span 
+                  v-else-if="chatStore.activeChatType === 'PRIVATE'" 
+                  class="presence-status-pill"
+                  :class="chatStore.isUserOnline(chatStore.activePartner?.username) ? 'is-online' : 'is-offline'"
+                >
+                  <span class="presence-pulse-dot"></span>
+                  {{ chatStore.isUserOnline(chatStore.activePartner?.username) ? 'Trực tuyến' : 'Ngoại tuyến' }}
+                </span>
               </div>
               <p class="current-chat-desc" :class="{ 'is-typing-desc': currentRoomIsTyping }">
                 <span v-if="currentRoomIsTyping" class="typing-dot-blink">●</span>
@@ -287,6 +304,33 @@
 
           <!-- Nút hành động nhanh trên Header (Đã thu gọn cực kỳ tinh tế & gọn gàng) -->
           <div class="header-actions">
+            <!-- Nút Gọi thoại nội bộ (Audio Call) -->
+            <button 
+              v-if="chatStore.activeChatType === 'PRIVATE'"
+              type="button" 
+              class="btn-icon-action btn-header-call btn-header-voice-call"
+              title="Gọi thoại nội bộ (Audio Call)"
+              @click="startVoiceCall"
+            >
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+              </svg>
+            </button>
+
+            <!-- Nút Gọi video nội bộ (Video Call) -->
+            <button 
+              v-if="chatStore.activeChatType === 'PRIVATE'"
+              type="button" 
+              class="btn-icon-action btn-header-call btn-header-video-call"
+              title="Gọi video nội bộ (Video Call)"
+              @click="startVideoCall"
+            >
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+              </svg>
+            </button>
+
             <!-- Nút Tìm kiếm tin nhắn trong đoạn chat -->
             <button 
               class="btn-icon-action" 
@@ -946,19 +990,6 @@
 
         <!-- Footer soạn thảo và gửi tin nhắn -->
         <footer class="main-footer">
-          <!-- Gợi ý emoji nhanh -->
-          <div class="quick-reactions-bar">
-            <button 
-              v-for="emoji in quickEmojis" 
-              :key="emoji" 
-              type="button" 
-              class="btn-quick-emoji"
-              @click="insertEmoji(emoji)"
-            >
-              {{ emoji }}
-            </button>
-          </div>
-
           <!-- Thanh xem trước tin nhắn đang Reply (nếu có) -->
           <div v-if="chatStore.replyingTo" class="reply-preview-bar">
             <div class="reply-preview-left">
@@ -1022,67 +1053,17 @@
             </div>
           </transition>
 
-          <form class="chat-input-form" @submit.prevent="handleSendMessage">
-            <!-- Input file ẩn để đính kèm hình ảnh, video hoặc tài liệu -->
-            <input 
-              ref="imageFileInputRef" 
-              type="file" 
-              accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.7z,.txt,.csv" 
-              class="hidden-file-input" 
-              @change="handleMediaSelected"
-            />
+          <!-- Input file ẩn để đính kèm hình ảnh, video hoặc tài liệu -->
+          <input 
+            ref="imageFileInputRef" 
+            type="file" 
+            accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.7z,.txt,.csv" 
+            class="hidden-file-input" 
+            @change="handleMediaSelected"
+          />
 
-            <!-- Thanh công cụ đính kèm cạnh ô nhập -->
-            <div class="input-tools-left">
-              <!-- Nút đính kèm ảnh, video hoặc tài liệu -->
-              <button 
-                type="button" 
-                class="btn-attach-image" 
-                :class="{ 'is-uploading': isUploadingImage }"
-                :disabled="isUploadingImage || !chatStore.isConnected || isRecordingVoice"
-                :title="isUploadingImage ? 'Đang tải tệp lên Cloud...' : 'Đính kèm tệp tin, hình ảnh hoặc video (hoặc dán Ctrl+V)'"
-                @click="triggerImageSelect"
-              >
-                <svg v-if="!isUploadingImage" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
-                </svg>
-                <span v-else class="upload-spinner-icon"></span>
-              </button>
-
-              <!-- Nút Ghi âm Tin nhắn thoại (Voice note) -->
-              <button 
-                type="button" 
-                class="btn-attach-voice" 
-                :class="{ 'is-recording-active': isRecordingVoice, 'is-uploading': isUploadingVoice }"
-                :disabled="!chatStore.isConnected || isUploadingVoice"
-                :title="isRecordingVoice ? 'Đang ghi âm (Bấm để gửi)' : 'Ghi âm tin nhắn thoại'"
-                @click="toggleVoiceRecording"
-              >
-                <svg v-if="!isUploadingVoice" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-                  <line x1="12" y1="19" x2="12" y2="23"></line>
-                  <line x1="8" y1="23" x2="16" y2="23"></line>
-                </svg>
-                <span v-else class="upload-spinner-icon"></span>
-              </button>
-
-              <!-- Nút Tạo bình chọn (Poll) -->
-              <button 
-                type="button" 
-                class="btn-attach-poll" 
-                :disabled="!chatStore.isConnected || isRecordingVoice"
-                title="Tạo cuộc thăm dò ý kiến / bình chọn"
-                @click="openCreatePollDialog"
-              >
-                <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2">
-                  <line x1="18" y1="20" x2="18" y2="10"></line>
-                  <line x1="12" y1="20" x2="12" y2="4"></line>
-                  <line x1="6" y1="20" x2="6" y2="14"></line>
-                </svg>
-              </button>
-            </div>
-
+          <!-- HỘP SOẠN THẢO HỢP NHẤT HIỆN ĐẠI (UNIFIED MODERN CHAT COMPOSER) -->
+          <form class="chat-composer-container" @submit.prevent="handleSendMessage">
             <!-- Giao diện đang ghi âm thoại -->
             <div v-if="isRecordingVoice" class="voice-recording-inline-bar">
               <span class="recording-pulse-dot"></span>
@@ -1090,7 +1071,7 @@
               <div class="recording-waves-animation">
                 <span v-for="w in 14" :key="w" class="wave-stick"></span>
               </div>
-              <span class="recording-status-msg">Đang thu âm...</span>
+              <span class="recording-status-msg">Đang thu âm tin nhắn thoại...</span>
               <div class="recording-btn-group">
                 <button type="button" class="btn-cancel-recording" title="Hủy bỏ ghi âm" @click="cancelVoiceRecording">
                   ✕ Hủy
@@ -1105,31 +1086,144 @@
               </div>
             </div>
 
-            <!-- Ô nhập văn bản thông thường -->
-            <template v-else>
+            <!-- Khung soạn thảo tin nhắn hợp nhất -->
+            <div v-else class="composer-unified-card" :class="{ 'is-focused': isInputFocused }">
+              <!-- Ô nhập văn bản -->
               <textarea
                 ref="inputTextareaRef"
                 v-model="inputContent"
-                class="chat-textarea"
+                class="composer-textarea"
                 :placeholder="editingMessage ? 'Nhập nội dung chỉnh sửa... (Nhấn Enter để lưu, ESC để hủy)' : 'Nhập tin nhắn, gõ @ để nhắc tên, dán ảnh/tệp (Ctrl+V)... (Enter gửi, Shift+Enter xuống dòng)'"
                 rows="2"
+                @focus="isInputFocused = true"
+                @blur="isInputFocused = false"
                 @keydown="handleTextareaKeydown"
                 @input="handleInputWithMention"
                 @paste="handlePaste"
               ></textarea>
 
-              <button 
-                type="submit" 
-                class="btn-send-message"
-                :disabled="!inputContent.trim() || !chatStore.isConnected"
-              >
-                <span>{{ editingMessage ? 'Lưu' : 'Gửi' }}</span>
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                  <line x1="22" y1="2" x2="11" y2="13"></line>
-                  <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                </svg>
-              </button>
-            </template>
+              <!-- Thanh công cụ bên trong đáy hộp soạn thảo -->
+              <div class="composer-bottom-toolbar">
+                <div class="composer-tools-left">
+                  <!-- Nút đính kèm ảnh, video hoặc tài liệu -->
+                  <button 
+                    type="button" 
+                    class="composer-tool-btn" 
+                    :class="{ 'is-uploading': isUploadingImage }"
+                    :disabled="isUploadingImage || !chatStore.isConnected || isRecordingVoice"
+                    :title="isUploadingImage ? 'Đang tải tệp lên Cloud...' : 'Đính kèm tệp tin, hình ảnh hoặc video (Ctrl+V)'"
+                    @click="triggerImageSelect"
+                  >
+                    <svg v-if="!isUploadingImage" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                    </svg>
+                    <span v-else class="upload-spinner-icon"></span>
+                  </button>
+
+                  <!-- Nút Ghi âm Tin nhắn thoại (Voice note) -->
+                  <button 
+                    type="button" 
+                    class="composer-tool-btn" 
+                    :disabled="!chatStore.isConnected || isUploadingVoice"
+                    title="Ghi âm tin nhắn thoại"
+                    @click="toggleVoiceRecording"
+                  >
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                      <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                      <line x1="12" y1="19" x2="12" y2="23"></line>
+                      <line x1="8" y1="23" x2="16" y2="23"></line>
+                    </svg>
+                  </button>
+
+                  <!-- Nút Tạo bình chọn (Poll) -->
+                  <button 
+                    type="button" 
+                    class="composer-tool-btn" 
+                    :disabled="!chatStore.isConnected"
+                    title="Tạo cuộc thăm dò ý kiến / bình chọn"
+                    @click="openCreatePollDialog"
+                  >
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                      <line x1="18" y1="20" x2="18" y2="10"></line>
+                      <line x1="12" y1="20" x2="12" y2="4"></line>
+                      <line x1="6" y1="20" x2="6" y2="14"></line>
+                    </svg>
+                  </button>
+
+                  <!-- Nút Chia sẻ Thẻ Sản phẩm ERP -->
+                  <button 
+                    type="button" 
+                    class="composer-tool-btn" 
+                    :disabled="!chatStore.isConnected"
+                    title="Chia sẻ Thẻ Sản phẩm ERP vào cuộc trò chuyện"
+                    @click="openProductShareModal"
+                  >
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                      <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                      <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                    </svg>
+                  </button>
+
+                  <div class="composer-tool-divider"></div>
+
+                  <!-- Nút biểu tượng cảm xúc (Quick Emoji Popover) -->
+                  <div class="composer-emoji-wrapper">
+                    <button 
+                      type="button" 
+                      class="composer-tool-btn" 
+                      :class="{ 'is-active': showEmojiPopover }"
+                      title="Chèn biểu tượng cảm xúc nhanh"
+                      @click="showEmojiPopover = !showEmojiPopover"
+                    >
+                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
+                        <line x1="9" y1="9" x2="9.01" y2="9"></line>
+                        <line x1="15" y1="9" x2="15.01" y2="9"></line>
+                      </svg>
+                    </button>
+
+                    <!-- Popover chèn emoji nhanh (gọn gàng, thanh lịch) -->
+                    <transition name="popover-fade">
+                      <div v-if="showEmojiPopover" class="composer-emoji-popover">
+                        <div class="emoji-popover-header">
+                          <span>Biểu tượng nhanh</span>
+                          <button type="button" class="btn-close-emoji-popover" @click="showEmojiPopover = false">✕</button>
+                        </div>
+                        <div class="emoji-popover-grid">
+                          <button 
+                            v-for="emoji in quickEmojis" 
+                            :key="emoji" 
+                            type="button" 
+                            class="btn-popover-emoji"
+                            @click="insertEmoji(emoji)"
+                          >
+                            {{ emoji }}
+                          </button>
+                        </div>
+                      </div>
+                    </transition>
+                  </div>
+                </div>
+
+                <!-- Nút gửi bên phải -->
+                <div class="composer-tools-right">
+                  <button 
+                    type="submit" 
+                    class="btn-send-message"
+                    :disabled="!inputContent.trim() || !chatStore.isConnected"
+                  >
+                    <span>{{ editingMessage ? 'Lưu' : 'Gửi' }}</span>
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <line x1="22" y1="2" x2="11" y2="13"></line>
+                      <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
           </form>
         </footer>
 
@@ -1735,6 +1829,179 @@
         </div>
       </div>
     </Teleport>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL CUỘC GỌI WEBRTC (GỌI THOẠI & GỌI VIDEO NỘI BỘ)                -->
+    <!-- ===================================================================== -->
+    <Teleport to="body">
+      <!-- 1. Hộp thoại khi có cuộc gọi đến (Incoming Call) -->
+      <div 
+        v-if="chatStore.callState.isOpen && chatStore.callState.isIncoming" 
+        class="incoming-call-overlay"
+      >
+        <div class="incoming-call-card">
+          <div class="incoming-avatar-sonar-wrapper">
+            <span class="sonar-ring"></span>
+            <span class="sonar-ring r2"></span>
+            <span class="sonar-ring r3"></span>
+            <div class="incoming-caller-avatar" :style="getAvatarBg(chatStore.callState.partnerFullName || chatStore.callState.partnerUsername)">
+              <img v-if="chatStore.callState.partnerAvatarUrl" :src="chatStore.callState.partnerAvatarUrl" alt="avatar" />
+              <span v-else>{{ getAvatarInitials(chatStore.callState.partnerFullName || chatStore.callState.partnerUsername) }}</span>
+            </div>
+          </div>
+
+          <h3 class="incoming-caller-name">{{ chatStore.callState.partnerFullName || chatStore.callState.partnerUsername }}</h3>
+          <p class="incoming-call-subtitle">
+            Cuộc gọi {{ chatStore.callState.callType === 'video' ? 'video' : 'thoại' }} nội bộ đến...
+          </p>
+
+          <div class="incoming-call-actions">
+            <!-- Nút từ chối -->
+            <button type="button" class="btn-call-action btn-call-decline" @click="handleDeclineIncomingCall">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+              </svg>
+              <span>Từ chối</span>
+            </button>
+
+            <!-- Nút chấp nhận -->
+            <button type="button" class="btn-call-action btn-call-accept" @click="handleAcceptIncomingCall">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+              </svg>
+              <span>Trả lời</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Giao diện đang thực hiện cuộc gọi (Active Calling Stage) -->
+      <div 
+        v-if="chatStore.callState.isOpen && !chatStore.callState.isIncoming" 
+        class="active-call-overlay"
+      >
+        <div class="active-call-stage">
+          <!-- Call Stage Header -->
+          <div class="call-stage-header">
+            <div class="call-header-info">
+              <h4>{{ chatStore.callState.partnerFullName || chatStore.callState.partnerUsername }}</h4>
+              <div v-if="chatStore.callState.status === 'CONNECTED'" class="active-timer-pill">
+                <span class="live-red-dot"></span>
+                <span>{{ callDurationFormatted }}</span>
+              </div>
+              <span v-else class="pulse-call-text">Đang đổ chuông...</span>
+            </div>
+          </div>
+
+          <!-- Khu vực hiển thị Video (khi gọi Video) -->
+          <div v-if="chatStore.callState.callType === 'video'" class="call-video-grid">
+            <div class="remote-video-container">
+              <video 
+                ref="remoteVideoRef" 
+                autoplay 
+                playsinline 
+                class="remote-video-element"
+              ></video>
+              <!-- Placeholder khi chưa có remote stream -->
+              <div v-if="!hasRemoteVideoTrack" class="video-placeholder-cover">
+                <div class="large-avatar-call" :style="getAvatarBg(chatStore.callState.partnerFullName || chatStore.callState.partnerUsername)">
+                  {{ getAvatarInitials(chatStore.callState.partnerFullName || chatStore.callState.partnerUsername) }}
+                </div>
+                <span class="wait-cam-text">Đang kết nối camera đối phương...</span>
+              </div>
+            </div>
+
+            <!-- Khung hình PiP Video của chính mình -->
+            <div class="local-pip-container">
+              <video 
+                ref="localVideoRef" 
+                autoplay 
+                playsinline 
+                muted 
+                class="local-video-element"
+              ></video>
+              <div v-if="isCameraOff" class="pip-cam-off-badge">
+                <span>Camera đã tắt</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Khu vực hiển thị Âm thanh (khi gọi Thoại Audio) -->
+          <div v-else class="call-audio-stage">
+            <div class="audio-caller-avatar-circle" :style="getAvatarBg(chatStore.callState.partnerFullName || chatStore.callState.partnerUsername)">
+              <img v-if="chatStore.callState.partnerAvatarUrl" :src="chatStore.callState.partnerAvatarUrl" alt="avatar" />
+              <span v-else>{{ getAvatarInitials(chatStore.callState.partnerFullName || chatStore.callState.partnerUsername) }}</span>
+              <div class="audio-soundwaves-ring">
+                <span class="sound-wave"></span>
+                <span class="sound-wave sw2"></span>
+              </div>
+            </div>
+            <p class="audio-call-note">
+              {{ chatStore.callState.status === 'CONNECTED' ? 'Đang trong cuộc gọi thoại bảo mật' : 'Đang kết nối tín hiệu cuộc gọi thoại...' }}
+            </p>
+          </div>
+
+          <!-- Thanh điều khiển cuộc gọi dưới đáy -->
+          <div class="call-controls-bar">
+            <!-- Nút Bật/Tắt Micro -->
+            <button 
+              type="button" 
+              class="btn-call-ctl" 
+              :class="{ 'is-active-off': isMuted }"
+              :title="isMuted ? 'Bật Micro' : 'Tắt Micro'"
+              @click="toggleMuteAudio"
+            >
+              <svg v-if="!isMuted" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                <line x1="12" y1="19" x2="12" y2="23"></line>
+                <line x1="8" y1="23" x2="16" y2="23"></line>
+              </svg>
+              <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="1" y1="1" x2="23" y2="23"></line>
+                <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"></path>
+                <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"></path>
+                <line x1="12" y1="19" x2="12" y2="23"></line>
+                <line x1="8" y1="23" x2="16" y2="23"></line>
+              </svg>
+            </button>
+
+            <!-- Nút Bật/Tắt Camera (khi gọi Video) -->
+            <button 
+              v-if="chatStore.callState.callType === 'video'"
+              type="button" 
+              class="btn-call-ctl" 
+              :class="{ 'is-active-off': isCameraOff }"
+              :title="isCameraOff ? 'Bật Camera' : 'Tắt Camera'"
+              @click="toggleCameraVideo"
+            >
+              <svg v-if="!isCameraOff" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+              </svg>
+              <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="1" y1="1" x2="23" y2="23"></line>
+                <path d="M21 21l-3.34-3.34M23 7l-7 5 7 5V7z"></path>
+                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+              </svg>
+            </button>
+
+            <!-- Nút Kết thúc cuộc gọi / Gác máy -->
+            <button 
+              type="button" 
+              class="btn-call-ctl btn-hangup" 
+              title="Kết thúc cuộc gọi"
+              @click="hangUpCall"
+            >
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
   </div>
 </template>
 
@@ -1827,9 +2094,18 @@ const colorThemes = [
   { key: 'blue', name: 'Xanh dương tiêu chuẩn', primary: '#2563eb', gradient: 'linear-gradient(135deg, #2563eb, #1d4ed8)' },
   { key: 'emerald', name: 'Xanh lục bảo', primary: '#059669', gradient: 'linear-gradient(135deg, #059669, #047857)' },
   { key: 'purple', name: 'Tím hoàng gia', primary: '#7c3aed', gradient: 'linear-gradient(135deg, #7c3aed, #6d28d9)' },
+  { key: 'indigo', name: 'Chàm thời thượng', primary: '#4f46e5', gradient: 'linear-gradient(135deg, #6366f1, #4338ca)' },
+  { key: 'cyan', name: 'Xanh ngọc biển', primary: '#0891b2', gradient: 'linear-gradient(135deg, #06b6d4, #0e7490)' },
+  { key: 'teal', name: 'Xanh mòng két', primary: '#0d9488', gradient: 'linear-gradient(135deg, #14b8a6, #0f766e)' },
+  { key: 'mint', name: 'Xanh bạc hà Mint', primary: '#10b981', gradient: 'linear-gradient(135deg, #34d399, #059669)' },
   { key: 'orange', name: 'Cam hoàng hôn', primary: '#ea580c', gradient: 'linear-gradient(135deg, #ea580c, #c2410c)' },
+  { key: 'amber', name: 'Vàng hổ phách', primary: '#d97706', gradient: 'linear-gradient(135deg, #f59e0b, #b45309)' },
   { key: 'pink', name: 'Hồng ngọc', primary: '#e11d48', gradient: 'linear-gradient(135deg, #e11d48, #be123c)' },
-  { key: 'slate', name: 'Ghi than tối giản', primary: '#334155', gradient: 'linear-gradient(135deg, #334155, #1e293b)' }
+  { key: 'rose', name: 'Cánh hồng Rose Gold', primary: '#f43f5e', gradient: 'linear-gradient(135deg, #fb7185, #e11d48)' },
+  { key: 'violet', name: 'Tím hoa cà', primary: '#8b5cf6', gradient: 'linear-gradient(135deg, #a78bfa, #7c3aed)' },
+  { key: 'cyberpunk', name: 'Neon Cyberpunk', primary: '#d946ef', gradient: 'linear-gradient(135deg, #ec4899, #8b5cf6)' },
+  { key: 'sunset', name: 'Rực rỡ Sunset', primary: '#f97316', gradient: 'linear-gradient(135deg, #f43f5e, #f97316)' },
+  { key: 'slate', name: 'Ghi than tối giản', primary: '#334155', gradient: 'linear-gradient(135deg, #475569, #1e293b)' }
 ]
 
 const currentRoomThemeKey = ref(localStorage.getItem(`erp_chat_theme_${chatStore.activeRoomId}`) || 'blue')
@@ -2254,9 +2530,9 @@ const activeSubtitle = computed(() => {
   const fullName = chatStore.activePartner?.fullName
   const hasNickname = chatStore.roomNicknames[chatStore.activeRoomId]?.[partnerUsername]
   if (hasNickname && fullName) {
-    return `${fullName} (@${partnerUsername}) • Trực tuyến`
+    return `${fullName} (@${partnerUsername})`
   }
-  return `@${partnerUsername || ''} • Trực tuyến`
+  return `@${partnerUsername || ''}`
 })
 
 // Danh sách đồng nghiệp chưa tham gia vào nhóm hiện tại
@@ -2591,7 +2867,11 @@ const handleScroll = async () => {
 const parseMessageDate = (isoString) => {
   if (!isoString) return new Date()
   if (isoString instanceof Date) return isoString
-  return new Date(isoString)
+  let str = String(isoString).trim()
+  if (str.includes('T') && !str.endsWith('Z') && !str.match(/[+-]\d{2}:?\d{2}$/)) {
+    return new Date(str + 'Z')
+  }
+  return new Date(str)
 }
 
 // Format thời gian hiển thị
@@ -3203,7 +3483,331 @@ const handleWindowFocus = () => {
   }
 }
 
+
+// =========================================================================
+//                   TÍNH NĂNG GỌI THOẠI & VIDEO (WEBRTC CALLING)
+// =========================================================================
+const showEmojiPopover = ref(false)
+const isInputFocused = ref(false)
+
+const localVideoRef = ref(null)
+const remoteVideoRef = ref(null)
+const isMuted = ref(false)
+const isCameraOff = ref(false)
+const hasRemoteVideoTrack = ref(false)
+const callDurationSeconds = ref(0)
+const callDurationFormatted = computed(() => {
+  const m = Math.floor(callDurationSeconds.value / 60)
+  const s = callDurationSeconds.value % 60
+  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+})
+let callDurationTimer = null
+let peerConnection = null
+let localMediaStream = null
+
+// Ringtones synthesizer (Web Audio API)
+let ringtoneAudioCtx = null
+let ringtoneInterval = null
+
+const playRingtone = () => {
+  stopRingtone()
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext
+    if (!AudioContextClass) return
+    ringtoneAudioCtx = new AudioContextClass()
+    const playBeep = () => {
+      if (!ringtoneAudioCtx || ringtoneAudioCtx.state === 'closed') return
+      const osc = ringtoneAudioCtx.createOscillator()
+      const gain = ringtoneAudioCtx.createGain()
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(440, ringtoneAudioCtx.currentTime)
+      osc.frequency.setValueAtTime(480, ringtoneAudioCtx.currentTime + 0.1)
+      gain.gain.setValueAtTime(0.15, ringtoneAudioCtx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.001, ringtoneAudioCtx.currentTime + 0.4)
+      osc.connect(gain)
+      gain.connect(ringtoneAudioCtx.destination)
+      osc.start()
+      osc.stop(ringtoneAudioCtx.currentTime + 0.4)
+    }
+    playBeep()
+    ringtoneInterval = setInterval(playBeep, 2000)
+  } catch (e) {
+    console.warn('Không thể phát ringtone:', e)
+  }
+}
+
+const stopRingtone = () => {
+  if (ringtoneInterval) {
+    clearInterval(ringtoneInterval)
+    ringtoneInterval = null
+  }
+  if (ringtoneAudioCtx) {
+    try { ringtoneAudioCtx.close() } catch (e) {}
+    ringtoneAudioCtx = null
+  }
+}
+
+const startCallDurationTimer = () => {
+  stopCallDurationTimer()
+  callDurationSeconds.value = 0
+  callDurationTimer = setInterval(() => {
+    callDurationSeconds.value++
+  }, 1000)
+}
+
+const stopCallDurationTimer = () => {
+  if (callDurationTimer) {
+    clearInterval(callDurationTimer)
+    callDurationTimer = null
+  }
+}
+
+const createPeerConnection = (targetUsername) => {
+  const pc = new RTCPeerConnection({
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' }
+    ]
+  })
+
+  pc.onicecandidate = (event) => {
+    if (event.candidate) {
+      chatStore.sendCallSignal({
+        type: 'call-candidate',
+        targetUsername,
+        candidate: event.candidate
+      })
+    }
+  }
+
+  pc.ontrack = (event) => {
+    if (remoteVideoRef.value && event.streams[0]) {
+      remoteVideoRef.value.srcObject = event.streams[0]
+      hasRemoteVideoTrack.value = true
+    }
+  }
+
+  pc.onconnectionstatechange = () => {
+    if (pc.connectionState === 'connected') {
+      stopRingtone()
+      chatStore.callState.status = 'CONNECTED'
+      startCallDurationTimer()
+    } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+      cleanupCall()
+    }
+  }
+
+  return pc
+}
+
+const startVoiceCall = async () => {
+  if (!chatStore.activePartner?.username) return
+  await startCall('audio')
+}
+
+const startVideoCall = async () => {
+  if (!chatStore.activePartner?.username) return
+  await startCall('video')
+}
+
+const startCall = async (type = 'video') => {
+  const partner = chatStore.activePartner
+  if (!partner) return
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: true,
+      video: type === 'video'
+    })
+    localMediaStream = stream
+    if (localVideoRef.value && type === 'video') {
+      localVideoRef.value.srcObject = stream
+    }
+  } catch (err) {
+    console.error('Không thể truy cập Microphone/Camera:', err)
+    ElMessage.error('Vui lòng cho phép truy cập Microphone & Camera để thực hiện cuộc gọi!')
+    return
+  }
+
+  isMuted.value = false
+  isCameraOff.value = false
+  hasRemoteVideoTrack.value = false
+
+  chatStore.callState = {
+    isOpen: true,
+    isIncoming: false,
+    callType: type,
+    partnerUsername: partner.username,
+    partnerFullName: partner.fullName || partner.username,
+    partnerAvatarUrl: partner.avatarUrl,
+    status: 'CALLING',
+    offerData: null
+  }
+
+  playRingtone()
+
+  peerConnection = createPeerConnection(partner.username)
+  localMediaStream.getTracks().forEach(track => {
+    peerConnection.addTrack(track, localMediaStream)
+  })
+
+  try {
+    const offer = await peerConnection.createOffer()
+    await peerConnection.setLocalDescription(offer)
+
+    chatStore.sendCallSignal({
+      type: 'call-request',
+      callType: type,
+      targetUsername: partner.username,
+      offer
+    })
+  } catch (e) {
+    console.error('Lỗi khởi tạo WebRTC offer:', e)
+    cleanupCall()
+    ElMessage.error('Không thể khởi tạo đường truyền cuộc gọi!')
+  }
+}
+
+const handleAcceptIncomingCall = async () => {
+  stopRingtone()
+  const callerUsername = chatStore.callState.partnerUsername
+  const callType = chatStore.callState.callType || 'video'
+  const offerData = chatStore.callState.offerData
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: true,
+      video: callType === 'video'
+    })
+    localMediaStream = stream
+    if (localVideoRef.value && callType === 'video') {
+      localVideoRef.value.srcObject = stream
+    }
+  } catch (err) {
+    console.error('Không thể truy cập Micro/Camera:', err)
+    ElMessage.error('Vui lòng cho phép quyền truy cập Micro/Camera để nhận cuộc gọi!')
+    handleDeclineIncomingCall()
+    return
+  }
+
+  isMuted.value = false
+  isCameraOff.value = false
+  hasRemoteVideoTrack.value = false
+  chatStore.callState.status = 'CONNECTED'
+  startCallDurationTimer()
+
+  peerConnection = createPeerConnection(callerUsername)
+  localMediaStream.getTracks().forEach(track => {
+    peerConnection.addTrack(track, localMediaStream)
+  })
+
+  try {
+    await peerConnection.setRemoteDescription(new RTCSessionDescription(offerData))
+    const answer = await peerConnection.createAnswer()
+    await peerConnection.setLocalDescription(answer)
+
+    chatStore.sendCallSignal({
+      type: 'call-accept',
+      targetUsername: callerUsername,
+      answer
+    })
+  } catch (e) {
+    console.error('Lỗi khi thiết lập answer WebRTC:', e)
+    cleanupCall()
+  }
+}
+
+const handleDeclineIncomingCall = () => {
+  stopRingtone()
+  const callerUsername = chatStore.callState.partnerUsername
+  chatStore.sendCallSignal({
+    type: 'call-reject',
+    targetUsername: callerUsername
+  })
+  chatStore.resetCallState()
+}
+
+const hangUpCall = () => {
+  const partnerUsername = chatStore.callState.partnerUsername
+  if (partnerUsername) {
+    chatStore.sendCallSignal({
+      type: 'call-end',
+      targetUsername: partnerUsername
+    })
+  }
+  cleanupCall()
+}
+
+const cleanupCall = () => {
+  stopRingtone()
+  stopCallDurationTimer()
+
+  if (localMediaStream) {
+    localMediaStream.getTracks().forEach(track => track.stop())
+    localMediaStream = null
+  }
+  if (peerConnection) {
+    peerConnection.close()
+    peerConnection = null
+  }
+  hasRemoteVideoTrack.value = false
+  chatStore.resetCallState()
+}
+
+const toggleMuteAudio = () => {
+  if (!localMediaStream) return
+  isMuted.value = !isMuted.value
+  localMediaStream.getAudioTracks().forEach(track => {
+    track.enabled = !isMuted.value
+  })
+}
+
+const toggleCameraVideo = () => {
+  if (!localMediaStream) return
+  isCameraOff.value = !isCameraOff.value
+  localMediaStream.getVideoTracks().forEach(track => {
+    track.enabled = !isCameraOff.value
+  })
+}
+
+let unregisterCallListener = null
+
 onMounted(() => {
+  unregisterCallListener = chatStore.registerCallSignalListener(async (signal) => {
+    if (signal.type === 'call-request') {
+      playRingtone()
+    } else if (signal.type === 'call-accept') {
+      stopRingtone()
+      if (peerConnection && signal.answer) {
+        try {
+          await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.answer))
+        } catch (e) {
+          console.error('Lỗi setRemoteDescription answer:', e)
+        }
+      }
+    } else if (signal.type === 'call-candidate') {
+      if (peerConnection && signal.candidate) {
+        try {
+          await peerConnection.addIceCandidate(new RTCIceCandidate(signal.candidate))
+        } catch (e) {
+          console.error('Lỗi addIceCandidate:', e)
+        }
+      }
+    } else if (signal.type === 'call-reject') {
+      stopRingtone()
+      ElMessage.warning('Đối phương đã từ chối cuộc gọi!')
+      cleanupCall()
+    } else if (signal.type === 'call-end') {
+      stopRingtone()
+      ElMessage.info('Cuộc gọi đã kết thúc.')
+      cleanupCall()
+    } else if (signal.type === 'call-busy') {
+      stopRingtone()
+      ElMessage.warning('Đối phương đang trong cuộc gọi khác!')
+      cleanupCall()
+    }
+  })
+
   // Đảm bảo WebSocket STOMP đã kích hoạt
   chatStore.connect()
   // Tải danh bạ đồng nghiệp
@@ -3222,6 +3826,9 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  if (unregisterCallListener) unregisterCallListener()
+  cleanupCall()
+
   window.removeEventListener('keydown', handleKeydown)
   window.removeEventListener('focus', handleWindowFocus)
   document.removeEventListener('visibilitychange', handleWindowFocus)
@@ -7213,5 +7820,607 @@ onUnmounted(() => {
     width: 215px;
   }
 }
+
+/* =========================================================================
+   HEADER PRESENCE PILL & CALL BUTTONS
+   ========================================================================= */
+.presence-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 999px;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.presence-status-pill.is-online {
+  background: #ecfdf5;
+  color: #059669;
+  border: 1px solid #a7f3d0;
+}
+
+.presence-status-pill.is-offline {
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+  font-weight: 500;
+}
+
+.presence-pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.presence-status-pill.is-online .presence-pulse-dot {
+  background: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
+  animation: pulse-badge-dot 1.8s infinite;
+}
+
+.presence-status-pill.is-offline .presence-pulse-dot {
+  background: #94a3b8;
+}
+
+@keyframes pulse-badge-dot {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+  70% { transform: scale(1.1); box-shadow: 0 0 0 5px rgba(16, 185, 129, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+.btn-header-call {
+  color: #2563eb;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  transition: all 0.2s ease;
+}
+
+.btn-header-call:hover {
+  background: #2563eb;
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);
+}
+
+/* =========================================================================
+   UNIFIED CHAT COMPOSER (SLACK / TELEGRAM STYLE)
+   ========================================================================= */
+.chat-composer-container {
+  width: 100%;
+}
+
+.composer-unified-card {
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 14px;
+  padding: 8px 12px;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.composer-unified-card.is-focused {
+  border-color: var(--chat-theme-primary, #2563eb);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12), 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.composer-textarea {
+  width: 100%;
+  border: none;
+  outline: none;
+  resize: none;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.45;
+  color: #1e293b;
+  background: transparent;
+  padding: 2px 4px 6px;
+  min-height: 42px;
+}
+
+.composer-bottom-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 6px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.composer-tools-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+
+.composer-tool-btn {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.composer-tool-btn:hover {
+  background: #f1f5f9;
+  color: #2563eb;
+}
+
+.composer-tool-btn.is-active {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.composer-tool-divider {
+  width: 1px;
+  height: 18px;
+  background: #e2e8f0;
+  margin: 0 2px;
+}
+
+.composer-emoji-wrapper {
+  position: relative;
+}
+
+.composer-emoji-popover {
+  position: absolute;
+  bottom: 42px;
+  left: 0;
+  z-index: 100;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
+  padding: 8px;
+  width: 250px;
+}
+
+.emoji-popover-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 6px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.btn-close-emoji-popover {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.emoji-popover-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.btn-popover-emoji {
+  font-size: 20px;
+  padding: 6px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-popover-emoji:hover {
+  background: #eff6ff;
+  transform: scale(1.15);
+}
+
+/* =========================================================================
+   WEBRTC CALLING MODALS
+   ========================================================================= */
+.incoming-call-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.incoming-call-card {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 32px 28px;
+  width: 100%;
+  max-width: 360px;
+  text-align: center;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+  animation: pop-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.incoming-avatar-sonar-wrapper {
+  position: relative;
+  width: 90px;
+  height: 90px;
+  margin: 0 auto 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.incoming-caller-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  overflow: hidden;
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 28px;
+  font-weight: 700;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+.incoming-caller-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sonar-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid #10b981;
+  animation: sonar-wave 2s infinite ease-out;
+}
+
+.sonar-ring.r2 { animation-delay: 0.6s; }
+.sonar-ring.r3 { animation-delay: 1.2s; }
+
+@keyframes sonar-wave {
+  0% { transform: scale(0.8); opacity: 0.9; }
+  100% { transform: scale(2); opacity: 0; }
+}
+
+.incoming-caller-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 6px;
+}
+
+.incoming-call-subtitle {
+  font-size: 13.5px;
+  color: #64748b;
+  margin-bottom: 24px;
+}
+
+.incoming-call-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+
+.btn-call-action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.btn-call-action svg {
+  width: 52px;
+  height: 52px;
+  padding: 13px;
+  border-radius: 50%;
+  color: #fff;
+  transition: all 0.2s;
+}
+
+.btn-call-decline svg {
+  background: #ef4444;
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.4);
+}
+
+.btn-call-accept svg {
+  background: #10b981;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);
+  animation: pulse-accept 1.5s infinite;
+}
+
+@keyframes pulse-accept {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+/* Active Call Overlay */
+.active-call-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: rgba(10, 15, 29, 0.92);
+  backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.active-call-stage {
+  width: 100%;
+  max-width: 900px;
+  height: 85vh;
+  max-height: 640px;
+  background: #0f172a;
+  border-radius: 20px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5);
+}
+
+.call-stage-header {
+  position: absolute;
+  top: 16px;
+  left: 20px;
+  right: 20px;
+  z-index: 10;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  pointer-events: none;
+}
+
+.call-header-info h4 {
+  font-size: 17px;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 4px;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+}
+
+.active-timer-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.live-red-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ef4444;
+  animation: blink-dot 1s infinite;
+}
+
+.pulse-call-text {
+  color: #38bdf8;
+  font-size: 13px;
+  font-weight: 600;
+  animation: blink-dot 1.2s infinite;
+}
+
+.call-video-grid {
+  flex: 1;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #020617;
+}
+
+.remote-video-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.remote-video-element {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.video-placeholder-cover {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #ffffff;
+}
+
+.large-avatar-call {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  font-weight: 700;
+  border: 3px solid rgba(255, 255, 255, 0.4);
+}
+
+.wait-cam-text {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.local-pip-container {
+  position: absolute;
+  bottom: 90px;
+  right: 20px;
+  width: 160px;
+  height: 110px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+  background: #1e293b;
+  z-index: 5;
+}
+
+.local-video-element {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+.pip-cam-off-badge {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1e293b;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.call-audio-stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+}
+
+.audio-caller-avatar-circle {
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 42px;
+  font-weight: 700;
+  position: relative;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+}
+
+.audio-caller-avatar-circle img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.audio-soundwaves-ring .sound-wave {
+  position: absolute;
+  inset: -12px;
+  border-radius: 50%;
+  border: 2px solid rgba(56, 189, 248, 0.6);
+  animation: soundwave-pulse 2s infinite ease-out;
+}
+
+.audio-soundwaves-ring .sw2 {
+  inset: -24px;
+  animation-delay: 0.8s;
+}
+
+@keyframes soundwave-pulse {
+  0% { transform: scale(0.9); opacity: 0.8; }
+  100% { transform: scale(1.3); opacity: 0; }
+}
+
+.audio-call-note {
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.call-controls-bar {
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  position: relative;
+  z-index: 10;
+}
+
+.btn-call-ctl {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-call-ctl:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.08);
+}
+
+.btn-call-ctl.is-active-off {
+  background: #f59e0b;
+  color: #ffffff;
+}
+
+.btn-call-ctl.btn-hangup {
+  width: 56px;
+  height: 56px;
+  background: #ef4444;
+  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.5);
+}
+
+.btn-call-ctl.btn-hangup:hover {
+  background: #dc2626;
+  transform: scale(1.1);
+}
+
 </style>
 

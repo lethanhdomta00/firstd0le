@@ -35,8 +35,8 @@ public class RealtimeMessageDto {
     private MessageType type;
     private MessageStatus status;
 
-    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
-    private LocalDateTime createdAt;
+    // Chuỗi thời gian chuẩn ISO-8601 kèm múi giờ +07:00 (Asia/Ho_Chi_Minh) để frontend hiển thị chính xác trên mọi server
+    private String createdAt;
 
     // Trả lời tin nhắn (Reply)
     private Long replyToId;
@@ -48,21 +48,14 @@ public class RealtimeMessageDto {
 
     // Xóa & Chỉnh sửa
     private Boolean isDeleted;
-
-    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
-    private LocalDateTime deletedAt;
+    private String deletedAt;
 
     private Boolean isEdited;
-
-    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
-    private LocalDateTime editedAt;
+    private String editedAt;
 
     // Ghim tin nhắn (Pinned)
     private Boolean isPinned;
-
-    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
-    private LocalDateTime pinnedAt;
-
+    private String pinnedAt;
     private String pinnedBy;
 
     public static RealtimeMessageDto fromEntity(RealtimeMessage entity) {
@@ -77,6 +70,22 @@ public class RealtimeMessageDto {
             }
         }
 
+        java.time.ZoneId vnZone = java.time.ZoneId.of("Asia/Ho_Chi_Minh");
+        java.time.format.DateTimeFormatter isoFormatter = java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME;
+
+        String createdAtStr = entity.getCreatedAt() != null 
+                ? entity.getCreatedAt().atZone(vnZone).format(isoFormatter) 
+                : null;
+        String deletedAtStr = entity.getDeletedAt() != null 
+                ? entity.getDeletedAt().atZone(vnZone).format(isoFormatter) 
+                : null;
+        String editedAtStr = entity.getEditedAt() != null 
+                ? entity.getEditedAt().atZone(vnZone).format(isoFormatter) 
+                : null;
+        String pinnedAtStr = entity.getPinnedAt() != null 
+                ? entity.getPinnedAt().atZone(vnZone).format(isoFormatter) 
+                : null;
+
         return RealtimeMessageDto.builder()
                 .id(entity.getId())
                 .roomId(entity.getRoomId())
@@ -87,17 +96,17 @@ public class RealtimeMessageDto {
                 .content(entity.getContent())
                 .type(entity.getType())
                 .status(entity.getStatus())
-                .createdAt(entity.getCreatedAt())
+                .createdAt(createdAtStr)
                 .replyToId(entity.getReplyToId())
                 .replyToSender(entity.getReplyToSender())
                 .replyToContent(entity.getReplyToContent())
                 .reactions(parsedReactions)
                 .isDeleted(entity.getIsDeleted())
-                .deletedAt(entity.getDeletedAt())
+                .deletedAt(deletedAtStr)
                 .isEdited(entity.getIsEdited())
-                .editedAt(entity.getEditedAt())
+                .editedAt(editedAtStr)
                 .isPinned(Boolean.TRUE.equals(entity.getIsPinned()))
-                .pinnedAt(entity.getPinnedAt())
+                .pinnedAt(pinnedAtStr)
                 .pinnedBy(entity.getPinnedBy())
                 .build();
     }

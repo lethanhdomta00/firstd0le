@@ -104,7 +104,7 @@ public class RealtimeMessage {
     @PrePersist
     protected void onCreate() {
         if (this.createdAt == null) {
-            this.createdAt = java.time.LocalDateTime.now();
+            this.createdAt = java.time.LocalDateTime.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
         }
         if (this.roomId == null || this.roomId.trim().isEmpty()) {
             this.roomId = "GLOBAL";

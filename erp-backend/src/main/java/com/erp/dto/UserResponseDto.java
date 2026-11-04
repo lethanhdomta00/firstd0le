@@ -28,6 +28,7 @@ public class UserResponseDto {
     private LocalDateTime lastMessageTime;
     private String lastMessageStatus; // "SENT" | "READ"
     private String lastMessageSender;
+    private Boolean isOnline;
     private LocalDateTime createdAt;
 
     public static UserResponseDto fromEntity(User user) {

@@ -9,6 +9,7 @@ public enum MessageType {
     VIDEO,
     FILE,
     VOICE,
-    POLL
+    POLL,
+    PRODUCT
 }
 

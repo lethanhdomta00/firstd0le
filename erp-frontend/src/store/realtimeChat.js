@@ -9,6 +9,9 @@ import {
   requestNotificationPermission 
 } from '../utils/soundNotification'
 
+// Quản lý bộ đếm thời gian gõ phím để tránh giật lag hoặc mất trạng thái khi đang gõ liên tục
+const typingTimers = {}
+
 export const useRealtimeChatStore = defineStore('realtimeChat', {
   state: () => ({
     client: null,
@@ -54,7 +57,23 @@ export const useRealtimeChatStore = defineStore('realtimeChat', {
     // Tin nhắn đã lưu / đánh dấu sao của người dùng
     savedMessages: JSON.parse(localStorage.getItem('erp_chat_bookmarks') || '[]'),
 
-    // Ai đang gõ phím: { [roomId]: Array<string> }
+    // Danh sách username đang trực tuyến qua kết nối WebSocket STOMP
+    onlineUsers: [],
+
+    // Trạng thái cuộc gọi thoại / video (WebRTC Call State)
+    callState: {
+      isOpen: false,
+      isIncoming: false,
+      callType: 'video', // 'audio' | 'video'
+      partnerUsername: null,
+      partnerFullName: null,
+      partnerAvatarUrl: null,
+      status: 'IDLE', // 'IDLE' | 'CALLING' | 'RINGING' | 'CONNECTED' | 'ENDED'
+      offerData: null
+    },
+    callSignalListeners: [],
+
+    // Ai đang gõ phím: { [roomId]: Array<{ username, name, avatarUrl }> }
     typingUsers: {},
 
     // Subscriptions để quản lý hủy khi disconnect
@@ -67,6 +86,10 @@ export const useRealtimeChatStore = defineStore('realtimeChat', {
     currentMessages: (state) => state.messagesByRoom[state.activeRoomId] || [],
     currentPinnedMessages: (state) => state.pinnedMessagesByRoom[state.activeRoomId] || [],
     currentTypingUsers: (state) => state.typingUsers[state.activeRoomId] || [],
+    isUserOnline: (state) => (username) => {
+      if (!username) return false
+      return state.onlineUsers.some(u => u?.toLowerCase() === username?.toLowerCase())
+    },
     getNickname: (state) => (username, defaultName = '') => {
       if (!username) return defaultName || ''
       const inRoom = state.roomNicknames[state.activeRoomId]?.[username]
@@ -110,6 +133,7 @@ export const useRealtimeChatStore = defineStore('realtimeChat', {
           this.fetchTotalUnreadCount()
           this.fetchColleagues()
           this.fetchMyGroups()
+          this.fetchOnlineUsers()
 
           // Tải trước dữ liệu phòng hiện tại
           if (this.activeChatType === 'PUBLIC') {
@@ -226,6 +250,31 @@ export const useRealtimeChatStore = defineStore('realtimeChat', {
 
       // 6. Đăng ký các topic nhóm chat
       this.subscribeGroupTopics()
+
+      // 7. Kênh nhận trạng thái Online / Offline thời gian thực toàn hệ thống
+      const onlineSub = this.client.subscribe('/topic/online-users', (message) => {
+        try {
+          const list = JSON.parse(message.body)
+          this.onlineUsers = Array.isArray(list) ? list : (list ? Array.from(list) : [])
+          this.colleagues.forEach(c => {
+            c.isOnline = this.onlineUsers.some(u => u?.toLowerCase() === c.username?.toLowerCase())
+          })
+        } catch (e) {
+          console.error('Lỗi parse danh sách online users:', e)
+        }
+      })
+      this.subscriptions.push(onlineSub)
+
+      // 8. Kênh nhận tín hiệu Gọi thoại / Video nội bộ (WebRTC Call Signaling)
+      const callSub = this.client.subscribe('/user/queue/call', (message) => {
+        try {
+          const signal = JSON.parse(message.body)
+          this.handleCallSignal(signal)
+        } catch (e) {
+          console.error('Lỗi parse WebRTC call signal:', e)
+        }
+      })
+      this.subscriptions.push(callSub)
     },
 
     /**
@@ -503,27 +552,45 @@ export const useRealtimeChatStore = defineStore('realtimeChat', {
     },
 
     /**
-     * Xử lý chỉ báo Typing indicator
+     * Xử lý chỉ báo Typing indicator (mượt mà, không bị mất giữa chừng khi gõ liên tục)
      */
     handleTypingIndicator(roomId, payload) {
       const authStore = useAuthStore()
       if (payload.senderUsername === authStore.user?.username) return
 
       const name = payload.senderFullName || payload.senderUsername
+      const username = payload.senderUsername
+      const timerKey = `${roomId}_${username}`
+
       if (!this.typingUsers[roomId]) {
         this.typingUsers[roomId] = []
       }
 
-      if (!this.typingUsers[roomId].includes(name)) {
-        this.typingUsers[roomId].push(name)
+      const exists = this.typingUsers[roomId].some(u => 
+        (typeof u === 'string' ? u === name : u.username === username)
+      )
+      if (!exists) {
+        this.typingUsers[roomId].push({
+          username,
+          name,
+          avatarUrl: payload.senderAvatarUrl || null
+        })
       }
 
-      // Tự động tắt typing sau 2.5 giây nếu không nhận thêm tín hiệu
-      setTimeout(() => {
+      // Xóa timer trước đó nếu người dùng vẫn tiếp tục gõ
+      if (typingTimers[timerKey]) {
+        clearTimeout(typingTimers[timerKey])
+      }
+
+      // Tự động tắt typing sau 3.2 giây nếu không nhận thêm tín hiệu gõ mới
+      typingTimers[timerKey] = setTimeout(() => {
         if (this.typingUsers[roomId]) {
-          this.typingUsers[roomId] = this.typingUsers[roomId].filter(u => u !== name)
+          this.typingUsers[roomId] = this.typingUsers[roomId].filter(u => 
+            (typeof u === 'string' ? u !== name : u.username !== username)
+          )
         }
-      }, 2500)
+        delete typingTimers[timerKey]
+      }, 3200)
     },
 
     /**
@@ -978,8 +1045,30 @@ export const useRealtimeChatStore = defineStore('realtimeChat', {
       try {
         const res = await api.get('/realtime-chat/colleagues')
         this.colleagues = res.data || []
+        // Đồng bộ trạng thái isOnline với danh sách onlineUsers hiện tại
+        if (this.onlineUsers.length > 0) {
+          this.colleagues.forEach(c => {
+            c.isOnline = this.onlineUsers.some(u => u?.toLowerCase() === c.username?.toLowerCase())
+          })
+        }
       } catch (err) {
         console.error('Lỗi tải danh bạ đồng nghiệp:', err)
+      }
+    },
+
+    /**
+     * Lấy danh sách username đang kết nối WebSocket STOMP trực tuyến
+     */
+    async fetchOnlineUsers() {
+      try {
+        const res = await api.get('/realtime-chat/online-users')
+        const list = res.data || []
+        this.onlineUsers = Array.isArray(list) ? list : (list ? Array.from(list) : [])
+        this.colleagues.forEach(c => {
+          c.isOnline = this.onlineUsers.some(u => u?.toLowerCase() === c.username?.toLowerCase())
+        })
+      } catch (err) {
+        console.warn('Lỗi lấy danh sách online users:', err)
       }
     },
 
@@ -1088,6 +1177,15 @@ export const useRealtimeChatStore = defineStore('realtimeChat', {
           }
         } catch (e) {}
         preview = `📊 [Bình chọn] ${q}`
+      } else if (messageDto.type === 'PRODUCT') {
+        let pName = 'Sản phẩm'
+        try {
+          if (messageDto.content && messageDto.content.startsWith('{')) {
+            const prod = JSON.parse(messageDto.content)
+            pName = prod.name || prod.productName || 'Sản phẩm'
+          }
+        } catch (e) {}
+        preview = `📦 [Sản phẩm] ${pName}`
       }
 
       const time = messageDto.createdAt || new Date().toISOString()
@@ -1729,6 +1827,90 @@ export const useRealtimeChatStore = defineStore('realtimeChat', {
     },
 
     /**
+     * Gửi Thẻ Sản phẩm ERP vào phòng chat chung hoặc nhóm
+     */
+    sendPublicProduct(productData, roomId = null) {
+      if (!this.client || !this.isConnected || !productData) return
+      const authStore = useAuthStore()
+      const targetRoomId = roomId || this.activeRoomId || 'GLOBAL'
+      const contentJson = typeof productData === 'string' ? productData : JSON.stringify(productData)
+
+      const tempId = 'temp_' + Date.now()
+      const optimisticMsg = {
+        id: tempId,
+        roomId: targetRoomId,
+        senderUsername: authStore.user?.username,
+        senderFullName: authStore.user?.fullName || authStore.user?.username,
+        senderAvatarUrl: authStore.user?.avatarUrl,
+        content: contentJson,
+        type: 'PRODUCT',
+        status: 'SENDING',
+        createdAt: new Date().toISOString(),
+        reactions: {}
+      }
+
+      if (!this.messagesByRoom[targetRoomId]) this.messagesByRoom[targetRoomId] = []
+      this.messagesByRoom[targetRoomId].push(optimisticMsg)
+      this.replyingTo = null
+
+      if (targetRoomId.startsWith('GROUP_')) {
+        this.bumpConversationToTop(targetRoomId, optimisticMsg)
+      }
+
+      this.client.publish({
+        destination: '/app/chat.sendPublic',
+        body: JSON.stringify({
+          roomId: targetRoomId,
+          senderUsername: authStore.user?.username,
+          content: contentJson,
+          type: 'PRODUCT'
+        })
+      })
+    },
+
+    /**
+     * Gửi Thẻ Sản phẩm ERP chat riêng 1-1
+     */
+    sendPrivateProduct(recipientUsername, productData) {
+      if (!this.client || !this.isConnected || !productData || !recipientUsername) return
+      const authStore = useAuthStore()
+      const myUsername = authStore.user?.username
+      const roomId = this.getPrivateRoomId(myUsername, recipientUsername)
+      const contentJson = typeof productData === 'string' ? productData : JSON.stringify(productData)
+
+      const tempId = 'temp_' + Date.now()
+      const optimisticMsg = {
+        id: tempId,
+        roomId,
+        senderUsername: myUsername,
+        senderFullName: authStore.user?.fullName || myUsername,
+        senderAvatarUrl: authStore.user?.avatarUrl,
+        recipientUsername: recipientUsername.trim(),
+        content: contentJson,
+        type: 'PRODUCT',
+        status: 'SENDING',
+        createdAt: new Date().toISOString(),
+        reactions: {}
+      }
+
+      if (!this.messagesByRoom[roomId]) this.messagesByRoom[roomId] = []
+      this.messagesByRoom[roomId].push(optimisticMsg)
+      this.replyingTo = null
+
+      this.bumpConversationToTop(roomId, optimisticMsg)
+
+      this.client.publish({
+        destination: '/app/chat.sendPrivate',
+        body: JSON.stringify({
+          recipientUsername: recipientUsername.trim(),
+          senderUsername: myUsername,
+          content: contentJson,
+          type: 'PRODUCT'
+        })
+      })
+    },
+
+    /**
      * Sinh Room ID 1-1 cố định theo thứ tự bảng chữ cái (luôn chuẩn hóa chữ thường để đồng bộ 100% với Backend)
      */
     getPrivateRoomId(u1, u2) {
@@ -1736,6 +1918,99 @@ export const useRealtimeChatStore = defineStore('realtimeChat', {
       const s1 = u1.trim().toLowerCase()
       const s2 = u2.trim().toLowerCase()
       return s1 <= s2 ? `${s1}_${s2}` : `${s2}_${s1}`
+    },
+
+    /**
+     * Gửi tín hiệu gọi điện WebRTC (offer, answer, candidate, reject, end, busy)
+     */
+    sendCallSignal(signal) {
+      if (!this.client || !this.isConnected) return
+      const authStore = useAuthStore()
+      const payload = {
+        ...signal,
+        senderUsername: authStore.user?.username,
+        senderFullName: authStore.user?.fullName || authStore.user?.username,
+        senderAvatarUrl: authStore.user?.avatarUrl
+      }
+      this.client.publish({
+        destination: '/app/chat.callSignal',
+        body: JSON.stringify(payload)
+      })
+    },
+
+    /**
+     * Xử lý tín hiệu cuộc gọi đến từ WebSocket
+     */
+    handleCallSignal(signal) {
+      if (!signal || !signal.type) return
+
+      // Gọi các listener đã đăng ký
+      this.callSignalListeners.forEach(fn => {
+        try { fn(signal) } catch (e) { console.error('Lỗi call listener:', e) }
+      })
+
+      if (signal.type === 'call-request') {
+        // Nếu người dùng đang trong cuộc gọi khác, phản hồi busy
+        if (this.callState.isOpen && this.callState.status === 'CONNECTED') {
+          this.sendCallSignal({
+            type: 'call-busy',
+            targetUsername: signal.senderUsername
+          })
+          return
+        }
+
+        this.callState = {
+          isOpen: true,
+          isIncoming: true,
+          callType: signal.callType || 'video',
+          partnerUsername: signal.senderUsername,
+          partnerFullName: signal.senderFullName || signal.senderUsername,
+          partnerAvatarUrl: signal.senderAvatarUrl || null,
+          status: 'RINGING',
+          offerData: signal.offer || null
+        }
+      } else if (signal.type === 'call-reject') {
+        this.callState.status = 'ENDED'
+        setTimeout(() => {
+          this.resetCallState()
+        }, 1500)
+      } else if (signal.type === 'call-end') {
+        this.callState.status = 'ENDED'
+        setTimeout(() => {
+          this.resetCallState()
+        }, 1000)
+      } else if (signal.type === 'call-busy') {
+        this.callState.status = 'ENDED'
+        setTimeout(() => {
+          this.resetCallState()
+        }, 1500)
+      }
+    },
+
+    /**
+     * Đăng ký lắng nghe tín hiệu gọi WebRTC
+     */
+    registerCallSignalListener(fn) {
+      this.callSignalListeners.push(fn)
+      return () => {
+        this.callSignalListeners = this.callSignalListeners.filter(l => l !== fn)
+      }
+    },
+
+    /**
+     * Đặt lại trạng thái cuộc gọi về ban đầu
+     */
+    resetCallState() {
+      this.callState = {
+        isOpen: false,
+        isIncoming: false,
+        callType: 'video',
+        partnerUsername: null,
+        partnerFullName: null,
+        partnerAvatarUrl: null,
+        status: 'IDLE',
+        offerData: null
+      }
     }
   }
 })

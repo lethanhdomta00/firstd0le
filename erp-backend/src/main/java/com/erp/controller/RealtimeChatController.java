@@ -1,5 +1,6 @@
 package com.erp.controller;
 
+import com.erp.config.WebSocketEventListener;
 import com.erp.dto.RealtimeMessageDto;
 import com.erp.dto.UserResponseDto;
 import com.erp.model.ChatNickname;
@@ -254,6 +255,27 @@ public class RealtimeChatController {
         return reactions;
     }
 
+    /**
+     * 5. Chuyển tiếp tín hiệu Gọi thoại / Video nội bộ (WebRTC Signaling)
+     * Client gửi lên: /app/chat.callSignal
+     * Server gửi đích danh qua STOMP User Destination: /user/{targetUsername}/queue/call
+     */
+    @MessageMapping("/chat.callSignal")
+    public void forwardCallSignal(@Payload Map<String, Object> signal, Principal principal) {
+        String senderUsername = (principal != null && StringUtils.hasText(principal.getName()))
+                ? principal.getName()
+                : (signal.get("senderUsername") != null ? signal.get("senderUsername").toString() : null);
+        String targetUsername = signal.get("targetUsername") != null ? signal.get("targetUsername").toString() : null;
+
+        if (StringUtils.hasText(targetUsername) && StringUtils.hasText(senderUsername)) {
+            signal.put("senderUsername", senderUsername);
+            messagingTemplate.convertAndSendToUser(targetUsername.trim(), "/queue/call", signal);
+            log.info("WebRTC Signal [{}] -> [{}]: action={}", senderUsername, targetUsername, signal.get("type"));
+        } else {
+            log.warn("WebRTC Signal bị bỏ qua vì thiếu sender hoặc targetUsername: sender={}, target={}", senderUsername, targetUsername);
+        }
+    }
+
     // =========================================================================
     //                        REST API CHO LỊCH SỬ CHAT
     // =========================================================================
@@ -372,7 +394,7 @@ public class RealtimeChatController {
         readEvent.put("type", "READ_RECEIPT");
         readEvent.put("roomId", roomId);
         readEvent.put("readerUsername", readerUsername);
-        readEvent.put("readAt", java.time.LocalDateTime.now().toString());
+        readEvent.put("readAt", java.time.LocalDateTime.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toString());
 
         messagingTemplate.convertAndSend("/topic/room." + roomId, (Object) readEvent);
         messagingTemplate.convertAndSend("/topic/private." + roomId, (Object) readEvent);
@@ -427,7 +449,7 @@ public class RealtimeChatController {
         }
 
         message.setIsDeleted(true);
-        message.setDeletedAt(java.time.LocalDateTime.now());
+        message.setDeletedAt(java.time.LocalDateTime.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh")));
         message.setContent("Tin nhắn đã được thu hồi");
         messageRepository.save(message);
 
@@ -492,7 +514,7 @@ public class RealtimeChatController {
 
         message.setContent(newContent);
         message.setIsEdited(true);
-        message.setEditedAt(java.time.LocalDateTime.now());
+        message.setEditedAt(java.time.LocalDateTime.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh")));
         messageRepository.save(message);
 
         Map<String, Object> event = new HashMap<>();
@@ -584,7 +606,7 @@ public class RealtimeChatController {
 
         boolean newPinState = targetPinned != null ? targetPinned : !Boolean.TRUE.equals(message.getIsPinned());
         message.setIsPinned(newPinState);
-        message.setPinnedAt(newPinState ? java.time.LocalDateTime.now() : null);
+        message.setPinnedAt(newPinState ? java.time.LocalDateTime.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh")) : null);
         message.setPinnedBy(newPinState ? currentUsername : null);
         RealtimeMessage saved = messageRepository.save(message);
 
@@ -761,7 +783,11 @@ public class RealtimeChatController {
                 .map(UserResponseDto::fromEntity)
                 .collect(Collectors.toList());
 
+        Set<String> onlineUsernames = WebSocketEventListener.getOnlineUsernames();
+
         for (UserResponseDto dto : colleagues) {
+            dto.setIsOnline(onlineUsernames.contains(dto.getUsername()));
+
             String privateRoomId = buildPrivateRoomId(currentUsername, dto.getUsername());
             nicknameRepository.findByRoomIdAndUsername(privateRoomId, dto.getUsername())
                     .ifPresent(n -> dto.setNickname(n.getNickname()));
@@ -780,6 +806,8 @@ public class RealtimeChatController {
                     preview = "🎙️ [Tin nhắn thoại]";
                 } else if (m.getType() == MessageType.POLL) {
                     preview = "📊 [Bình chọn]";
+                } else if (m.getType() == MessageType.PRODUCT) {
+                    preview = "📦 [Thẻ Sản phẩm]";
                 } else if (m.getType() == MessageType.FILE) {
                     preview = "📎 [Tệp đính kèm]";
                 }
@@ -802,6 +830,14 @@ public class RealtimeChatController {
         });
 
         return ResponseEntity.ok(colleagues);
+    }
+
+    /**
+     * Lấy danh sách username đang trực tuyến qua kết nối WebSocket
+     */
+    @GetMapping("/api/realtime-chat/online-users")
+    public ResponseEntity<Set<String>> getOnlineUsers() {
+        return ResponseEntity.ok(WebSocketEventListener.getOnlineUsernames());
     }
 
     // =========================================================================
