@@ -25,6 +25,51 @@ public class TelegramService {
             .connectTimeout(Duration.ofSeconds(10))
             .build();
 
+    public boolean sendMessage(String text) {
+        return sendMessage(defaultChatId, text);
+    }
+
+    public boolean sendMessage(String targetChatId, String text) {
+        String chatId = (targetChatId != null && !targetChatId.trim().isEmpty()) ? targetChatId.trim() : defaultChatId;
+
+        if (botToken == null || botToken.trim().isEmpty()) {
+            log.warn("Telegram Bot Token chưa được cấu hình! Bỏ qua gửi Telegram.");
+            return false;
+        }
+
+        if (chatId == null || chatId.trim().isEmpty()) {
+            log.warn("Telegram Chat ID chưa được cung cấp! Bỏ qua gửi Telegram.");
+            return false;
+        }
+
+        try {
+            String jsonPayload = "{\"chat_id\":\"" + escapeJson(chatId) + "\","
+                    + "\"text\":\"" + escapeJson(text) + "\","
+                    + "\"parse_mode\":\"HTML\"}";
+
+            String url = "https://api.telegram.org/bot" + botToken.trim() + "/sendMessage";
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofSeconds(10))
+                    .header("Content-Type", "application/json; charset=UTF-8")
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonPayload, StandardCharsets.UTF_8))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            if (response.statusCode() == 200) {
+                log.info("Đã gửi thông báo Telegram thành công tới Chat ID: {}", chatId);
+                return true;
+            } else {
+                log.error("Gửi Telegram thất bại. Status: {}, Body: {}", response.statusCode(), response.body());
+                return false;
+            }
+        } catch (Exception e) {
+            log.error("Lỗi khi kết nối tới Telegram API: {}", e.getMessage());
+            return false;
+        }
+    }
+
     public boolean sendOtpMessage(String targetChatId, String username, String otpCode) {
         String chatId = (targetChatId != null && !targetChatId.trim().isEmpty()) ? targetChatId.trim() : defaultChatId;
 
