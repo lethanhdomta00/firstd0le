@@ -269,8 +269,12 @@ public class RealtimeChatController {
 
         if (StringUtils.hasText(targetUsername) && StringUtils.hasText(senderUsername)) {
             signal.put("senderUsername", senderUsername);
-            messagingTemplate.convertAndSendToUser(targetUsername.trim(), "/queue/call", signal);
-            log.info("WebRTC Signal [{}] -> [{}]: action={}", senderUsername, targetUsername, signal.get("type"));
+            String finalTarget = WebSocketEventListener.getOnlineUsernames().stream()
+                    .filter(u -> u.equalsIgnoreCase(targetUsername.trim()))
+                    .findFirst()
+                    .orElse(targetUsername.trim());
+            messagingTemplate.convertAndSendToUser(finalTarget, "/queue/call", signal);
+            log.info("WebRTC Signal [{}] -> [{}]: action={}", senderUsername, finalTarget, signal.get("type"));
         } else {
             log.warn("WebRTC Signal bị bỏ qua vì thiếu sender hoặc targetUsername: sender={}, target={}", senderUsername, targetUsername);
         }

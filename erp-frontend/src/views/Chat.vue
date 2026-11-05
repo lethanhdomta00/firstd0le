@@ -1880,6 +1880,9 @@
         v-if="chatStore.callState.isOpen && !chatStore.callState.isIncoming" 
         class="active-call-overlay"
       >
+        <!-- Thẻ Audio ẩn để luôn phát âm thanh từ đối phương (cho cả gọi Thoại lẫn Video) -->
+        <audio ref="remoteAudioRef" autoplay playsinline style="display: none;"></audio>
+
         <div class="active-call-stage">
           <!-- Call Stage Header -->
           <div class="call-stage-header">
@@ -1900,6 +1903,7 @@
                 ref="remoteVideoRef" 
                 autoplay 
                 playsinline 
+                muted
                 class="remote-video-element"
               ></video>
               <!-- Placeholder khi chưa có remote stream -->
@@ -3492,6 +3496,7 @@ const isInputFocused = ref(false)
 
 const localVideoRef = ref(null)
 const remoteVideoRef = ref(null)
+const remoteAudioRef = ref(null)
 const isMuted = ref(false)
 const isCameraOff = ref(false)
 const hasRemoteVideoTrack = ref(false)
@@ -3504,6 +3509,8 @@ const callDurationFormatted = computed(() => {
 let callDurationTimer = null
 let peerConnection = null
 let localMediaStream = null
+let remoteMediaStream = null
+let pendingCandidates = []
 
 // Ringtones synthesizer (Web Audio API)
 let ringtoneAudioCtx = null
@@ -3515,6 +3522,9 @@ const playRingtone = () => {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext
     if (!AudioContextClass) return
     ringtoneAudioCtx = new AudioContextClass()
+    if (ringtoneAudioCtx.state === 'suspended') {
+      ringtoneAudioCtx.resume().catch(e => console.warn('AudioContext resume:', e))
+    }
     const playBeep = () => {
       if (!ringtoneAudioCtx || ringtoneAudioCtx.state === 'closed') return
       const osc = ringtoneAudioCtx.createOscillator()
@@ -3562,11 +3572,112 @@ const stopCallDurationTimer = () => {
   }
 }
 
+// Gắn luồng video/audio vào các phần tử DOM tương ứng
+const attachMediaStreams = () => {
+  nextTick(() => {
+    if (localVideoRef.value && localMediaStream) {
+      if (localVideoRef.value.srcObject !== localMediaStream) {
+        localVideoRef.value.srcObject = localMediaStream
+      }
+      localVideoRef.value.play().catch(e => console.warn('Lỗi play local video:', e))
+    }
+    if (remoteVideoRef.value && remoteMediaStream) {
+      if (remoteVideoRef.value.srcObject !== remoteMediaStream) {
+        remoteVideoRef.value.srcObject = remoteMediaStream
+      }
+      remoteVideoRef.value.play().catch(e => console.warn('Lỗi play remote video:', e))
+    }
+    if (remoteAudioRef.value && remoteMediaStream) {
+      if (remoteAudioRef.value.srcObject !== remoteMediaStream) {
+        remoteAudioRef.value.srcObject = remoteMediaStream
+      }
+      remoteAudioRef.value.play().catch(e => console.warn('Lỗi play remote audio:', e))
+    }
+  })
+}
+
+// Đệm và xử lý ICE Candidate chống mất gói khi đang đổ chuông
+const addOrQueueCandidate = async (candidate) => {
+  if (!candidate) return
+  if (peerConnection && peerConnection.remoteDescription && peerConnection.remoteDescription.type) {
+    try {
+      await peerConnection.addIceCandidate(new RTCIceCandidate(candidate))
+    } catch (e) {
+      console.warn('Lỗi addIceCandidate:', e)
+    }
+  } else {
+    pendingCandidates.push(candidate)
+  }
+}
+
+const flushPendingCandidates = async () => {
+  if (!peerConnection || !peerConnection.remoteDescription) return
+  while (pendingCandidates.length > 0) {
+    const cand = pendingCandidates.shift()
+    try {
+      await peerConnection.addIceCandidate(new RTCIceCandidate(cand))
+    } catch (e) {
+      console.warn('Lỗi flush candidate:', e)
+    }
+  }
+}
+
+// Tạo luồng âm thanh mô phỏng để WebRTC vẫn kết nối 100% khi test trên máy không có microphone
+const createSilentAudioStream = () => {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext
+    if (!AudioCtx) return new MediaStream()
+    const ctx = new AudioCtx()
+    const osc = ctx.createOscillator()
+    const dst = ctx.createMediaStreamDestination()
+    osc.connect(dst)
+    osc.start()
+    const track = dst.stream.getAudioTracks()[0]
+    if (track) track.enabled = false
+    return dst.stream
+  } catch (e) {
+    console.warn('Không thể khởi tạo silent stream:', e)
+    return new MediaStream()
+  }
+}
+
+// Lấy media stream với cơ chế tự động fallback nếu không có camera hoặc microphone
+const getMediaStream = async (type) => {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    console.warn('Trình duyệt không hỗ trợ getUserMedia, sử dụng luồng âm thanh mô phỏng')
+    return createSilentAudioStream()
+  }
+
+  try {
+    if (type === 'audio') {
+      return await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+    }
+    // video
+    try {
+      return await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: { width: { ideal: 1280 }, height: { ideal: 720 } }
+      })
+    } catch (camErr) {
+      console.warn('Không tìm thấy camera hoặc bị từ chối, chuyển sang gọi thoại:', camErr)
+      ElMessage.warning('Không tìm thấy camera trên máy, tự động chuyển sang gọi thoại!')
+      chatStore.callState.callType = 'audio'
+      return await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+    }
+  } catch (audioErr) {
+    console.warn('Không thể truy cập microphone phần cứng:', audioErr)
+    ElMessage.warning('Không phát hiện Microphone phần cứng hoặc quyền bị hạn chế. Hệ thống tự động kết nối mô phỏng để test!')
+    return createSilentAudioStream()
+  }
+}
+
 const createPeerConnection = (targetUsername) => {
   const pc = new RTCPeerConnection({
     iceServers: [
       { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' }
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
+      { urls: 'stun:stun.services.mozilla.com' }
     ]
   })
 
@@ -3581,17 +3692,22 @@ const createPeerConnection = (targetUsername) => {
   }
 
   pc.ontrack = (event) => {
-    if (remoteVideoRef.value && event.streams[0]) {
-      remoteVideoRef.value.srcObject = event.streams[0]
+    console.log('WebRTC ontrack received:', event.track.kind, event.streams)
+    const stream = (event.streams && event.streams[0]) ? event.streams[0] : new MediaStream([event.track])
+    remoteMediaStream = stream
+    if (event.track.kind === 'video') {
       hasRemoteVideoTrack.value = true
     }
+    attachMediaStreams()
   }
 
   pc.onconnectionstatechange = () => {
+    console.log('WebRTC connection state:', pc.connectionState)
     if (pc.connectionState === 'connected') {
       stopRingtone()
       chatStore.callState.status = 'CONNECTED'
       startCallDurationTimer()
+      attachMediaStreams()
     } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed' || pc.connectionState === 'closed') {
       cleanupCall()
     }
@@ -3614,15 +3730,13 @@ const startCall = async (type = 'video') => {
   const partner = chatStore.activePartner
   if (!partner) return
 
+  if (!chatStore.isUserOnline(partner.username)) {
+    ElMessage.warning(`Đồng nghiệp "${partner.fullName || partner.username}" hiện đang ngoại tuyến, không thể nhận cuộc gọi!`)
+    return
+  }
+
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: true,
-      video: type === 'video'
-    })
-    localMediaStream = stream
-    if (localVideoRef.value && type === 'video') {
-      localVideoRef.value.srcObject = stream
-    }
+    localMediaStream = await getMediaStream(type)
   } catch (err) {
     console.error('Không thể truy cập Microphone/Camera:', err)
     ElMessage.error('Vui lòng cho phép truy cập Microphone & Camera để thực hiện cuộc gọi!')
@@ -3632,6 +3746,7 @@ const startCall = async (type = 'video') => {
   isMuted.value = false
   isCameraOff.value = false
   hasRemoteVideoTrack.value = false
+  pendingCandidates = []
 
   chatStore.callState = {
     isOpen: true,
@@ -3644,6 +3759,7 @@ const startCall = async (type = 'video') => {
     offerData: null
   }
 
+  attachMediaStreams()
   playRingtone()
 
   peerConnection = createPeerConnection(partner.username)
@@ -3674,18 +3790,17 @@ const handleAcceptIncomingCall = async () => {
   const callType = chatStore.callState.callType || 'video'
   const offerData = chatStore.callState.offerData
 
+  // 1. Chuyển trạng thái giao diện sang Active Call ngay lập tức
+  chatStore.callState.isIncoming = false
+  chatStore.callState.status = 'CONNECTED'
+  startCallDurationTimer()
+
+  // 2. Lấy stream Microphone / Camera
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: true,
-      video: callType === 'video'
-    })
-    localMediaStream = stream
-    if (localVideoRef.value && callType === 'video') {
-      localVideoRef.value.srcObject = stream
-    }
+    localMediaStream = await getMediaStream(callType)
   } catch (err) {
-    console.error('Không thể truy cập Micro/Camera:', err)
-    ElMessage.error('Vui lòng cho phép quyền truy cập Micro/Camera để nhận cuộc gọi!')
+    console.error('Lỗi getUserMedia khi nhận cuộc gọi:', err)
+    ElMessage.error('Không thể truy cập Micro/Camera!')
     handleDeclineIncomingCall()
     return
   }
@@ -3693,16 +3808,19 @@ const handleAcceptIncomingCall = async () => {
   isMuted.value = false
   isCameraOff.value = false
   hasRemoteVideoTrack.value = false
-  chatStore.callState.status = 'CONNECTED'
-  startCallDurationTimer()
+  attachMediaStreams()
 
+  // 3. Khởi tạo PeerConnection
   peerConnection = createPeerConnection(callerUsername)
   localMediaStream.getTracks().forEach(track => {
     peerConnection.addTrack(track, localMediaStream)
   })
 
+  // 4. Set remote description offer
   try {
     await peerConnection.setRemoteDescription(new RTCSessionDescription(offerData))
+    await flushPendingCandidates()
+
     const answer = await peerConnection.createAnswer()
     await peerConnection.setLocalDescription(answer)
 
@@ -3714,6 +3832,7 @@ const handleAcceptIncomingCall = async () => {
   } catch (e) {
     console.error('Lỗi khi thiết lập answer WebRTC:', e)
     cleanupCall()
+    ElMessage.error('Không thể kết nối cuộc gọi!')
   }
 }
 
@@ -3724,7 +3843,7 @@ const handleDeclineIncomingCall = () => {
     type: 'call-reject',
     targetUsername: callerUsername
   })
-  chatStore.resetCallState()
+  cleanupCall()
 }
 
 const hangUpCall = () => {
@@ -3746,11 +3865,21 @@ const cleanupCall = () => {
     localMediaStream.getTracks().forEach(track => track.stop())
     localMediaStream = null
   }
+  if (remoteMediaStream) {
+    remoteMediaStream.getTracks().forEach(track => track.stop())
+    remoteMediaStream = null
+  }
   if (peerConnection) {
     peerConnection.close()
     peerConnection = null
   }
+  pendingCandidates = []
   hasRemoteVideoTrack.value = false
+
+  if (localVideoRef.value) localVideoRef.value.srcObject = null
+  if (remoteVideoRef.value) remoteVideoRef.value.srcObject = null
+  if (remoteAudioRef.value) remoteAudioRef.value.srcObject = null
+
   chatStore.resetCallState()
 }
 
@@ -3770,6 +3899,15 @@ const toggleCameraVideo = () => {
   })
 }
 
+watch(
+  () => [chatStore.callState.isOpen, chatStore.callState.isIncoming],
+  ([isOpen, isIncoming]) => {
+    if (isOpen && !isIncoming) {
+      attachMediaStreams()
+    }
+  }
+)
+
 let unregisterCallListener = null
 
 onMounted(() => {
@@ -3778,21 +3916,19 @@ onMounted(() => {
       playRingtone()
     } else if (signal.type === 'call-accept') {
       stopRingtone()
+      chatStore.callState.status = 'CONNECTED'
+      startCallDurationTimer()
       if (peerConnection && signal.answer) {
         try {
           await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.answer))
+          await flushPendingCandidates()
         } catch (e) {
           console.error('Lỗi setRemoteDescription answer:', e)
         }
       }
+      attachMediaStreams()
     } else if (signal.type === 'call-candidate') {
-      if (peerConnection && signal.candidate) {
-        try {
-          await peerConnection.addIceCandidate(new RTCIceCandidate(signal.candidate))
-        } catch (e) {
-          console.error('Lỗi addIceCandidate:', e)
-        }
-      }
+      await addOrQueueCandidate(signal.candidate)
     } else if (signal.type === 'call-reject') {
       stopRingtone()
       ElMessage.warning('Đối phương đã từ chối cuộc gọi!')
