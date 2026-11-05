@@ -182,7 +182,14 @@
         </el-menu-item>
         <el-menu-item index="/chat">
           <el-icon><ChatDotRound /></el-icon>
-          <template #title>Trò chuyện nội bộ</template>
+          <template #title>
+            <div class="menu-item-with-badge">
+              <span class="menu-title-text">Trò chuyện nội bộ</span>
+              <span v-if="chatStore.totalUnreadCount > 0" class="sidebar-unread-badge">
+                {{ chatStore.totalUnreadCount > 99 ? '99+' : chatStore.totalUnreadCount }}
+              </span>
+            </div>
+          </template>
         </el-menu-item>
         <el-menu-item v-if="authStore.isAdmin" index="/announcements">
           <el-icon><BellFilled /></el-icon>

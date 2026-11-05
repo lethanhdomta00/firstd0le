@@ -57,6 +57,9 @@ export const useRealtimeChatStore = defineStore('realtimeChat', {
     // Tin nhắn đã lưu / đánh dấu sao của người dùng
     savedMessages: JSON.parse(localStorage.getItem('erp_chat_bookmarks') || '[]'),
 
+    // Danh sách ID tin nhắn bị ẩn ở phía tôi (xóa ở phía tôi)
+    hiddenMessageIds: JSON.parse(localStorage.getItem('erp_chat_hidden_msgs') || '[]'),
+
     // Danh sách username đang trực tuyến qua kết nối WebSocket STOMP
     onlineUsers: [],
 
@@ -83,7 +86,12 @@ export const useRealtimeChatStore = defineStore('realtimeChat', {
   }),
 
   getters: {
-    currentMessages: (state) => state.messagesByRoom[state.activeRoomId] || [],
+    currentMessages: (state) => {
+      const msgs = state.messagesByRoom[state.activeRoomId] || []
+      if (!state.hiddenMessageIds || state.hiddenMessageIds.length === 0) return msgs
+      const hiddenSet = new Set(state.hiddenMessageIds)
+      return msgs.filter(m => !hiddenSet.has(m.id))
+    },
     currentPinnedMessages: (state) => state.pinnedMessagesByRoom[state.activeRoomId] || [],
     currentTypingUsers: (state) => state.typingUsers[state.activeRoomId] || [],
     isUserOnline: (state) => (username) => {
@@ -928,28 +936,34 @@ export const useRealtimeChatStore = defineStore('realtimeChat', {
     },
 
     /**
-     * Tải lịch sử ban đầu phòng chat chung hoặc nhóm
+     * Tải lịch sử ban đầu phòng chat chung hoặc nhóm (lấy 30 tin nhắn mới nhất)
      */
     async loadRoomHistory(roomId = 'GLOBAL') {
       try {
-        const res = await api.get(`/realtime-chat/history/${roomId}`)
-        this.messagesByRoom[roomId] = res.data || []
-        this.hasMoreHistory[roomId] = (res.data?.length || 0) >= 20
+        const res = await api.get(`/realtime-chat/history/${roomId}/page`, {
+          params: { limit: 30 }
+        })
+        const hiddenSet = new Set(this.hiddenMessageIds || [])
+        this.messagesByRoom[roomId] = (res.data || []).filter(m => !hiddenSet.has(m.id))
+        this.hasMoreHistory[roomId] = (res.data?.length || 0) >= 30
       } catch (err) {
         console.error('Lỗi tải lịch sử phòng chat:', err)
       }
     },
 
     /**
-     * Tải lịch sử ban đầu chat riêng 1-1
+     * Tải lịch sử ban đầu chat riêng 1-1 (lấy 30 tin nhắn mới nhất)
      */
     async loadPrivateHistory(targetUsername) {
       try {
         const authStore = useAuthStore()
         const roomId = this.getPrivateRoomId(authStore.user?.username, targetUsername)
-        const res = await api.get(`/realtime-chat/private-history/${targetUsername}`)
-        this.messagesByRoom[roomId] = res.data || []
-        this.hasMoreHistory[roomId] = (res.data?.length || 0) >= 20
+        const res = await api.get(`/realtime-chat/private-history/${targetUsername}/page`, {
+          params: { limit: 30 }
+        })
+        const hiddenSet = new Set(this.hiddenMessageIds || [])
+        this.messagesByRoom[roomId] = (res.data || []).filter(m => !hiddenSet.has(m.id))
+        this.hasMoreHistory[roomId] = (res.data?.length || 0) >= 30
       } catch (err) {
         console.error('Lỗi tải lịch sử chat riêng:', err)
       }
@@ -973,21 +987,22 @@ export const useRealtimeChatStore = defineStore('realtimeChat', {
         let res
         if (roomId === 'GLOBAL' || roomId.startsWith('GROUP_')) {
           res = await api.get(`/realtime-chat/history/${roomId}/page`, {
-            params: { beforeId: oldestValid.id, limit: 20 }
+            params: { beforeId: oldestValid.id, limit: 30 }
           })
         } else if (this.activePartner) {
           res = await api.get(`/realtime-chat/private-history/${this.activePartner.username}/page`, {
-            params: { beforeId: oldestValid.id, limit: 20 }
+            params: { beforeId: oldestValid.id, limit: 30 }
           })
         }
 
         const olderMsgs = res?.data || []
-        if (olderMsgs.length < 20) {
+        if (olderMsgs.length < 30) {
           this.hasMoreHistory[roomId] = false
         }
         if (olderMsgs.length > 0) {
+          const hiddenSet = new Set(this.hiddenMessageIds || [])
           const existingIds = new Set(currentList.map(m => m.id))
-          const filteredNew = olderMsgs.filter(m => !existingIds.has(m.id))
+          const filteredNew = olderMsgs.filter(m => !existingIds.has(m.id) && !hiddenSet.has(m.id))
           this.messagesByRoom[roomId] = [...filteredNew, ...currentList]
         }
       } catch (err) {
@@ -1021,8 +1036,29 @@ export const useRealtimeChatStore = defineStore('realtimeChat', {
           this.totalUnreadCount = Math.max(0, this.totalUnreadCount - this.unreadCounts[roomId])
           this.unreadCounts[roomId] = 0
         }
+        if (this.activePartner) {
+          const c = this.colleagues.find(col => col.username?.toLowerCase() === this.activePartner.username?.toLowerCase())
+          if (c) c.unreadCount = 0
+        }
+        this.fetchTotalUnreadCount()
       } catch (err) {
         console.error('Lỗi mark as read:', err)
+      }
+    },
+
+    /**
+     * Đánh dấu toàn bộ tin nhắn chưa đọc của tôi là đã đọc
+     */
+    async markAllAsRead() {
+      try {
+        await api.put('/realtime-chat/read-all')
+        this.totalUnreadCount = 0
+        this.unreadCounts = {}
+        this.colleagues.forEach(c => {
+          c.unreadCount = 0
+        })
+      } catch (err) {
+        console.error('Lỗi markAllAsRead:', err)
       }
     },
 
@@ -1045,12 +1081,23 @@ export const useRealtimeChatStore = defineStore('realtimeChat', {
       try {
         const res = await api.get('/realtime-chat/colleagues')
         this.colleagues = res.data || []
-        // Đồng bộ trạng thái isOnline với danh sách onlineUsers hiện tại
-        if (this.onlineUsers.length > 0) {
-          this.colleagues.forEach(c => {
+        const authStore = useAuthStore()
+        const myUsername = authStore.user?.username
+
+        // Đồng bộ trạng thái isOnline & unreadCounts từ backend
+        this.colleagues.forEach(c => {
+          if (this.onlineUsers.length > 0) {
             c.isOnline = this.onlineUsers.some(u => u?.toLowerCase() === c.username?.toLowerCase())
-          })
-        }
+          }
+          if (myUsername && c.username) {
+            const roomId = this.getPrivateRoomId(myUsername, c.username)
+            if (c.unreadCount && c.unreadCount > 0) {
+              this.unreadCounts[roomId] = c.unreadCount
+            } else if (this.unreadCounts[roomId] === undefined) {
+              this.unreadCounts[roomId] = 0
+            }
+          }
+        })
       } catch (err) {
         console.error('Lỗi tải danh bạ đồng nghiệp:', err)
       }
@@ -1260,6 +1307,21 @@ export const useRealtimeChatStore = defineStore('realtimeChat', {
         })
       } else {
         await api.delete(`/realtime-chat/messages/${messageId}`)
+      }
+    },
+
+    /**
+     * Xóa tin nhắn ở phía tôi (ẩn trên máy tôi nhưng đối phương vẫn thấy bình thường)
+     */
+    hideMessageForMe(messageId, roomId = null) {
+      if (!messageId) return
+      if (!this.hiddenMessageIds.includes(messageId)) {
+        this.hiddenMessageIds.push(messageId)
+        localStorage.setItem('erp_chat_hidden_msgs', JSON.stringify(this.hiddenMessageIds))
+      }
+      const targetRoom = roomId || this.activeRoomId
+      if (this.messagesByRoom[targetRoom]) {
+        this.messagesByRoom[targetRoom] = this.messagesByRoom[targetRoom].filter(m => m.id !== messageId)
       }
     },
 

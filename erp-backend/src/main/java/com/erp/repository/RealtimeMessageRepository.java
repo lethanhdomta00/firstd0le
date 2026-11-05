@@ -39,8 +39,35 @@ public interface RealtimeMessageRepository extends JpaRepository<RealtimeMessage
     // Đếm số lượng tin nhắn chưa đọc gửi tới một người
     long countByRecipientUsernameAndStatus(String recipientUsername, MessageStatus status);
 
+    // Đếm số lượng tin nhắn chưa đọc từ một người gửi cụ thể tới tôi
+    @Query("SELECT COUNT(m) FROM RealtimeMessage m WHERE LOWER(m.senderUsername) = LOWER(:senderUsername) AND LOWER(m.recipientUsername) = LOWER(:recipientUsername) AND m.status = :status")
+    long countUnreadFromSender(@Param("senderUsername") String senderUsername, 
+                               @Param("recipientUsername") String recipientUsername, 
+                               @Param("status") MessageStatus status);
+
     // Đếm số lượng tin nhắn chưa đọc trong 1 phòng cụ thể gửi tới một người
     long countByRoomIdAndRecipientUsernameAndStatus(String roomId, String recipientUsername, MessageStatus status);
+
+    // Phân trang tin nhắn riêng 1-1 (mới nhất)
+    @Query("SELECT m FROM RealtimeMessage m WHERE (LOWER(m.roomId) = LOWER(:roomId) OR " +
+           "(LOWER(m.senderUsername) = LOWER(:u1) AND LOWER(m.recipientUsername) = LOWER(:u2)) OR " +
+           "(LOWER(m.senderUsername) = LOWER(:u2) AND LOWER(m.recipientUsername) = LOWER(:u1))) " +
+           "ORDER BY m.id DESC")
+    List<RealtimeMessage> findPrivateHistoryLatest(@Param("roomId") String roomId, 
+                                                   @Param("u1") String u1, 
+                                                   @Param("u2") String u2, 
+                                                   Pageable pageable);
+
+    // Phân trang tin nhắn riêng 1-1 cũ hơn một ID (Lazy loading kéo lên trên)
+    @Query("SELECT m FROM RealtimeMessage m WHERE ((LOWER(m.roomId) = LOWER(:roomId)) OR " +
+           "(LOWER(m.senderUsername) = LOWER(:u1) AND LOWER(m.recipientUsername) = LOWER(:u2)) OR " +
+           "(LOWER(m.senderUsername) = LOWER(:u2) AND LOWER(m.recipientUsername) = LOWER(:u1))) " +
+           "AND m.id < :beforeId ORDER BY m.id DESC")
+    List<RealtimeMessage> findPrivateHistoryBeforeId(@Param("roomId") String roomId, 
+                                                     @Param("u1") String u1, 
+                                                     @Param("u2") String u2, 
+                                                     @Param("beforeId") Long beforeId, 
+                                                     Pageable pageable);
 
     // Lấy danh sách tin nhắn được ghim trong phòng
     List<RealtimeMessage> findByRoomIdAndIsPinnedTrueOrderByPinnedAtDesc(String roomId);
@@ -59,5 +86,21 @@ public interface RealtimeMessageRepository extends JpaRepository<RealtimeMessage
     int markMessagesAsReadInRoom(@Param("roomId") String roomId, 
                                  @Param("recipientUsername") String recipientUsername, 
                                  @Param("readStatus") MessageStatus readStatus);
+
+    // Đánh dấu đã đọc tin nhắn trong phòng hoặc theo người gửi (Hỗ trợ chat 1-1 phòng riêng)
+    @Modifying
+    @Query("UPDATE RealtimeMessage m SET m.status = :readStatus " +
+           "WHERE (LOWER(m.roomId) = LOWER(:roomId) OR (LOWER(m.recipientUsername) = LOWER(:recipientUsername) AND LOWER(m.senderUsername) = LOWER(:partnerUsername))) " +
+           "AND LOWER(m.recipientUsername) = LOWER(:recipientUsername) AND m.status != :readStatus")
+    int markMessagesAsReadInRoomWithPartner(@Param("roomId") String roomId,
+                                            @Param("recipientUsername") String recipientUsername,
+                                            @Param("partnerUsername") String partnerUsername,
+                                            @Param("readStatus") MessageStatus readStatus);
+
+    // Đánh dấu TẤT CẢ tin nhắn gửi tới một người là ĐÃ ĐỌC
+    @Modifying
+    @Query("UPDATE RealtimeMessage m SET m.status = :readStatus WHERE LOWER(m.recipientUsername) = LOWER(:recipientUsername) AND m.status != :readStatus")
+    int markAllMessagesAsReadForUser(@Param("recipientUsername") String recipientUsername, 
+                                     @Param("readStatus") MessageStatus readStatus);
 }
 

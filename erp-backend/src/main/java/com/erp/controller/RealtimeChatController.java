@@ -346,9 +346,9 @@ public class RealtimeChatController {
         Pageable pageable = PageRequest.of(0, Math.min(limit, 50));
         List<RealtimeMessage> messages;
         if (beforeId == null) {
-            messages = messageRepository.findByRoomIdOrderByIdDesc(roomId, pageable);
+            messages = messageRepository.findPrivateHistoryLatest(roomId, currentUsername, targetUsername, pageable);
         } else {
-            messages = messageRepository.findByRoomIdAndIdLessThanOrderByIdDesc(roomId, beforeId, pageable);
+            messages = messageRepository.findPrivateHistoryBeforeId(roomId, currentUsername, targetUsername, beforeId, pageable);
         }
 
         List<RealtimeMessageDto> result = messages.stream()
@@ -365,10 +365,30 @@ public class RealtimeChatController {
     @Transactional
     public ResponseEntity<?> markAsRead(@PathVariable String roomId) {
         String currentUsername = getCurrentUsername();
-        int updatedCount = messageRepository.markMessagesAsReadInRoom(roomId, currentUsername, MessageStatus.READ);
+        String partnerUsername = "";
+        if (roomId.contains("_") && !roomId.startsWith("GROUP_")) {
+            String[] parts = roomId.split("_");
+            partnerUsername = parts[0].equalsIgnoreCase(currentUsername) ? parts[1] : parts[0];
+        }
+        int updatedCount = messageRepository.markMessagesAsReadInRoomWithPartner(roomId, currentUsername, partnerUsername, MessageStatus.READ);
         if (updatedCount > 0) {
             broadcastReadReceipt(roomId, currentUsername);
         }
+        return ResponseEntity.ok(Map.of(
+                "status", "SUCCESS",
+                "markedCount", updatedCount
+        ));
+    }
+
+    /**
+     * Đánh dấu TẤT CẢ tin nhắn chưa đọc của tôi là ĐÃ ĐỌC
+     */
+    @PutMapping("/api/realtime-chat/read-all")
+    @Transactional
+    public ResponseEntity<?> markAllAsRead() {
+        String currentUsername = getCurrentUsername();
+        int updatedCount = messageRepository.markAllMessagesAsReadForUser(currentUsername, MessageStatus.READ);
+        log.info("Người dùng [{}] đã đánh dấu tất cả ({}) tin nhắn là ĐÃ ĐỌC", currentUsername, updatedCount);
         return ResponseEntity.ok(Map.of(
                 "status", "SUCCESS",
                 "markedCount", updatedCount
@@ -386,7 +406,12 @@ public class RealtimeChatController {
                 : payload.get("readerUsername");
         String roomId = payload.get("roomId");
         if (StringUtils.hasText(roomId) && StringUtils.hasText(currentUsername)) {
-            int updatedCount = messageRepository.markMessagesAsReadInRoom(roomId, currentUsername, MessageStatus.READ);
+            String partnerUsername = "";
+            if (roomId.contains("_") && !roomId.startsWith("GROUP_")) {
+                String[] parts = roomId.split("_");
+                partnerUsername = parts[0].equalsIgnoreCase(currentUsername) ? parts[1] : parts[0];
+            }
+            int updatedCount = messageRepository.markMessagesAsReadInRoomWithPartner(roomId, currentUsername, partnerUsername, MessageStatus.READ);
             if (updatedCount > 0) {
                 broadcastReadReceipt(roomId, currentUsername);
             }
@@ -796,6 +821,10 @@ public class RealtimeChatController {
             nicknameRepository.findByRoomIdAndUsername(privateRoomId, dto.getUsername())
                     .ifPresent(n -> dto.setNickname(n.getNickname()));
 
+            // Đếm số tin nhắn chưa đọc mà đồng nghiệp này gửi tới tôi
+            long unread = messageRepository.countUnreadFromSender(dto.getUsername(), currentUsername, MessageStatus.SENT);
+            dto.setUnreadCount((int) unread);
+
             List<RealtimeMessage> lastMsgs = messageRepository.findLastMessageBetween(currentUsername, dto.getUsername(), PageRequest.of(0, 1));
             if (!lastMsgs.isEmpty()) {
                 RealtimeMessage m = lastMsgs.get(0);
@@ -823,6 +852,11 @@ public class RealtimeChatController {
         }
 
         colleagues.sort((a, b) -> {
+            int unreadA = a.getUnreadCount() != null ? a.getUnreadCount() : 0;
+            int unreadB = b.getUnreadCount() != null ? b.getUnreadCount() : 0;
+            if (unreadA > 0 && unreadB == 0) return -1;
+            if (unreadB > 0 && unreadA == 0) return 1;
+
             if (a.getLastMessageTime() == null && b.getLastMessageTime() == null) {
                 String nameA = a.getFullName() != null ? a.getFullName() : a.getUsername();
                 String nameB = b.getFullName() != null ? b.getFullName() : b.getUsername();

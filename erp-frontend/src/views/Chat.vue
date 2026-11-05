@@ -66,6 +66,20 @@
               </div>
               <p v-else class="item-preview">Thảo luận công việc & thông báo nhanh</p>
             </div>
+
+            <!-- Nút Ghim Kênh Chung -->
+            <button 
+              type="button" 
+              class="btn-pin-room" 
+              :class="{ 'is-pinned': isRoomPinned('GLOBAL') }"
+              :title="isRoomPinned('GLOBAL') ? 'Bỏ ghim phòng chung' : 'Ghim phòng chung lên đầu'"
+              @click.stop="togglePinRoom('GLOBAL')"
+            >
+              <svg viewBox="0 0 24 24" width="13" height="13" :fill="isRoomPinned('GLOBAL') ? '#f59e0b' : 'none'" stroke="currentColor" stroke-width="2">
+                <path d="M16 4l1 1v2l-3 3v5l-2 2-2-2V10L7 7V5l1-1h8m0-2H8c-1.1 0-2 .9-2 2v2.59L8.41 9H8v5.59L6 16.59V18h5v5l1 1 1-1v-5h5v-1.41l-2-2V9h-.41L18 6.59V4c0-1.1-.9-2-2-2z"/>
+              </svg>
+            </button>
+
             <span v-if="chatStore.unreadCounts['GLOBAL']" class="unread-pill">
               {{ chatStore.unreadCounts['GLOBAL'] }}
             </span>
@@ -74,21 +88,17 @@
           <!-- PHẦN 2: NHÓM CHAT (GROUP CHAT) -->
           <div class="section-label-row">
             <span class="section-label">NHÓM CHAT ({{ chatStore.myGroups.length }})</span>
-            <button class="btn-create-group" title="Tạo nhóm chat mới" @click="openCreateGroupDialog">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5">
+            <button type="button" class="btn-create-group-pill" title="Tạo nhóm chat mới" @click="openCreateGroupDialog">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5">
                 <line x1="12" y1="5" x2="12" y2="19"></line>
                 <line x1="5" y1="12" x2="19" y2="12"></line>
               </svg>
+              <span>Tạo nhóm</span>
             </button>
           </div>
 
-          <div v-if="chatStore.myGroups.length === 0" class="empty-groups-hint">
-            <span>Chưa tham gia nhóm nào</span>
-            <button type="button" class="btn-link-create" @click="openCreateGroupDialog">+ Tạo nhóm ngay</button>
-          </div>
-
           <div 
-            v-for="grp in chatStore.myGroups" 
+            v-for="grp in sortedMyGroups" 
             :key="grp.id"
             class="directory-item"
             :class="{ 'is-active': chatStore.activeChatType === 'GROUP' && chatStore.activeGroup?.id === grp.id }"
@@ -135,6 +145,19 @@
                 </template>
               </div>
             </div>
+            <!-- Nút Ghim Nhóm -->
+            <button 
+              type="button" 
+              class="btn-pin-room" 
+              :class="{ 'is-pinned': isRoomPinned('GROUP_' + grp.id) }"
+              :title="isRoomPinned('GROUP_' + grp.id) ? 'Bỏ ghim nhóm này' : 'Ghim nhóm lên đầu'"
+              @click.stop="togglePinRoom('GROUP_' + grp.id)"
+            >
+              <svg viewBox="0 0 24 24" width="13" height="13" :fill="isRoomPinned('GROUP_' + grp.id) ? '#f59e0b' : 'none'" stroke="currentColor" stroke-width="2">
+                <path d="M16 4l1 1v2l-3 3v5l-2 2-2-2V10L7 7V5l1-1h8m0-2H8c-1.1 0-2 .9-2 2v2.59L8.41 9H8v5.59L6 16.59V18h5v5l1 1 1-1v-5h5v-1.41l-2-2V9h-.41L18 6.59V4c0-1.1-.9-2-2-2z"/>
+              </svg>
+            </button>
+
             <span v-if="chatStore.unreadCounts['GROUP_' + grp.id]" class="unread-pill">
               {{ chatStore.unreadCounts['GROUP_' + grp.id] }}
             </span>
@@ -150,11 +173,25 @@
           <!-- PHẦN 3: TIN NHẮN RIÊNG 1-1 (ĐỒNG NGHIỆP) -->
           <div class="section-label-row">
             <span class="section-label">ĐỒNG NGHIỆP ({{ filteredColleagues.length }})</span>
-            <button class="btn-refresh-colleagues" title="Làm mới danh sách" @click="chatStore.fetchColleagues">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            </button>
+            <div class="section-actions-right">
+              <button 
+                v-if="chatStore.totalUnreadCount > 0" 
+                type="button"
+                class="btn-mark-all-read" 
+                title="Đánh dấu tất cả tin nhắn đã đọc"
+                @click.stop="handleMarkAllRead"
+              >
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M2 13l4 4L16 7M8 13l4 4L22 7" />
+                </svg>
+                <span>Đã đọc hết</span>
+              </button>
+              <button type="button" class="btn-refresh-colleagues" title="Làm mới danh sách" @click="chatStore.fetchColleagues">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </button>
+            </div>
           </div>
 
           <div v-if="filteredColleagues.length === 0" class="empty-colleagues">
@@ -162,7 +199,7 @@
           </div>
 
           <div 
-            v-for="colleague in filteredColleagues" 
+            v-for="colleague in sortedFilteredColleagues" 
             :key="colleague.id"
             class="directory-item"
             :class="{ 'is-active': chatStore.activeChatType === 'PRIVATE' && chatStore.activePartner?.username === colleague.username }"
@@ -234,6 +271,19 @@
             >
               Đã xem
             </span>
+
+            <!-- Nút Ghim Đồng Nghiệp -->
+            <button 
+              type="button" 
+              class="btn-pin-room" 
+              :class="{ 'is-pinned': isRoomPinned(colleague.username) }"
+              :title="isRoomPinned(colleague.username) ? 'Bỏ ghim đồng nghiệp này' : 'Ghim đồng nghiệp lên đầu'"
+              @click.stop="togglePinRoom(colleague.username)"
+            >
+              <svg viewBox="0 0 24 24" width="13" height="13" :fill="isRoomPinned(colleague.username) ? '#f59e0b' : 'none'" stroke="currentColor" stroke-width="2">
+                <path d="M16 4l1 1v2l-3 3v5l-2 2-2-2V10L7 7V5l1-1h8m0-2H8c-1.1 0-2 .9-2 2v2.59L8.41 9H8v5.59L6 16.59V18h5v5l1 1 1-1v-5h5v-1.41l-2-2V9h-.41L18 6.59V4c0-1.1-.9-2-2-2z"/>
+              </svg>
+            </button>
           </div>
 
         </div>
@@ -333,7 +383,7 @@
 
             <!-- Nút Tìm kiếm tin nhắn trong đoạn chat -->
             <button 
-              class="btn-icon-action" 
+              class="btn-icon-action btn-header-search-toggle" 
               :class="{ 'is-search-active': isSearchOpen }"
               title="Tìm kiếm tin nhắn trong cuộc trò chuyện (Ctrl+F)"
               @click="toggleSearchBar"
@@ -346,7 +396,7 @@
 
             <!-- Nút Ngăn lưu trữ Media & Tài liệu (Shared Drawer) -->
             <button 
-              class="btn-icon-action" 
+              class="btn-icon-action btn-header-drawer-toggle" 
               :class="{ 'is-drawer-open': showMediaDrawer }"
               title="Media, Tệp tin & Liên kết đã chia sẻ"
               @click="showMediaDrawer = !showMediaDrawer"
@@ -376,6 +426,23 @@
               <!-- Dropdown Menu Header -->
               <transition name="popover-fade">
                 <div v-if="isHeaderMenuOpen" class="header-dropdown-menu" @click.stop>
+                  <!-- 0. Tìm kiếm & Media cho Mobile -->
+                  <button type="button" class="header-menu-item header-menu-mobile-only" @click="toggleSearchBar(); isHeaderMenuOpen = false">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="11" cy="11" r="8"></circle>
+                      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <span>Tìm kiếm tin nhắn</span>
+                  </button>
+
+                  <button type="button" class="header-menu-item header-menu-mobile-only" @click="showMediaDrawer = !showMediaDrawer; isHeaderMenuOpen = false">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                      <line x1="15" y1="3" x2="15" y2="21"></line>
+                    </svg>
+                    <span>Tệp & Media đã chia sẻ</span>
+                  </button>
+
                   <!-- 1. Đổi màu chủ đề -->
                   <button type="button" class="header-menu-item" @click="openThemePicker(); isHeaderMenuOpen = false">
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
@@ -424,6 +491,16 @@
                       <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
                     </svg>
                     <span>Thành viên nhóm ({{ chatStore.activeGroup?.memberCount }})</span>
+                  </button>
+
+                  <!-- Cài đặt nhạc chuông cuộc gọi -->
+                  <button type="button" class="header-menu-item" @click="showRingtoneModal = true; isHeaderMenuOpen = false">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M9 18V5l12-2v13"></path>
+                      <circle cx="6" cy="18" r="3"></circle>
+                      <circle cx="18" cy="16" r="3"></circle>
+                    </svg>
+                    <span>Nhạc chuông cuộc gọi 🎵</span>
                   </button>
 
                   <div class="dropdown-menu-divider"></div>
@@ -846,18 +923,21 @@
                   </div>
                 </div>
 
-                <!-- Thanh thao tác nhanh khi Hover: 2 emojis + Nút 3 chấm gọn gàng -->
+                <!-- Thanh thao tác nhanh khi Hover: 6 animated emojis + Nút 3 chấm gọn gàng -->
                 <div v-if="!msg.isDeleted" class="message-actions-hover">
-                  <button 
-                    v-for="emoji in ['👍', '❤️']" 
-                    :key="emoji"
-                    type="button" 
-                    class="btn-hover-reaction" 
-                    :title="`Thả ${emoji}`"
-                    @click.stop="chatStore.toggleReaction(msg.id, emoji)"
-                  >
-                    {{ emoji }}
-                  </button>
+                  <div class="hover-reactions-group">
+                    <button 
+                      v-for="emoji in ['👍', '❤️', '😂', '😮', '😢', '🔥']" 
+                      :key="emoji"
+                      type="button" 
+                      class="btn-hover-reaction" 
+                      :class="'emoji-' + getEmojiClass(emoji)"
+                      :title="`Thả ${emoji}`"
+                      @click.stop="chatStore.toggleReaction(msg.id, emoji)"
+                    >
+                      <span class="animated-emoji-char">{{ emoji }}</span>
+                    </button>
+                  </div>
 
                   <!-- Nút menu 3 chấm mở rộng -->
                   <div class="msg-more-menu-container">
@@ -906,6 +986,14 @@
                           <span>{{ chatStore.isBookmarked(msg.id) ? 'Bỏ lưu ⭐' : 'Lưu tin nhắn ⭐' }}</span>
                         </button>
 
+                        <!-- Xóa ở phía tôi (ẩn trên màn hình của mình) -->
+                        <button type="button" class="dropdown-item is-danger-item" @click="handleDeleteForMe(msg); closeMessageMenu()">
+                          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                          </svg>
+                          <span>Xóa ở phía tôi</span>
+                        </button>
+
                         <div class="dropdown-menu-divider"></div>
 
                         <!-- Nút chuyển sang trang 2 -->
@@ -951,7 +1039,7 @@
                             <polyline points="3 6 5 6 21 6"></polyline>
                             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                           </svg>
-                          <span>Thu hồi</span>
+                          <span>Thu hồi cho tất cả</span>
                         </button>
                       </div>
                     </div>
@@ -1093,8 +1181,8 @@
                 ref="inputTextareaRef"
                 v-model="inputContent"
                 class="composer-textarea"
-                :placeholder="editingMessage ? 'Nhập nội dung chỉnh sửa... (Nhấn Enter để lưu, ESC để hủy)' : 'Nhập tin nhắn, gõ @ để nhắc tên, dán ảnh/tệp (Ctrl+V)... (Enter gửi, Shift+Enter xuống dòng)'"
-                rows="2"
+                :placeholder="editingMessage ? 'Nhập nội dung chỉnh sửa... (Enter lưu, ESC hủy)' : 'Nhập tin nhắn... (Enter gửi, Shift+Enter xuống dòng)'"
+                rows="1"
                 @focus="isInputFocused = true"
                 @blur="isInputFocused = false"
                 @keydown="handleTextareaKeydown"
@@ -2004,6 +2092,71 @@
           </div>
         </div>
       </div>
+
+      <!-- 3. MODAL CÀI ĐẶT NHẠC CHUÔNG CUỘC GỌI -->
+      <div v-if="showRingtoneModal" class="custom-modal-overlay" @click.self="stopRingtonePreview(); showRingtoneModal = false">
+        <div class="custom-modal-card ringtone-modal-card">
+          <div class="custom-modal-header">
+            <div class="modal-header-title">
+              <span class="modal-header-icon">🎵</span>
+              <div>
+                <h4>Cài đặt nhạc chuông cuộc gọi</h4>
+                <p>Tùy chỉnh âm thanh thông báo khi có đồng nghiệp gọi đến</p>
+              </div>
+            </div>
+            <button type="button" class="btn-close-modal" @click="stopRingtonePreview(); showRingtoneModal = false">✕</button>
+          </div>
+
+          <div class="custom-modal-body">
+            <div class="ringtone-list">
+              <div 
+                v-for="rt in ringtoneOptions" 
+                :key="rt.id"
+                class="ringtone-item-row"
+                :class="{ 'is-selected': userRingtone === rt.id }"
+                @click="userRingtone = rt.id"
+              >
+                <div class="ringtone-radio-dot">
+                  <span v-if="userRingtone === rt.id" class="radio-inner"></span>
+                </div>
+                <div class="ringtone-info">
+                  <div class="ringtone-name">{{ rt.name }}</div>
+                  <div class="ringtone-desc">{{ rt.desc }}</div>
+                </div>
+                <button 
+                  type="button" 
+                  class="btn-preview-ringtone" 
+                  :class="{ 'is-playing': previewingRingtone === rt.id }"
+                  @click.stop="previewRingtone(rt.id)"
+                  :title="previewingRingtone === rt.id ? 'Dừng phát' : 'Nghe thử nhạc chuông'"
+                >
+                  <span v-if="previewingRingtone === rt.id">⏹ Dừng</span>
+                  <span v-else>▶ Nghe thử</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Âm lượng nhạc chuông -->
+            <div class="ringtone-volume-row">
+              <span class="volume-label">Âm lượng chuông:</span>
+              <input 
+                type="range" 
+                min="0.1" 
+                max="1" 
+                step="0.05" 
+                v-model.number="userRingtoneVolume" 
+                class="ringtone-vol-slider"
+              />
+              <span class="volume-val">{{ Math.round(userRingtoneVolume * 100) }}%</span>
+            </div>
+          </div>
+
+          <div class="custom-modal-footer">
+            <button type="button" class="btn-cancel" @click="stopRingtonePreview(); showRingtoneModal = false">Đóng</button>
+            <button type="button" class="btn-confirm-save" @click="saveRingtone(userRingtone)">Lưu cài đặt</button>
+          </div>
+        </div>
+      </div>
     </Teleport>
 
   </div>
@@ -2050,9 +2203,13 @@ const isUploadingImage = ref(false)
 const previewImageUrl = ref(null)
 
 // State Responsive Mobile
-const showMobileChat = ref(true)
+const isMobileScreen = ref(typeof window !== 'undefined' ? window.innerWidth <= 768 : false)
+const showMobileChat = ref(typeof window !== 'undefined' ? window.innerWidth > 768 : true)
 const backToSidebar = () => {
   showMobileChat.value = false
+}
+const handleResize = () => {
+  isMobileScreen.value = window.innerWidth <= 768
 }
 
 // State Menu 3 chấm thao tác tin nhắn (Phân trang gọn gàng & vị trí thông minh)
@@ -2565,6 +2722,44 @@ const filteredColleagues = computed(() => {
   })
 })
 
+// Tính năng Ghim cuộc trò chuyện (Pin room/conversation)
+const pinnedRoomIds = ref(JSON.parse(localStorage.getItem('erp_pinned_rooms_' + (authStore.user?.username || 'user')) || '[]'))
+const isRoomPinned = (id) => pinnedRoomIds.value.includes(id)
+const togglePinRoom = (id) => {
+  const idx = pinnedRoomIds.value.indexOf(id)
+  if (idx !== -1) {
+    pinnedRoomIds.value.splice(idx, 1)
+  } else {
+    pinnedRoomIds.value.push(id)
+  }
+  localStorage.setItem('erp_pinned_rooms_' + (authStore.user?.username || 'user'), JSON.stringify(pinnedRoomIds.value))
+  ElMessage.success(idx === -1 ? 'Đã ghim cuộc trò chuyện lên đầu' : 'Đã bỏ ghim cuộc trò chuyện')
+}
+
+// Sắp xếp danh sách đồng nghiệp: Pinned lên đầu -> Tin chưa đọc -> Bình thường
+const sortedFilteredColleagues = computed(() => {
+  const list = [...filteredColleagues.value]
+  return list.sort((a, b) => {
+    const pA = isRoomPinned(a.username) ? 1 : 0
+    const pB = isRoomPinned(b.username) ? 1 : 0
+    if (pA !== pB) return pB - pA
+    const uA = getPrivateUnreadCount(a.username) > 0 ? 1 : 0
+    const uB = getPrivateUnreadCount(b.username) > 0 ? 1 : 0
+    if (uA !== uB) return uB - uA
+    return 0
+  })
+})
+
+// Sắp xếp nhóm chat: Nhóm được ghim lên trước
+const sortedMyGroups = computed(() => {
+  const list = [...chatStore.myGroups]
+  return list.sort((a, b) => {
+    const pA = isRoomPinned('GROUP_' + a.id) ? 1 : 0
+    const pB = isRoomPinned('GROUP_' + b.id) ? 1 : 0
+    return pB - pA
+  })
+})
+
 // Kiểm tra xem tin nhắn có phải do mình gửi không
 const isMyMessage = (msg) => {
   return msg.senderUsername === authStore.user?.username
@@ -2574,37 +2769,66 @@ const isMyMessage = (msg) => {
 const getPrivateUnreadCount = (partnerUsername) => {
   const myUsername = authStore.user?.username
   const roomId = chatStore.getPrivateRoomId(myUsername, partnerUsername)
-  return chatStore.unreadCounts[roomId] || 0
+  if (chatStore.unreadCounts[roomId] !== undefined && chatStore.unreadCounts[roomId] > 0) {
+    return chatStore.unreadCounts[roomId]
+  }
+  const colleague = chatStore.colleagues.find(c => c.username?.toLowerCase() === partnerUsername?.toLowerCase())
+  return colleague?.unreadCount || 0
+}
+
+// Đánh dấu tất cả tin nhắn đã đọc
+const handleMarkAllRead = async () => {
+  try {
+    await chatStore.markAllAsRead()
+    ElMessage.success('Đã đánh dấu tất cả tin nhắn là đã đọc')
+  } catch (e) {
+    ElMessage.error('Không thể đánh dấu đã đọc')
+  }
 }
 
 // Chuyển sang phòng chung
-const selectPublicRoom = () => {
+const selectPublicRoom = async () => {
   showMobileChat.value = true
-  chatStore.selectRoom('PUBLIC')
-  nextTick(() => {
-    scrollToBottom(false)
-    inputTextareaRef.value?.focus()
-  })
+  await chatStore.selectRoom('PUBLIC')
+  await nextTick()
+  scrollToBottom(false)
+  setTimeout(() => scrollToBottom(false), 50)
+  setTimeout(() => scrollToBottom(false), 200)
+  inputTextareaRef.value?.focus()
 }
 
 // Chuyển sang chat 1-1 với đồng nghiệp
-const selectPrivatePartner = (partner) => {
+const selectPrivatePartner = async (partner) => {
   showMobileChat.value = true
-  chatStore.selectRoom('PRIVATE', partner)
-  nextTick(() => {
-    scrollToBottom(false)
-    inputTextareaRef.value?.focus()
-  })
+  partner.unreadCount = 0
+  const myUsername = authStore.user?.username
+  const roomId = chatStore.getPrivateRoomId(myUsername, partner.username)
+  if (chatStore.unreadCounts[roomId]) {
+    chatStore.totalUnreadCount = Math.max(0, chatStore.totalUnreadCount - chatStore.unreadCounts[roomId])
+    chatStore.unreadCounts[roomId] = 0
+  }
+  await chatStore.selectRoom('PRIVATE', partner)
+  await nextTick()
+  scrollToBottom(false)
+  setTimeout(() => scrollToBottom(false), 50)
+  setTimeout(() => scrollToBottom(false), 200)
+  inputTextareaRef.value?.focus()
 }
 
 // Chuyển sang phòng nhóm
-const selectGroupRoom = (group) => {
+const selectGroupRoom = async (group) => {
   showMobileChat.value = true
-  chatStore.selectRoom('GROUP', group)
-  nextTick(() => {
-    scrollToBottom(false)
-    inputTextareaRef.value?.focus()
-  })
+  const roomId = `GROUP_${group.id}`
+  if (chatStore.unreadCounts[roomId]) {
+    chatStore.totalUnreadCount = Math.max(0, chatStore.totalUnreadCount - chatStore.unreadCounts[roomId])
+    chatStore.unreadCounts[roomId] = 0
+  }
+  await chatStore.selectRoom('GROUP', group)
+  await nextTick()
+  scrollToBottom(false)
+  setTimeout(() => scrollToBottom(false), 50)
+  setTimeout(() => scrollToBottom(false), 200)
+  inputTextareaRef.value?.focus()
 }
 
 // Mở modal tạo nhóm
@@ -2733,6 +2957,39 @@ const handleDeleteMessage = async (msg) => {
     ElMessage.success('Đã thu hồi tin nhắn')
   } catch (e) {
     // Người dùng bấm Hủy
+  }
+}
+
+// Xóa tin nhắn ở phía tôi (đối phương vẫn thấy bình thường)
+const handleDeleteForMe = async (msg) => {
+  if (!msg) return
+  try {
+    await ElMessageBox.confirm(
+      'Tin nhắn này sẽ bị ẩn khỏi màn hình trò chuyện của bạn. Đối phương vẫn sẽ nhìn thấy tin nhắn bình thường.',
+      'Xóa tin nhắn ở phía tôi?',
+      {
+        confirmButtonText: 'Xóa ở phía tôi',
+        cancelButtonText: 'Hủy',
+        type: 'warning'
+      }
+    )
+    chatStore.hideMessageForMe(msg.id, chatStore.activeRoomId)
+    ElMessage.success('Đã xóa tin nhắn ở phía bạn')
+  } catch (e) {
+    // Người dùng bấm Hủy
+  }
+}
+
+// Lấy class animation cho từng emoji micro-interaction
+const getEmojiClass = (emoji) => {
+  switch (emoji) {
+    case '👍': return 'thumbsup'
+    case '❤️': return 'heart'
+    case '😂': return 'joy'
+    case '😮': return 'wow'
+    case '😢': return 'cry'
+    case '🔥': return 'fire'
+    default: return 'general'
   }
 }
 
@@ -3512,11 +3769,69 @@ let localMediaStream = null
 let remoteMediaStream = null
 let pendingCandidates = []
 
-// Ringtones synthesizer (Web Audio API)
+// State & logic cài đặt nhạc chuông cuộc gọi
+const showRingtoneModal = ref(false)
+const userRingtone = ref(localStorage.getItem('erp_chat_ringtone') || 'modern')
+const userRingtoneVolume = ref(Number(localStorage.getItem('erp_chat_ringtone_vol') || 0.8))
+const previewingRingtone = ref(null)
+let previewTimeout = null
+
+const ringtoneOptions = [
+  { id: 'modern', name: 'Du dương hiện đại (Modern Chime)', desc: 'Giai điệu chuông Marimba arpeggio trong trẻo, vui tươi' },
+  { id: 'classic', name: 'Điện thoại cổ điển (Classic Bell)', desc: 'Tiếng chuông reo điện thoại văn phòng truyền thống' },
+  { id: 'cyber', name: 'Công nghệ Synthwave (Cyber Digital)', desc: 'Hợp âm điện tử đa âm phong cách tương lai' },
+  { id: 'gentle', name: 'Nhẹ nhàng thanh lịch (Zen Harmony)', desc: 'Âm sắc sáo mộc mạc du dương, không gây giật mình' }
+]
+
+// Ringtones synthesizer (Web Audio API đa âm sắc)
 let ringtoneAudioCtx = null
 let ringtoneInterval = null
 
-const playRingtone = () => {
+const playToneNote = (ctx, freq, startSec, durationSec, type = 'sine', maxGain = 0.25) => {
+  if (!ctx || ctx.state === 'closed') return
+  const osc = ctx.createOscillator()
+  const gain = ctx.createGain()
+  osc.type = type
+  osc.frequency.setValueAtTime(freq, ctx.currentTime + startSec)
+  gain.gain.setValueAtTime(0.001, ctx.currentTime + startSec)
+  gain.gain.linearRampToValueAtTime(maxGain * userRingtoneVolume.value, ctx.currentTime + startSec + 0.03)
+  gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + startSec + durationSec)
+  osc.connect(gain)
+  gain.connect(ctx.destination)
+  osc.start(ctx.currentTime + startSec)
+  osc.stop(ctx.currentTime + startSec + durationSec)
+}
+
+const triggerRingtoneMelody = (ctx, typeId) => {
+  if (!ctx || ctx.state === 'closed') return
+  const vol = Math.max(0.05, Math.min(1, userRingtoneVolume.value))
+  if (typeId === 'classic') {
+    // Dual frequency telephone ring: 440Hz + 480Hz modulated
+    for (let i = 0; i < 4; i++) {
+      playToneNote(ctx, 440, i * 0.12, 0.08, 'sine', 0.2 * vol)
+      playToneNote(ctx, 480, i * 0.12, 0.08, 'triangle', 0.15 * vol)
+    }
+  } else if (typeId === 'cyber') {
+    // Synthwave pulse
+    playToneNote(ctx, 523.25, 0, 0.15, 'sawtooth', 0.12 * vol) // C5
+    playToneNote(ctx, 659.25, 0.12, 0.15, 'sawtooth', 0.12 * vol) // E5
+    playToneNote(ctx, 783.99, 0.24, 0.25, 'triangle', 0.15 * vol) // G5
+    playToneNote(ctx, 1046.50, 0.38, 0.4, 'sine', 0.2 * vol) // C6
+  } else if (typeId === 'gentle') {
+    // Zen harmony chime
+    playToneNote(ctx, 587.33, 0, 0.4, 'sine', 0.18 * vol) // D5
+    playToneNote(ctx, 739.99, 0.18, 0.5, 'sine', 0.18 * vol) // F#5
+    playToneNote(ctx, 880.00, 0.36, 0.6, 'sine', 0.2 * vol) // A5
+  } else {
+    // modern (default): Marimba arpeggio
+    playToneNote(ctx, 523.25, 0, 0.18, 'triangle', 0.22 * vol) // C5
+    playToneNote(ctx, 659.25, 0.12, 0.18, 'triangle', 0.22 * vol) // E5
+    playToneNote(ctx, 783.99, 0.24, 0.22, 'triangle', 0.24 * vol) // G5
+    playToneNote(ctx, 1046.50, 0.38, 0.45, 'sine', 0.25 * vol) // C6
+  }
+}
+
+const playRingtone = (overrideType = null) => {
   stopRingtone()
   try {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext
@@ -3525,22 +3840,11 @@ const playRingtone = () => {
     if (ringtoneAudioCtx.state === 'suspended') {
       ringtoneAudioCtx.resume().catch(e => console.warn('AudioContext resume:', e))
     }
-    const playBeep = () => {
-      if (!ringtoneAudioCtx || ringtoneAudioCtx.state === 'closed') return
-      const osc = ringtoneAudioCtx.createOscillator()
-      const gain = ringtoneAudioCtx.createGain()
-      osc.type = 'sine'
-      osc.frequency.setValueAtTime(440, ringtoneAudioCtx.currentTime)
-      osc.frequency.setValueAtTime(480, ringtoneAudioCtx.currentTime + 0.1)
-      gain.gain.setValueAtTime(0.15, ringtoneAudioCtx.currentTime)
-      gain.gain.exponentialRampToValueAtTime(0.001, ringtoneAudioCtx.currentTime + 0.4)
-      osc.connect(gain)
-      gain.connect(ringtoneAudioCtx.destination)
-      osc.start()
-      osc.stop(ringtoneAudioCtx.currentTime + 0.4)
-    }
-    playBeep()
-    ringtoneInterval = setInterval(playBeep, 2000)
+    const chosen = overrideType || userRingtone.value || 'modern'
+    triggerRingtoneMelody(ringtoneAudioCtx, chosen)
+    ringtoneInterval = setInterval(() => {
+      triggerRingtoneMelody(ringtoneAudioCtx, chosen)
+    }, 2200)
   } catch (e) {
     console.warn('Không thể phát ringtone:', e)
   }
@@ -3555,6 +3859,37 @@ const stopRingtone = () => {
     try { ringtoneAudioCtx.close() } catch (e) {}
     ringtoneAudioCtx = null
   }
+}
+
+const previewRingtone = (toneId) => {
+  if (previewingRingtone.value === toneId) {
+    stopRingtonePreview()
+    return
+  }
+  stopRingtonePreview()
+  previewingRingtone.value = toneId
+  playRingtone(toneId)
+  previewTimeout = setTimeout(() => {
+    stopRingtonePreview()
+  }, 4500)
+}
+
+const stopRingtonePreview = () => {
+  previewingRingtone.value = null
+  if (previewTimeout) {
+    clearTimeout(previewTimeout)
+    previewTimeout = null
+  }
+  stopRingtone()
+}
+
+const saveRingtone = (id) => {
+  userRingtone.value = id
+  localStorage.setItem('erp_chat_ringtone', id)
+  localStorage.setItem('erp_chat_ringtone_vol', userRingtoneVolume.value)
+  stopRingtonePreview()
+  showRingtoneModal.value = false
+  ElMessage.success('Đã lưu cấu hình nhạc chuông cuộc gọi!')
 }
 
 const startCallDurationTimer = () => {
@@ -3950,8 +4285,15 @@ onMounted(() => {
   chatStore.fetchColleagues()
   // Tải danh sách nhóm chat của tôi
   chatStore.fetchMyGroups()
-  // Mở mặc định phòng chung
-  selectPublicRoom()
+
+  window.addEventListener('resize', handleResize)
+  // Nếu là desktop (> 768px), mở mặc định phòng chung; nếu là mobile (<= 768px), mở danh bạ trước
+  if (typeof window !== 'undefined' && window.innerWidth > 768) {
+    selectPublicRoom()
+  } else {
+    showMobileChat.value = false
+  }
+
   // Lắng nghe sự kiện ESC để đóng lightbox/menu
   window.addEventListener('keydown', handleKeydown)
   // Lắng nghe sự kiện quay lại tab hoặc focus cửa sổ để cập nhật đã đọc
@@ -3965,6 +4307,7 @@ onUnmounted(() => {
   if (unregisterCallListener) unregisterCallListener()
   cleanupCall()
 
+  window.removeEventListener('resize', handleResize)
   window.removeEventListener('keydown', handleKeydown)
   window.removeEventListener('focus', handleWindowFocus)
   document.removeEventListener('visibilitychange', handleWindowFocus)
@@ -4190,11 +4533,63 @@ onUnmounted(() => {
 }
 
 .directory-item.is-active {
-  background: linear-gradient(90deg, #eff6ff 0%, #dbeafe 100%) !important;
-  border: 1px solid #93c5fd !important;
-  border-left: 4px solid #2563eb !important;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.12) !important;
-  transform: translateX(2px);
+  background: #eff6ff !important;
+  border: 1px solid #bfdbfe !important;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.08) !important;
+  border-radius: 10px;
+}
+
+/* Nút ghim cuộc trò chuyện (Pin room) */
+.btn-pin-room {
+  background: transparent;
+  border: none;
+  padding: 4px;
+  border-radius: 4px;
+  color: #94a3b8;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: all 0.15s ease;
+  margin-left: 4px;
+  flex-shrink: 0;
+}
+
+.directory-item:hover .btn-pin-room,
+.btn-pin-room.is-pinned {
+  opacity: 1;
+}
+
+.btn-pin-room.is-pinned {
+  color: #f59e0b;
+}
+
+.btn-pin-room:hover {
+  background: #f1f5f9;
+  color: #d97706;
+}
+
+/* Nút tạo nhóm dạng pill gọn gàng trên tiêu đề */
+.btn-create-group-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #2563eb;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-create-group-pill:hover {
+  background: #2563eb;
+  color: #ffffff;
+  border-color: #2563eb;
 }
 
 .directory-item.is-active .item-name {
@@ -4755,7 +5150,7 @@ onUnmounted(() => {
    FOOTER SOẠN THẢO VĂN BẢN
    ========================================================================= */
 .main-footer {
-  padding: 10px 16px 14px 16px;
+  padding: 6px 16px 10px 16px;
   background: #ffffff;
   border-top: 1px solid #e2e8f0;
 }
@@ -4789,10 +5184,10 @@ onUnmounted(() => {
 
 .chat-textarea {
   flex: 1;
-  padding: 10px 14px;
+  padding: 8px 12px;
   border: 1px solid #cbd5e1;
   border-radius: 10px;
-  font-size: 14px;
+  font-size: 13.5px;
   line-height: 1.4;
   color: #1e293b;
   resize: none;
@@ -4811,17 +5206,17 @@ onUnmounted(() => {
 .btn-send-message {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 10px 20px;
+  gap: 5px;
+  padding: 0 14px;
   background: linear-gradient(135deg, #2563eb, #1d4ed8);
   color: #ffffff;
   border: none;
-  border-radius: 10px;
-  font-size: 14px;
+  border-radius: 8px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
-  height: 42px;
+  height: 32px;
 }
 
 .btn-send-message:hover:not(:disabled) {
@@ -5101,16 +5496,16 @@ onUnmounted(() => {
 .message-actions-hover {
   display: flex;
   align-items: center;
-  gap: 2px;
-  padding: 2px 6px;
+  gap: 4px;
+  padding: 3px 8px;
   background: #ffffff;
   border: 1px solid #e2e8f0;
-  border-radius: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-radius: 24px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.15s ease, transform 0.15s ease;
-  transform: scale(0.95);
+  transition: opacity 0.15s ease, transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform: scale(0.92);
   z-index: 5;
 }
 
@@ -5120,18 +5515,88 @@ onUnmounted(() => {
   transform: scale(1);
 }
 
+.hover-reactions-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
 .btn-hover-reaction {
   background: transparent;
   border: none;
-  font-size: 14px;
-  padding: 2px 4px;
+  font-size: 16px;
+  padding: 3px 5px;
   cursor: pointer;
-  border-radius: 4px;
-  transition: transform 0.1s ease;
+  border-radius: 8px;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.animated-emoji-char {
+  display: inline-block;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: transform;
 }
 
 .btn-hover-reaction:hover {
-  transform: scale(1.3);
+  background: #f1f5f9;
+  transform: scale(1.35) translateY(-3px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+  z-index: 2;
+}
+
+/* Micro-interaction animations for emojis */
+.emoji-heart:hover .animated-emoji-char {
+  animation: heartPulseAnim 0.7s infinite alternate ease-in-out;
+}
+@keyframes heartPulseAnim {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.4); }
+  100% { transform: scale(1.15); }
+}
+
+.emoji-fire:hover .animated-emoji-char {
+  animation: fireFlickerAnim 0.6s infinite alternate ease-in-out;
+}
+@keyframes fireFlickerAnim {
+  0% { transform: scale(1) rotate(-4deg); }
+  50% { transform: scale(1.35) rotate(6deg) translateY(-2px); }
+  100% { transform: scale(1.15) rotate(-3deg); }
+}
+
+.emoji-joy:hover .animated-emoji-char {
+  animation: joyWiggleAnim 0.6s infinite alternate ease-in-out;
+}
+@keyframes joyWiggleAnim {
+  0% { transform: rotate(-10deg) scale(1.1); }
+  100% { transform: rotate(10deg) scale(1.35); }
+}
+
+.emoji-thumbsup:hover .animated-emoji-char {
+  animation: thumbBounceAnim 0.5s ease;
+}
+@keyframes thumbBounceAnim {
+  0% { transform: translateY(0) scale(1); }
+  40% { transform: translateY(-5px) scale(1.35) rotate(-8deg); }
+  100% { transform: translateY(-2px) scale(1.25); }
+}
+
+.emoji-wow:hover .animated-emoji-char {
+  animation: wowPopAnim 0.6s infinite alternate ease-in-out;
+}
+@keyframes wowPopAnim {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.4); }
+}
+
+.emoji-cry:hover .animated-emoji-char {
+  animation: cryShakeAnim 0.6s infinite alternate ease-in-out;
+}
+@keyframes cryShakeAnim {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(2px) scale(1.25); }
 }
 
 .btn-hover-reply {
@@ -5388,6 +5853,33 @@ onUnmounted(() => {
   background: #2563eb;
   border-color: #2563eb;
   color: #ffffff;
+}
+
+.section-actions-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-mark-all-read {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #2563eb;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-mark-all-read:hover {
+  background: #2563eb;
+  color: #ffffff;
+  border-color: #2563eb;
 }
 
 .empty-groups-hint {
@@ -7905,41 +8397,56 @@ onUnmounted(() => {
   color: #0f172a;
 }
 
+.header-menu-mobile-only {
+  display: none;
+}
+
 @media (max-width: 900px) {
   .realtime-chat-page {
     padding: 0;
     height: calc(100vh - 64px);
+    height: calc(100dvh - 64px);
   }
 
   .chat-card-container {
     border-radius: 0;
     border: none;
+    height: 100%;
   }
 
   .btn-mobile-back {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: #f1f5f9;
+    color: #1e293b;
+    margin-right: 8px;
+    flex-shrink: 0;
   }
 
   .chat-sidebar {
     width: 100%;
+    height: 100%;
   }
 
   .chat-sidebar.is-mobile-hidden {
-    display: none;
+    display: none !important;
   }
 
   .chat-main {
     width: 100%;
+    height: 100%;
   }
 
   .chat-main.is-mobile-hidden {
-    display: none;
+    display: none !important;
   }
 
   .message-bubble-row {
-    max-width: 88%;
+    max-width: 90%;
   }
 
   .chat-right-drawer {
@@ -7953,7 +8460,123 @@ onUnmounted(() => {
 
   .header-dropdown-menu {
     right: 0;
-    width: 215px;
+    width: 220px;
+  }
+}
+
+@media (max-width: 768px) {
+  .main-header {
+    padding: 8px 10px;
+    gap: 8px;
+    min-height: 52px;
+  }
+
+  .current-room-info {
+    min-width: 0;
+    gap: 6px;
+    flex: 1;
+  }
+
+  .header-title-group {
+    min-width: 0;
+  }
+
+  .current-chat-name {
+    font-size: 14px;
+    max-width: 140px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .current-chat-desc {
+    display: none;
+  }
+
+  .presence-status-pill {
+    font-size: 10px;
+    padding: 1px 6px;
+  }
+
+  .header-actions {
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .btn-header-search-toggle,
+  .btn-header-drawer-toggle {
+    display: none !important;
+  }
+
+  .header-menu-mobile-only {
+    display: flex !important;
+  }
+
+  .btn-header-call,
+  .btn-icon-action {
+    width: 32px;
+    height: 32px;
+  }
+
+  .main-footer {
+    padding: 6px 8px 10px;
+  }
+
+  .composer-unified-card {
+    padding: 6px 8px;
+    border-radius: 12px;
+  }
+
+  .composer-textarea {
+    min-height: 34px;
+    font-size: 13.5px;
+    padding: 2px 2px 4px;
+  }
+
+  .composer-bottom-toolbar {
+    padding-top: 4px;
+  }
+
+  .composer-tools-left {
+    gap: 2px;
+  }
+
+  .composer-tool-btn {
+    width: 30px;
+    height: 30px;
+  }
+
+  .btn-send-message {
+    height: 32px;
+    padding: 0 12px;
+    font-size: 13px;
+    border-radius: 8px;
+  }
+
+  .messages-viewport {
+    padding: 10px 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .current-chat-name {
+    max-width: 110px;
+  }
+
+  .btn-send-message {
+    padding: 0 10px;
+  }
+
+  .btn-send-message span {
+    display: none;
+  }
+
+  .message-bubble-row {
+    max-width: 95%;
+  }
+
+  .composer-tool-divider {
+    display: none;
   }
 }
 
@@ -8033,15 +8656,15 @@ onUnmounted(() => {
   flex-direction: column;
   background: #ffffff;
   border: 1.5px solid #cbd5e1;
-  border-radius: 14px;
-  padding: 8px 12px;
+  border-radius: 12px;
+  padding: 6px 12px;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
 }
 
 .composer-unified-card.is-focused {
   border-color: var(--chat-theme-primary, #2563eb);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12), 0 4px 12px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12), 0 3px 8px rgba(0, 0, 0, 0.04);
 }
 
 .composer-textarea {
@@ -8050,38 +8673,39 @@ onUnmounted(() => {
   outline: none;
   resize: none;
   font-family: inherit;
-  font-size: 14px;
-  line-height: 1.45;
+  font-size: 13.5px;
+  line-height: 1.4;
   color: #1e293b;
   background: transparent;
-  padding: 2px 4px 6px;
-  min-height: 42px;
+  padding: 2px 4px 4px;
+  min-height: 28px;
+  max-height: 120px;
 }
 
 .composer-bottom-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-top: 6px;
+  padding-top: 4px;
   border-top: 1px solid #f1f5f9;
 }
 
 .composer-tools-left {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   position: relative;
 }
 
 .composer-tool-btn {
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   background: transparent;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   color: #64748b;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -8099,7 +8723,7 @@ onUnmounted(() => {
 
 .composer-tool-divider {
   width: 1px;
-  height: 18px;
+  height: 16px;
   background: #e2e8f0;
   margin: 0 2px;
 }
@@ -8556,6 +9180,141 @@ onUnmounted(() => {
 .btn-call-ctl.btn-hangup:hover {
   background: #dc2626;
   transform: scale(1.1);
+}
+
+/* =========================================================================
+   MODAL CÀI ĐẶT NHẠC CHUÔNG CUỘC GỌI
+   ========================================================================= */
+.ringtone-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.ringtone-item-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #f8fafc;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ringtone-item-row:hover {
+  border-color: #93c5fd;
+  background: #f0f7ff;
+}
+
+.ringtone-item-row.is-selected {
+  border-color: #2563eb;
+  background: #eff6ff;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08);
+}
+
+.ringtone-radio-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #cbd5e1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.ringtone-item-row.is-selected .ringtone-radio-dot {
+  border-color: #2563eb;
+}
+
+.radio-inner {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2563eb;
+}
+
+.ringtone-info {
+  flex: 1;
+}
+
+.ringtone-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: #1e293b;
+  margin-bottom: 2px;
+}
+
+.ringtone-desc {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.btn-preview-ringtone {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.btn-preview-ringtone:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.btn-preview-ringtone.is-playing {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #dc2626;
+  animation: pulsePreviewBtn 1s infinite alternate;
+}
+
+@keyframes pulsePreviewBtn {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.04); }
+}
+
+.ringtone-volume-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #f8fafc;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+.volume-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  white-space: nowrap;
+}
+
+.ringtone-vol-slider {
+  flex: 1;
+  cursor: pointer;
+  accent-color: #2563eb;
+}
+
+.volume-val {
+  font-size: 13px;
+  font-weight: 700;
+  color: #2563eb;
+  width: 42px;
+  text-align: right;
 }
 
 </style>
