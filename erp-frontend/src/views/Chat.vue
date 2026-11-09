@@ -2092,22 +2092,24 @@
           </div>
         </div>
       </div>
+    </Teleport>
 
-      <!-- 3. MODAL CÀI ĐẶT NHẠC CHUÔNG CUỘC GỌI -->
-      <div v-if="showRingtoneModal" class="custom-modal-overlay" @click.self="stopRingtonePreview(); showRingtoneModal = false">
+    <!-- 3. MODAL CÀI ĐẶT NHẠC CHUÔNG CUỘC GỌI -->
+    <Teleport to="body">
+      <div v-if="showRingtoneModal" class="modal-backdrop-overlay" @click.self="stopRingtonePreview(); showRingtoneModal = false">
         <div class="custom-modal-card ringtone-modal-card">
-          <div class="custom-modal-header">
-            <div class="modal-header-title">
-              <span class="modal-header-icon">🎵</span>
-              <div>
-                <h4>Cài đặt nhạc chuông cuộc gọi</h4>
-                <p>Tùy chỉnh âm thanh thông báo khi có đồng nghiệp gọi đến</p>
+          <div class="modal-card-header">
+            <div class="header-icon-title">
+              <div class="modal-header-icon">🎵</div>
+              <div class="modal-title-group">
+                <h3 class="modal-card-title">Cài đặt nhạc chuông cuộc gọi</h3>
+                <span class="modal-card-desc">Tùy chỉnh âm thanh thông báo khi có đồng nghiệp gọi đến</span>
               </div>
             </div>
             <button type="button" class="btn-close-modal" @click="stopRingtonePreview(); showRingtoneModal = false">✕</button>
           </div>
 
-          <div class="custom-modal-body">
+          <div class="modal-card-body">
             <div class="ringtone-list">
               <div 
                 v-for="rt in ringtoneOptions" 
@@ -2151,9 +2153,9 @@
             </div>
           </div>
 
-          <div class="custom-modal-footer">
-            <button type="button" class="btn-cancel" @click="stopRingtonePreview(); showRingtoneModal = false">Đóng</button>
-            <button type="button" class="btn-confirm-save" @click="saveRingtone(userRingtone)">Lưu cài đặt</button>
+          <div class="modal-card-footer">
+            <button type="button" class="btn-modal-cancel" @click="stopRingtonePreview(); showRingtoneModal = false">Đóng</button>
+            <button type="button" class="btn-modal-primary" @click="saveRingtone(userRingtone)">Lưu cài đặt</button>
           </div>
         </div>
       </div>
@@ -9185,6 +9187,11 @@ onUnmounted(() => {
 /* =========================================================================
    MODAL CÀI ĐẶT NHẠC CHUÔNG CUỘC GỌI
    ========================================================================= */
+.ringtone-modal-card {
+  max-width: 520px;
+  width: 100%;
+}
+
 .ringtone-list {
   display: flex;
   flex-direction: column;

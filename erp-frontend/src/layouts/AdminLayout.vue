@@ -93,6 +93,13 @@
           </template>
         </el-menu-item>
 
+        <el-menu-item index="/calendar">
+          <el-icon><Calendar /></el-icon>
+          <template #title>
+            <span class="menu-title-text">Lịch biểu & Công việc</span>
+          </template>
+        </el-menu-item>
+
         <el-menu-item index="/ai-copilot" @click.prevent="openChatWidget">
           <el-icon class="ai-sparkle-icon"><Cpu /></el-icon>
           <template #title>
@@ -189,6 +196,13 @@
                 {{ chatStore.totalUnreadCount > 99 ? '99+' : chatStore.totalUnreadCount }}
               </span>
             </div>
+          </template>
+        </el-menu-item>
+
+        <el-menu-item index="/calendar">
+          <el-icon><Calendar /></el-icon>
+          <template #title>
+            <span class="menu-title-text">Lịch biểu & Công việc</span>
           </template>
         </el-menu-item>
         <el-menu-item v-if="authStore.isAdmin" index="/announcements">
@@ -476,7 +490,8 @@ import {
   DataAnalysis,
   Setting,
   Cpu,
-  ChatDotRound
+  ChatDotRound,
+  Calendar
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -693,7 +708,9 @@ onBeforeUnmount(() => {
    FIGMA ENTERPRISE ADMIN LAYOUT STYLES (MATCHING IMAGES 3 & 4)
    ============================================================================== */
 .admin-layout {
-  min-height: 100vh;
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
   background-color: #f8fafc;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   color: #0f172a;
@@ -706,8 +723,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  position: sticky;
-  top: 0;
+  flex-shrink: 0;
   transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
   z-index: 100;
@@ -969,7 +985,12 @@ onBeforeUnmount(() => {
 .main-wrapper {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;
+  max-height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1;
+  min-width: 0;
 }
 
 .top-header {
@@ -984,6 +1005,7 @@ onBeforeUnmount(() => {
   position: sticky;
   top: 0;
   z-index: 9;
+  flex-shrink: 0;
 }
 
 .header-left-group {
