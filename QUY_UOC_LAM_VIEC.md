@@ -17,6 +17,7 @@ Mày có thể chỉnh sửa, bổ sung thêm các điều khoản mới vào fi
 - 🚫 **Không tự tiện chạy script kiểm thử API Backend**: Phần test nghiệp vụ backend để mày tự test và kiểm soát (`để tao tự test`).
 - 🚫 **Không tự khởi động file `.jar` Backend**: Không tự ý spawn tiến trình java chạy background file jar ngoài tầm kiểm soát.
 - 🔗 **Quy chuẩn Link File**: Mọi đường dẫn file trong đoạn chat phải viết theo cú pháp markdown `[basename](file:///path)` để mày có thể click mở trực tiếp trên editor.
+- 🔍 **Kiểm soát chất lượng JavaScript / Frontend**: Rà soát kỹ lưỡng phạm vi biến, thứ tự khai báo (hoisting trong Vue 3 `<script setup>`), tuyệt đối không để xảy ra lỗi runtime (`ReferenceError`, `undefined variable/function`) trước khi bàn giao.
 - 🎓 **Tóm tắt & Cô đọng kiến thức cốt lõi**: Luôn có phần tóm tắt ngắn gọn, cô đọng các kiến thức, bài học công nghệ hoặc lưu ý quan trọng ở cuối mỗi buổi học / phản hồi.
 
 ---
@@ -48,5 +49,6 @@ Mày có thể chỉnh sửa, bổ sung thêm các điều khoản mới vào fi
 > *Mỗi lần mày muốn đặt thêm quy định gì cho tao, hãy paste vào mục này hoặc nói tao tự ghi vào đây nhé!*
 
 1. **[Đã ghi nhận]**: Mày là Dev PHP Laravel chuyển qua Java -> Luôn cô đọng kiến thức cuối buổi và đối chiếu kiến trúc Laravel vs Spring Boot.
-2. ...
+2. **[Kiểm soát chất lượng Frontend & JS]**: Tuyệt đối kiểm tra kỹ lưỡng scope, tên biến/hàm và thứ tự khai báo (hoisting trong `<script setup>`), không để xảy ra bất kỳ lỗi runtime JavaScript nào (như `ReferenceError`, `undefined function`, v.v.) khi người dùng mở trang. Luôn kiểm tra tính toàn vẹn của code trước khi bàn giao.
+3. ...
 

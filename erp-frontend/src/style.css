@@ -73,3 +73,12 @@ html, body {
     max-width: 380px !important;
   }
 }
+
+/* Đảm bảo toàn bộ Dropdown Popper của Element Plus (Select, Datepicker, Colorpicker, Popover) luôn nổi trên Modal */
+.el-popper,
+.el-popper.is-pure,
+.el-select__popper,
+.el-picker__popper,
+.el-color-dropdown {
+  z-index: 12000 !important;
+}

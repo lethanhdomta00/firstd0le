@@ -47,6 +47,12 @@ const routes = [
         component: () => import('../views/Calendar.vue')
       },
       {
+        path: 'jobs',
+        name: 'Jobs',
+        component: () => import('../views/Jobs.vue'),
+        meta: { role: 'ADMIN' }
+      },
+      {
         path: ':pathMatch(.*)*',
         name: 'NotFound',
         component: () => import('../views/NotFound.vue')

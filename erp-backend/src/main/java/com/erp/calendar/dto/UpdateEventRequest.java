@@ -46,6 +46,12 @@ public class UpdateEventRequest {
 
     private Integer reminderMinutesBefore;
 
+    private Integer progress; // Tiến độ công việc (0 - 100%)
+
+    private String assigneeUsername; // Người phụ trách chính
+
+    private List<java.util.Map<String, Object>> subtasks; // Danh sách việc con (Checklist)
+
     private Boolean isPublic;
 }
 

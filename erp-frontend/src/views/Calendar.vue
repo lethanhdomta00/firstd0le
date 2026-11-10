@@ -21,6 +21,21 @@
       </div>
 
       <div class="header-right-col">
+        <!-- Nút Bật/Tắt Bảng Công việc & To-do -->
+        <button
+          type="button"
+          class="btn-toggle-task-board"
+          :class="{ 'is-active': isTaskBoardOpen }"
+          @click="isTaskBoardOpen = !isTaskBoardOpen"
+        >
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 11l3 3L22 4"></path>
+            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+          </svg>
+          <span>Bảng Công việc</span>
+          <span v-if="pendingTasksList.length > 0" class="task-badge-count">{{ pendingTasksList.length }}</span>
+        </button>
+
         <!-- Nút Tạo sự kiện mới -->
         <button type="button" class="btn-create-event" @click="openCreateModal()">
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -228,8 +243,10 @@
       </div>
     </div>
 
-    <!-- NỘI DUNG CHÍNH CỦA LỊCH (MAIN CALENDAR VIEWS COMPACT) -->
-    <div v-loading="isLoading" class="calendar-content-card">
+    <!-- KHÔNG GIAN LÀM VIỆC LỊCH BIỂU & CÔNG VIỆC (WORKSPACE LAYOUT) -->
+    <div class="calendar-workspace-layout" :class="{ 'with-task-board': isTaskBoardOpen }">
+      <!-- NỘI DUNG CHÍNH CỦA LỊCH (MAIN CALENDAR VIEWS COMPACT) -->
+      <div v-loading="isLoading" class="calendar-content-card">
       <!-- ================================================================= -->
       <!-- 1. CHẾ ĐỘ XEM NĂM (YEAR VIEW - TỔNG QUAN 12 THÁNG)                 -->
       <!-- ================================================================= -->
@@ -627,6 +644,186 @@
       </div>
     </div>
 
+      <!-- BẢNG CÔNG VIỆC, TO-DO, TIẾN ĐỘ & DEADLINE (TASK BOARD SIDEBAR) -->
+      <aside v-if="isTaskBoardOpen" class="task-board-panel">
+        <div class="task-panel-header">
+          <div class="panel-header-title">
+            <span class="panel-header-icon">📋</span>
+            <div class="panel-titles">
+              <h3 class="panel-main-title">Công việc & Deadline</h3>
+              <span class="panel-sub-title">Kéo thẻ việc thả vào ngày trên Lịch để dời hạn chót</span>
+            </div>
+          </div>
+          <button type="button" class="btn-panel-close" title="Thu gọn bảng công việc" @click="isTaskBoardOpen = false">✕</button>
+        </div>
+
+        <!-- KPI TIẾN ĐỘ HOÀN THÀNH CÔNG VIỆC -->
+        <div class="task-kpi-card">
+          <div class="kpi-header">
+            <span class="kpi-label">Tiến độ công việc</span>
+            <span class="kpi-rate">{{ completedTasksCount }}/{{ allTasksList.length }} việc ({{ taskCompletionRate }}%)</span>
+          </div>
+          <div class="kpi-progress-track">
+            <div class="kpi-progress-bar" :style="{ width: taskCompletionRate + '%' }"></div>
+          </div>
+        </div>
+
+        <!-- BỘ LỌC CÔNG VIỆC NHANH (Tất cả, Của tôi, Hôm nay, Chờ xử lý, Đã xong) -->
+        <div class="task-filter-pills">
+          <button
+            type="button"
+            class="task-filter-pill"
+            :class="{ 'is-active': taskFilter === 'all' }"
+            @click="taskFilter = 'all'"
+          >
+            Tất cả ({{ allTasksList.length }})
+          </button>
+          <button
+            type="button"
+            class="task-filter-pill"
+            :class="{ 'is-active': taskFilter === 'my' }"
+            @click="taskFilter = 'my'"
+          >
+            Của tôi ({{ myTasksList.length }})
+          </button>
+          <button
+            type="button"
+            class="task-filter-pill"
+            :class="{ 'is-active': taskFilter === 'today' }"
+            @click="taskFilter = 'today'"
+          >
+            Hôm nay ({{ todayTasksList.length }})
+          </button>
+          <button
+            type="button"
+            class="task-filter-pill"
+            :class="{ 'is-active': taskFilter === 'pending' }"
+            @click="taskFilter = 'pending'"
+          >
+            Chưa xong ({{ pendingTasksList.length }})
+          </button>
+          <button
+            type="button"
+            class="task-filter-pill"
+            :class="{ 'is-active': taskFilter === 'completed' }"
+            @click="taskFilter = 'completed'"
+          >
+            Đã xong ({{ completedTasksList.length }})
+          </button>
+        </div>
+
+        <!-- Ô NHẬP TẠO NHANH CÔNG VIỆC (QUICK TASK INPUT) -->
+        <div class="quick-task-input-box">
+          <input
+            v-model="quickTaskTitle"
+            type="text"
+            placeholder="+ Thêm công việc nhanh (Enter để lưu)..."
+            class="quick-task-input"
+            @keyup.enter="handleCreateQuickTask"
+          />
+          <button
+            v-if="quickTaskTitle.trim()"
+            type="button"
+            class="btn-submit-quick-task"
+            @click="handleCreateQuickTask"
+          >
+            Lưu
+          </button>
+        </div>
+
+        <!-- DANH SÁCH THẺ CÔNG VIỆC (TASK CARDS) -->
+        <div class="task-list-scroll">
+          <div v-if="filteredTasksList.length === 0" class="task-list-empty">
+            <span class="empty-icon">🎉</span>
+            <p>Không có công việc nào trong mục này</p>
+          </div>
+
+          <div
+            v-for="task in filteredTasksList"
+            :key="task.id"
+            class="task-card-item"
+            :class="{
+              'is-completed': task.status === 'COMPLETED' || (task.progress >= 100),
+              'is-dragging': draggingEventId === task.id
+            }"
+            :style="{ borderLeftColor: task.colorHex || '#2563eb' }"
+            draggable="true"
+            @dragstart="handleDragStart(task, $event)"
+            @dragend="handleDragEnd"
+            @click="openDetailModal(task)"
+          >
+            <div class="task-card-top-row">
+              <!-- Checkbox hoàn thành nhanh -->
+              <button
+                type="button"
+                class="task-checkbox-btn"
+                :class="{ 'is-checked': task.status === 'COMPLETED' || (task.progress >= 100) }"
+                :title="task.status === 'COMPLETED' ? 'Đánh dấu chưa hoàn thành' : 'Đánh dấu hoàn thành'"
+                @click.stop="toggleTaskStatus(task)"
+              >
+                <svg v-if="task.status === 'COMPLETED' || (task.progress >= 100)" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </button>
+
+              <div class="task-card-main-info">
+                <h4 class="task-card-title" :class="{ 'completed-strikethrough': task.status === 'COMPLETED' || (task.progress >= 100) }">
+                  {{ task.title }}
+                </h4>
+                
+                <div class="task-badges-row">
+                  <span class="task-type-badge-mini" :style="{ backgroundColor: (task.colorHex || '#2563eb') + '18', color: task.colorHex || '#2563eb' }">
+                    {{ getTypeName(task.eventType) }}
+                  </span>
+                  <span v-if="task.priority" class="task-priority-badge-mini" :class="getPriorityClass(task.priority)">
+                    {{ getPriorityName(task.priority) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- THANH TIẾN ĐỘ % & SUBTASKS -->
+            <div class="task-card-progress-section">
+              <div class="progress-labels">
+                <span class="subtask-count-text">
+                  <span v-if="task.subtasks && task.subtasks.length > 0">
+                    ☑️ {{ countCompletedSubtasks(task.subtasks) }}/{{ task.subtasks.length }} việc con
+                  </span>
+                  <span v-else>Tiến độ</span>
+                </span>
+                <span class="progress-percent-val">{{ task.progress || 0 }}%</span>
+              </div>
+              <div class="mini-progress-track">
+                <div
+                  class="mini-progress-fill"
+                  :style="{
+                    width: (task.progress || 0) + '%',
+                    backgroundColor: (task.progress >= 100 || task.status === 'COMPLETED') ? '#10b981' : (task.colorHex || '#2563eb')
+                  }"
+                ></div>
+              </div>
+            </div>
+
+            <!-- DÒNG META: PHỤ TRÁCH & DEADLINE -->
+            <div class="task-card-footer-meta">
+              <div class="task-assignee-box" :title="'Người phụ trách: ' + (task.assigneeFullName || task.assigneeUsername || 'Chưa phân công')">
+                <span class="assignee-avatar-mini">{{ getAvatarInitial(task.assigneeFullName || task.assigneeUsername) }}</span>
+                <span class="assignee-name">{{ task.assigneeFullName || (task.assigneeUsername ? '@' + task.assigneeUsername : 'Chưa phân công') }}</span>
+              </div>
+
+              <div class="task-deadline-tag" :class="{ 'is-overdue': isTaskOverdue(task) }">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+                <span>{{ formatTaskDeadline(task.endTime) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
     <!-- MODAL 1: THÊM MỚI / CHỈNH SỬA SỰ KIỆN -->
     <Teleport to="body">
       <div v-if="showEventModal" class="modal-backdrop-overlay" @click.self="showEventModal = false">
@@ -777,19 +974,123 @@
                 </div>
               </div>
 
-              <!-- Chọn màu sắc sự kiện (Color Presets) -->
+              <!-- Người phụ trách chính (Assignee) & Tiến độ % -->
+              <div class="form-row-2col">
+                <div class="form-group-field">
+                  <label class="field-label">Người phụ trách chính (Assignee)</label>
+                  <el-select
+                    v-model="form.assigneeUsername"
+                    clearable
+                    filterable
+                    placeholder="Chọn người chịu trách nhiệm"
+                    style="width: 100%"
+                  >
+                    <el-option
+                      v-for="user in colleagueOptions"
+                      :key="user.username"
+                      :label="user.fullName ? `${user.fullName} (@${user.username})` : `@${user.username}`"
+                      :value="user.username"
+                    />
+                  </el-select>
+                </div>
+
+                <div class="form-group-field">
+                  <div class="field-label-with-val">
+                    <label class="field-label">Tiến độ công việc</label>
+                    <span class="field-val-badge">{{ form.progress || 0 }}%</span>
+                  </div>
+                  <el-slider
+                    v-model="form.progress"
+                    :min="0"
+                    :max="100"
+                    :step="5"
+                    style="margin-top: 4px"
+                  />
+                </div>
+              </div>
+
+              <!-- Checklist việc con (Subtasks) -->
               <div class="form-group-field">
-                <label class="field-label">Màu sắc đánh dấu trên lịch</label>
-                <div class="color-preset-picker">
-                  <button
-                    v-for="color in colorPresets"
-                    :key="color"
-                    type="button"
-                    class="color-dot-btn"
-                    :style="{ backgroundColor: color }"
-                    :class="{ 'is-selected': form.colorHex === color }"
-                    @click="form.colorHex = color"
-                  ></button>
+                <label class="field-label">
+                  Checklist việc con (Subtasks)
+                  <span v-if="form.subtasks && form.subtasks.length > 0" class="subtask-header-counter">
+                    ({{ countCompletedSubtasks(form.subtasks) }}/{{ form.subtasks.length }} việc xong)
+                  </span>
+                </label>
+                <div class="subtask-input-row">
+                  <input
+                    v-model="subtaskDraftText"
+                    type="text"
+                    placeholder="Nhập việc con cần làm (ví dụ: Soạn thảo hợp đồng, gửi email...)"
+                    class="form-text-input subtask-text-input"
+                    @keyup.enter.prevent="addSubtaskToForm"
+                  />
+                  <button type="button" class="btn-add-subtask" @click="addSubtaskToForm">+ Thêm</button>
+                </div>
+
+                <!-- Danh sách việc con trong form -->
+                <div v-if="form.subtasks && form.subtasks.length > 0" class="form-subtasks-list">
+                  <div
+                    v-for="(st, idx) in form.subtasks"
+                    :key="st.id || idx"
+                    class="subtask-list-item"
+                  >
+                    <el-checkbox
+                      v-model="st.completed"
+                      @change="onSubtaskFormCheckChange"
+                    >
+                      <span :class="{ 'subtask-done-text': st.completed }">{{ st.title }}</span>
+                    </el-checkbox>
+                    <button type="button" class="btn-remove-subtask" title="Xóa việc con này" @click="removeSubtaskFromForm(idx)">✕</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Tùy chọn dải màu sắc sự kiện (Color Picker & Dải màu tùy chỉnh) -->
+              <div class="form-group-field">
+                <div class="field-label-with-val">
+                  <label class="field-label">Màu sắc đánh dấu trên lịch (Kéo dải màu hoặc chọn nhanh)</label>
+                  <span class="field-val-badge" :style="{ color: form.colorHex, backgroundColor: (form.colorHex || '#2563eb') + '18' }">
+                    {{ form.colorHex || '#2563eb' }}
+                  </span>
+                </div>
+
+                <div class="custom-color-picker-row">
+                  <!-- Dải màu Element Plus Color Picker (kéo gradient & dải quang phổ Hue) -->
+                  <div class="el-picker-container" title="Kéo dải màu tùy chỉnh">
+                    <el-color-picker
+                      v-model="form.colorHex"
+                      :predefine="colorPresets"
+                      size="default"
+                    />
+                  </div>
+
+                  <!-- Ô nhập mã màu HEX có chấm chỉ báo màu -->
+                  <div class="color-hex-input-wrapper" title="Nhập trực tiếp mã màu HEX">
+                    <span class="color-dot-indicator" :style="{ backgroundColor: form.colorHex || '#2563eb' }"></span>
+                    <input
+                      v-model="form.colorHex"
+                      type="text"
+                      placeholder="#2563eb"
+                      class="color-hex-text-input"
+                      maxlength="7"
+                    />
+                  </div>
+
+                  <span class="color-divider-line"></span>
+
+                  <!-- Dải màu gợi ý phổ biến (Click chọn nhanh) -->
+                  <div class="color-preset-picker" title="Bảng màu gợi ý">
+                    <button
+                      v-for="color in colorPresets"
+                      :key="color"
+                      type="button"
+                      class="color-dot-btn"
+                      :style="{ backgroundColor: color }"
+                      :class="{ 'is-selected': form.colorHex === color }"
+                      @click="form.colorHex = color"
+                    ></button>
+                  </div>
                 </div>
               </div>
 
@@ -893,6 +1194,63 @@
               </div>
             </div>
 
+            <!-- Người phụ trách chính -->
+            <div v-if="selectedEvent.assigneeUsername || selectedEvent.assigneeFullName" class="detail-info-row">
+              <span class="detail-row-icon">🎯</span>
+              <div class="detail-row-content">
+                <strong>Người phụ trách chính:</strong>
+                <div class="assignee-detail-badge">
+                  <span class="assignee-avatar-mini">{{ getAvatarInitial(selectedEvent.assigneeFullName || selectedEvent.assigneeUsername) }}</span>
+                  <span>{{ selectedEvent.assigneeFullName || ('@' + selectedEvent.assigneeUsername) }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tiến độ công việc -->
+            <div class="detail-info-row">
+              <span class="detail-row-icon">📊</span>
+              <div class="detail-row-content" style="width: 100%">
+                <div class="detail-progress-header">
+                  <strong>Tiến độ hoàn thành:</strong>
+                  <span class="progress-val-text">{{ selectedEvent.progress || 0 }}%</span>
+                </div>
+                <div class="detail-progress-track">
+                  <div
+                    class="detail-progress-fill"
+                    :style="{
+                      width: (selectedEvent.progress || 0) + '%',
+                      backgroundColor: (selectedEvent.progress >= 100 || selectedEvent.status === 'COMPLETED') ? '#10b981' : (selectedEvent.colorHex || '#2563eb')
+                    }"
+                  ></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Checklist việc con tương tác trực tiếp (Subtasks in Detail) -->
+            <div v-if="selectedEvent.subtasks && selectedEvent.subtasks.length > 0" class="detail-subtasks-box">
+              <div class="detail-subtasks-title">
+                <strong>Checklist công việc con:</strong>
+                <span class="subtask-ratio">({{ countCompletedSubtasks(selectedEvent.subtasks) }}/{{ selectedEvent.subtasks.length }} hoàn thành)</span>
+              </div>
+              <div class="detail-subtasks-checklist">
+                <div
+                  v-for="(st, idx) in selectedEvent.subtasks"
+                  :key="st.id || idx"
+                  class="detail-subtask-item"
+                >
+                  <label class="subtask-checkbox-label">
+                    <input
+                      type="checkbox"
+                      :checked="st.completed"
+                      class="subtask-real-check"
+                      @change="handleToggleSubtaskInDetail(idx)"
+                    />
+                    <span :class="{ 'subtask-done-text': st.completed }">{{ st.title }}</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
             <!-- Mô tả chi tiết -->
             <div v-if="selectedEvent.description" class="detail-desc-box">
               <strong>Nội dung cuộc họp:</strong>
@@ -912,6 +1270,16 @@
               </button>
             </div>
             <div class="detail-footer-right">
+              <!-- Nút Hoàn thành nhanh / Mở lại công việc -->
+              <button
+                type="button"
+                class="btn-detail-toggle-status"
+                :class="{ 'is-completed': selectedEvent.status === 'COMPLETED' || selectedEvent.progress >= 100 }"
+                @click="handleToggleStatusInDetail"
+              >
+                {{ (selectedEvent.status === 'COMPLETED' || selectedEvent.progress >= 100) ? '↩️ Mở lại công việc' : '✅ Đánh dấu hoàn thành' }}
+              </button>
+
               <button
                 v-if="canModifyEvent(selectedEvent)"
                 type="button"
@@ -962,6 +1330,12 @@ const stats = ref({
 })
 const colleagueOptions = ref([])
 
+// State Bảng Công việc (Task Board Sidebar)
+const isTaskBoardOpen = ref(true)
+const taskFilter = ref('all') // 'all' | 'my' | 'today' | 'pending' | 'completed'
+const quickTaskTitle = ref('')
+const subtaskDraftText = ref('')
+
 // State Modal Thêm / Sửa
 const showEventModal = ref(false)
 const isEditing = ref(false)
@@ -984,6 +1358,9 @@ const form = ref({
   department: 'Toàn công ty',
   attendees: [],
   reminderMinutesBefore: 15,
+  progress: 0,
+  assigneeUsername: '',
+  subtasks: [],
   isPublic: true
 })
 
@@ -1001,6 +1378,17 @@ const draggingEventId = ref(null)
 const dragOverDateKey = ref(null)
 
 const hoursOfDay = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+
+// Helper chuyển Date sang chuỗi khóa 'YYYY-MM-DD'
+const toDateKey = (date) => {
+  if (!date) return ''
+  const d = date instanceof Date ? date : new Date(date)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+const formatDateKey = toDateKey
 
 // =========================================================================
 //                           COMPUTED PROPERTIES
@@ -1053,6 +1441,92 @@ const rangeDisplaySummary = computed(() => {
   }
   return `${formatShort(startD)} → ${formatShort(endD)} (${diffDays} ngày)`
 })
+
+// =========================================================================
+//                   COMPUTED CHO BẢNG CÔNG VIỆC & TIẾN ĐỘ
+// =========================================================================
+const allTasksList = computed(() => {
+  return eventsList.value || []
+})
+
+const myTasksList = computed(() => {
+  const currentUsername = authStore.user?.username || ''
+  return allTasksList.value.filter(e => {
+    return (e.assigneeUsername && e.assigneeUsername.toLowerCase() === currentUsername.toLowerCase()) ||
+           (e.creatorUsername && e.creatorUsername.toLowerCase() === currentUsername.toLowerCase()) ||
+           (Array.isArray(e.attendees) && e.attendees.map(a => a.toLowerCase()).includes(currentUsername.toLowerCase()))
+  })
+})
+
+const todayTasksList = computed(() => {
+  const todayStr = formatDateKey(new Date())
+  return allTasksList.value.filter(e => {
+    const startStr = e.startTime ? e.startTime.substring(0, 10) : ''
+    const endStr = e.endTime ? e.endTime.substring(0, 10) : ''
+    return startStr === todayStr || endStr === todayStr
+  })
+})
+
+const pendingTasksList = computed(() => {
+  return allTasksList.value.filter(e => e.status !== 'COMPLETED' && (!e.progress || e.progress < 100))
+})
+
+const completedTasksList = computed(() => {
+  return allTasksList.value.filter(e => e.status === 'COMPLETED' || (e.progress && e.progress >= 100))
+})
+
+const completedTasksCount = computed(() => completedTasksList.value.length)
+
+const taskCompletionRate = computed(() => {
+  if (allTasksList.value.length === 0) return 0
+  return Math.round((completedTasksCount.value / allTasksList.value.length) * 100)
+})
+
+const filteredTasksList = computed(() => {
+  let list = []
+  if (taskFilter.value === 'my') {
+    list = myTasksList.value
+  } else if (taskFilter.value === 'today') {
+    list = todayTasksList.value
+  } else if (taskFilter.value === 'pending') {
+    list = pendingTasksList.value
+  } else if (taskFilter.value === 'completed') {
+    list = completedTasksList.value
+  } else {
+    list = allTasksList.value
+  }
+
+  // Sắp xếp: việc chưa xong lên trước, theo deadline gần nhất
+  return [...list].sort((a, b) => {
+    const aDone = a.status === 'COMPLETED' || (a.progress >= 100)
+    const bDone = b.status === 'COMPLETED' || (b.progress >= 100)
+    if (aDone !== bDone) return aDone ? 1 : -1
+    return new Date(a.endTime || a.startTime) - new Date(b.endTime || b.startTime)
+  })
+})
+
+const countCompletedSubtasks = (subtasks) => {
+  if (!Array.isArray(subtasks)) return 0
+  return subtasks.filter(s => s && (s.completed === true || s.completed === 'true')).length
+}
+
+const getAvatarInitial = (name) => {
+  if (!name) return '?'
+  return name.trim().charAt(0).toUpperCase()
+}
+
+const isTaskOverdue = (task) => {
+  if (!task || task.status === 'COMPLETED' || (task.progress && task.progress >= 100)) return false
+  if (!task.endTime) return false
+  return new Date(task.endTime) < new Date()
+}
+
+const formatTaskDeadline = (dateStr) => {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}, ${pad(d.getDate())}/${pad(d.getMonth() + 1)}`
+}
 
 const isCellInRange = (dateKey) => {
   if (!isSelectingRange.value || !rangeStartDateKey.value || !rangeHoverDateKey.value) return false
@@ -1576,6 +2050,7 @@ const openDayAgenda = (cell) => {
 const openCreateModal = (targetDate = null, targetHour = null) => {
   isEditing.value = false
   editingEventId.value = null
+  subtaskDraftText.value = ''
 
   const d = targetDate ? new Date(targetDate) : new Date()
   const hour = targetHour !== null ? targetHour : 9
@@ -1599,6 +2074,9 @@ const openCreateModal = (targetDate = null, targetHour = null) => {
     department: 'Toàn công ty',
     attendees: [],
     reminderMinutesBefore: 15,
+    progress: 0,
+    assigneeUsername: '',
+    subtasks: [],
     isPublic: true
   }
 
@@ -1608,6 +2086,7 @@ const openCreateModal = (targetDate = null, targetHour = null) => {
 const openCreateModalWithRange = (startDateKey, endDateKey) => {
   isEditing.value = false
   editingEventId.value = null
+  subtaskDraftText.value = ''
 
   const startD = new Date(startDateKey)
   startD.setHours(9, 0, 0, 0)
@@ -1636,6 +2115,9 @@ const openCreateModalWithRange = (startDateKey, endDateKey) => {
     department: 'Toàn công ty',
     attendees: [],
     reminderMinutesBefore: 15,
+    progress: 0,
+    assigneeUsername: '',
+    subtasks: [],
     isPublic: true
   }
 
@@ -1646,6 +2128,7 @@ const editEvent = (evt) => {
   showDetailModal.value = false
   isEditing.value = true
   editingEventId.value = evt.id
+  subtaskDraftText.value = ''
 
   form.value = {
     title: evt.title || '',
@@ -1662,6 +2145,9 @@ const editEvent = (evt) => {
     department: evt.department || 'Toàn công ty',
     attendees: Array.isArray(evt.attendees) ? [...evt.attendees] : [],
     reminderMinutesBefore: evt.reminderMinutesBefore || 15,
+    progress: evt.progress !== undefined ? evt.progress : 0,
+    assigneeUsername: evt.assigneeUsername || '',
+    subtasks: Array.isArray(evt.subtasks) ? JSON.parse(JSON.stringify(evt.subtasks)) : [],
     isPublic: evt.isPublic !== undefined ? evt.isPublic : true
   }
 
@@ -1747,6 +2233,128 @@ const handleTypeChange = (type) => {
   }
 }
 
+// =========================================================================
+//            ACTION METHODS CHO BẢNG CÔNG VIỆC & SUBTASKS
+// =========================================================================
+
+// Đổi trạng thái hoàn thành nhanh (PATCH /toggle-status)
+const toggleTaskStatus = async (task) => {
+  try {
+    const res = await api.patch(`/calendar/events/${task.id}/toggle-status`)
+    const updated = res.data
+    const idx = eventsList.value.findIndex(e => e.id === task.id)
+    if (idx !== -1) {
+      eventsList.value[idx] = updated
+    }
+    if (selectedEvent.value && selectedEvent.value.id === task.id) {
+      selectedEvent.value = updated
+    }
+    if (updated.status === 'COMPLETED' || (updated.progress && updated.progress >= 100)) {
+      ElMessage.success(`🎉 Đã hoàn thành công việc "${updated.title}"!`)
+    } else {
+      ElMessage.info(`Đã mở lại công việc "${updated.title}"`)
+    }
+    fetchStats()
+  } catch (err) {
+    console.error('Lỗi đổi trạng thái công việc:', err)
+    ElMessage.error('Không thể cập nhật trạng thái công việc!')
+  }
+}
+
+// Tạo công việc nhanh (Quick Task Input)
+const handleCreateQuickTask = async () => {
+  const title = quickTaskTitle.value.trim()
+  if (!title) return
+
+  const now = new Date()
+  const end = new Date(now)
+  end.setHours(17, 30, 0, 0)
+  if (end <= now) {
+    end.setDate(end.getDate() + 1)
+  }
+
+  try {
+    const payload = {
+      title,
+      description: 'Công việc tạo nhanh từ Bảng nhiệm vụ',
+      startTime: formatToIsoString(now),
+      endTime: formatToIsoString(end),
+      isAllDay: false,
+      eventType: 'TASK',
+      priority: 'MEDIUM',
+      status: 'SCHEDULED',
+      colorHex: '#f59e0b',
+      progress: 0,
+      department: 'Toàn công ty',
+      attendees: [],
+      subtasks: []
+    }
+    await api.post('/calendar/events', payload)
+    ElMessage.success(`Đã thêm nhanh công việc: "${title}"`)
+    quickTaskTitle.value = ''
+    await fetchEvents()
+    fetchStats()
+  } catch (err) {
+    console.error('Lỗi tạo nhanh công việc:', err)
+    ElMessage.error('Không thể tạo nhanh công việc!')
+  }
+}
+
+// Quản lý Subtasks trong Modal Thêm / Sửa
+const addSubtaskToForm = () => {
+  const text = subtaskDraftText.value.trim()
+  if (!text) return
+  if (!Array.isArray(form.value.subtasks)) {
+    form.value.subtasks = []
+  }
+  form.value.subtasks.push({
+    id: Date.now(),
+    title: text,
+    completed: false
+  })
+  subtaskDraftText.value = ''
+  onSubtaskFormCheckChange()
+}
+
+const removeSubtaskFromForm = (idx) => {
+  if (Array.isArray(form.value.subtasks)) {
+    form.value.subtasks.splice(idx, 1)
+    onSubtaskFormCheckChange()
+  }
+}
+
+const onSubtaskFormCheckChange = () => {
+  if (!form.value.subtasks || form.value.subtasks.length === 0) return
+  const done = countCompletedSubtasks(form.value.subtasks)
+  form.value.progress = Math.round((done / form.value.subtasks.length) * 100)
+}
+
+// Toggle Subtasks trong Detail Modal
+const handleToggleSubtaskInDetail = async (idx) => {
+  if (!selectedEvent.value || !Array.isArray(selectedEvent.value.subtasks)) return
+  const subtasks = JSON.parse(JSON.stringify(selectedEvent.value.subtasks))
+  subtasks[idx].completed = !subtasks[idx].completed
+
+  try {
+    const res = await api.patch(`/calendar/events/${selectedEvent.value.id}/subtasks`, { subtasks })
+    const updated = res.data
+    selectedEvent.value = updated
+    const listIdx = eventsList.value.findIndex(e => e.id === updated.id)
+    if (listIdx !== -1) {
+      eventsList.value[listIdx] = updated
+    }
+    fetchStats()
+  } catch (err) {
+    console.error('Lỗi cập nhật subtasks:', err)
+    ElMessage.error('Không thể cập nhật danh sách việc con!')
+  }
+}
+
+const handleToggleStatusInDetail = async () => {
+  if (!selectedEvent.value) return
+  await toggleTaskStatus(selectedEvent.value)
+}
+
 const canModifyEvent = (evt) => {
   if (!evt) return false
   if (authStore.user?.role === 'ADMIN') return true
@@ -1756,13 +2364,6 @@ const canModifyEvent = (evt) => {
 // =========================================================================
 //                         UTILITY FUNCTIONS
 // =========================================================================
-
-const toDateKey = (date) => {
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
-}
 
 const getStartOfWeek = (date) => {
   const d = new Date(date)
@@ -1955,6 +2556,54 @@ onBeforeUnmount(() => {
   font-size: 12px;
   color: #64748b;
   margin: 1px 0 0 0;
+}
+
+.header-right-col {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-toggle-task-board {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f1f5f9;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 6.5px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-toggle-task-board:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.btn-toggle-task-board.is-active {
+  background: #eff6ff;
+  color: #2563eb;
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+}
+
+.task-badge-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 10.5px;
+  font-weight: 700;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  line-height: 1;
 }
 
 .btn-create-event {
@@ -3301,7 +3950,7 @@ onBeforeUnmount(() => {
   inset: 0;
   background: rgba(15, 23, 42, 0.55);
   backdrop-filter: blur(4px);
-  z-index: 9999;
+  z-index: 1050;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3457,6 +4106,62 @@ onBeforeUnmount(() => {
 .form-textarea-input:focus {
   border-color: #2563eb;
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+.custom-color-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 4px 0;
+}
+
+.el-picker-container {
+  display: flex;
+  align-items: center;
+}
+
+.color-hex-input-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 4px 8px;
+  transition: all 0.15s ease;
+}
+
+.color-hex-input-wrapper:focus-within {
+  border-color: #2563eb;
+  background: #ffffff;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+.color-dot-indicator {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  flex-shrink: 0;
+}
+
+.color-hex-text-input {
+  border: none;
+  background: transparent;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: monospace;
+  color: #1e293b;
+  width: 68px;
+  outline: none;
+  text-transform: uppercase;
+}
+
+.color-divider-line {
+  width: 1px;
+  height: 24px;
+  background: #e2e8f0;
 }
 
 .color-preset-picker {
@@ -3687,6 +4392,637 @@ onBeforeUnmount(() => {
 
 .btn-detail-join:hover {
   background: #1d4ed8;
+}
+
+/* =========================================================================
+   WORKSPACE LAYOUT & TASK BOARD PANEL (BUỔI 3)
+   ========================================================================= */
+.calendar-workspace-layout {
+  display: block;
+  width: 100%;
+}
+
+.calendar-workspace-layout.with-task-board {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 12px;
+  align-items: start;
+}
+
+.task-board-panel {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: calc(100vh - 120px);
+  position: sticky;
+  top: 10px;
+  overflow: hidden;
+}
+
+.task-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.panel-header-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panel-header-icon {
+  font-size: 18px;
+}
+
+.panel-titles {
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-main-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.panel-sub-title {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 1px;
+}
+
+.btn-panel-close {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 15px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  border-radius: 4px;
+}
+
+.btn-panel-close:hover {
+  color: #ef4444;
+  background: #fee2e2;
+}
+
+/* Task KPI Bar */
+.task-kpi-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.kpi-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11.5px;
+}
+
+.kpi-label {
+  font-weight: 600;
+  color: #475569;
+}
+
+.kpi-rate {
+  font-weight: 700;
+  color: #2563eb;
+}
+
+.kpi-progress-track {
+  width: 100%;
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.kpi-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #10b981);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+/* Filter pills */
+.task-filter-pills {
+  display: flex;
+  gap: 5px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.task-filter-pill {
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #64748b;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.task-filter-pill:hover {
+  background: #f8fafc;
+  color: #1e293b;
+}
+
+.task-filter-pill.is-active {
+  background: #eff6ff;
+  color: #2563eb;
+  border-color: #bfdbfe;
+}
+
+/* Quick input */
+.quick-task-input-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  padding: 4px 8px;
+  transition: all 0.2s ease;
+}
+
+.quick-task-input-box:focus-within {
+  border-color: #3b82f6;
+  background: #ffffff;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.quick-task-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 12.5px;
+  color: #1e293b;
+  outline: none;
+  padding: 4px 0;
+}
+
+.quick-task-input::placeholder {
+  color: #94a3b8;
+}
+
+.btn-submit-quick-task {
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Task list scroll */
+.task-list-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  max-height: calc(100vh - 350px);
+  padding-right: 2px;
+}
+
+.task-list-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px 10px;
+  color: #94a3b8;
+  font-size: 12px;
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 24px;
+  margin-bottom: 6px;
+}
+
+/* Task card item */
+.task-card-item {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-left-width: 4px;
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: grab;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.task-card-item:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.06);
+  transform: translateY(-1px);
+}
+
+.task-card-item.is-completed {
+  background: #f8fafc;
+  opacity: 0.75;
+}
+
+.task-card-item.is-dragging {
+  opacity: 0.4;
+  transform: scale(0.97);
+}
+
+.task-card-top-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.task-checkbox-btn {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1.5px solid #cbd5e1;
+  background: #ffffff;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-top: 2px;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.task-checkbox-btn:hover {
+  border-color: #2563eb;
+}
+
+.task-checkbox-btn.is-checked {
+  background: #10b981;
+  border-color: #10b981;
+}
+
+.task-card-main-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.task-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 4px 0;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.task-card-title.completed-strikethrough {
+  text-decoration: line-through;
+  color: #94a3b8;
+}
+
+.task-badges-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.task-type-badge-mini {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1.5px 6px;
+  border-radius: 4px;
+}
+
+.task-priority-badge-mini {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1.5px 6px;
+  border-radius: 4px;
+}
+
+/* Progress bar inside card */
+.task-card-progress-section {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.progress-labels {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10.5px;
+  color: #64748b;
+}
+
+.subtask-count-text {
+  font-weight: 500;
+}
+
+.progress-percent-val {
+  font-weight: 700;
+}
+
+.mini-progress-track {
+  width: 100%;
+  height: 4px;
+  background: #f1f5f9;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.mini-progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.25s ease;
+}
+
+/* Card footer */
+.task-card-footer-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #64748b;
+  border-top: 1px solid #f8fafc;
+  padding-top: 6px;
+}
+
+.task-assignee-box {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 150px;
+}
+
+.assignee-avatar-mini {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #e0e7ff;
+  color: #4338ca;
+  font-size: 9.5px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.assignee-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.task-deadline-tag {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  color: #64748b;
+}
+
+.task-deadline-tag.is-overdue {
+  color: #ef4444;
+  font-weight: 600;
+}
+
+/* FORM SUBTASKS & ASSIGNEE */
+.field-label-with-val {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.field-val-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #2563eb;
+  background: #eff6ff;
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+
+.subtask-header-counter {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #10b981;
+  margin-left: 6px;
+}
+
+.subtask-input-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.subtask-text-input {
+  flex: 1;
+}
+
+.btn-add-subtask {
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 0 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.btn-add-subtask:hover {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.form-subtasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.subtask-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: #ffffff;
+  border: 1px solid #f1f5f9;
+}
+
+.subtask-done-text {
+  text-decoration: line-through;
+  color: #94a3b8;
+}
+
+.btn-remove-subtask {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 4px;
+  line-height: 1;
+  border-radius: 4px;
+}
+
+.btn-remove-subtask:hover {
+  color: #ef4444;
+  background: #fee2e2;
+}
+
+/* DETAIL MODAL SUBTASKS & STATUS BUTTON */
+.assignee-detail-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f1f5f9;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #334155;
+  margin-top: 2px;
+}
+
+.detail-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.progress-val-text {
+  font-weight: 700;
+  color: #2563eb;
+}
+
+.detail-progress-track {
+  width: 100%;
+  height: 8px;
+  background: #f1f5f9;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.detail-progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.detail-subtasks-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.detail-subtasks-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.subtask-ratio {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #10b981;
+}
+
+.detail-subtasks-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detail-subtask-item {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+
+.subtask-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: #1e293b;
+  cursor: pointer;
+  margin: 0;
+}
+
+.subtask-real-check {
+  width: 16px;
+  height: 16px;
+  accent-color: #10b981;
+  cursor: pointer;
+}
+
+.btn-detail-toggle-status {
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  transition: all 0.15s ease;
+}
+
+.btn-detail-toggle-status:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.btn-detail-toggle-status.is-completed {
+  background: #f0fdf4;
+  color: #15803d;
+  border-color: #bbf7d0;
 }
 
 /* =========================================================================

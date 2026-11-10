@@ -340,6 +340,11 @@
                   <span>Thông tin tài khoản</span>
                 </el-dropdown-item>
 
+                <el-dropdown-item v-if="authStore.isAdmin" command="jobs">
+                  <el-icon><Timer /></el-icon>
+                  <span>Tác vụ tự động (Cron Jobs)</span>
+                </el-dropdown-item>
+
                 <el-dropdown-item command="logout" class="dropdown-item-danger">
                   <el-icon><SwitchButton /></el-icon>
                   <span>Đăng xuất</span>
@@ -491,7 +496,8 @@ import {
   Setting,
   Cpu,
   ChatDotRound,
-  Calendar
+  Calendar,
+  Timer
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -539,6 +545,7 @@ const currentRouteTitle = computed(() => {
   if (route.path.startsWith('/products')) return 'Quản lý Sản phẩm'
   if (route.path.startsWith('/users')) return 'Quản lý Tài khoản'
   if (route.path.startsWith('/announcements')) return 'Quản lý Thông báo'
+  if (route.path.startsWith('/jobs')) return 'Tác vụ tự động & Cron Jobs'
   return 'Hệ thống ERP'
 })
 
@@ -547,6 +554,7 @@ const currentRouteBreadcrumb = computed(() => {
   if (route.path.startsWith('/products')) return 'Kho hàng & Sản phẩm'
   if (route.path.startsWith('/users')) return 'Danh sách nhân sự'
   if (route.path.startsWith('/announcements')) return 'Cài đặt truyền thông'
+  if (route.path.startsWith('/jobs')) return 'Lập lịch hệ thống'
   return 'Trang chính'
 })
 
@@ -653,6 +661,8 @@ function handleUserMenuCommand(command) {
     profileForm.bio = authStore.user?.bio || ''
     profileForm.avatarUrl = authStore.user?.avatarUrl || ''
     profileDialogVisible.value = true
+  } else if (command === 'jobs') {
+    router.push('/jobs')
   }
 }
 

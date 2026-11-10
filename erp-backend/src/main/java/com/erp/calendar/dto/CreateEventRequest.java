@@ -46,6 +46,12 @@ public class CreateEventRequest {
 
     private Integer reminderMinutesBefore = 15;
 
+    private Integer progress = 0; // Tiến độ công việc (0 - 100%)
+
+    private String assigneeUsername; // Người phụ trách chính
+
+    private List<java.util.Map<String, Object>> subtasks; // Danh sách việc con (Checklist)
+
     private Boolean isPublic = true;
 }
 

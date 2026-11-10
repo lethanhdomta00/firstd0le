@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 @Data
 @Builder
@@ -37,11 +38,16 @@ public class CalendarEventDto {
     private String attendeesJson;
     private List<String> attendees;
     private Integer reminderMinutesBefore;
+    private Integer progress;
+    private String assigneeUsername;
+    private String assigneeFullName;
+    private String subtasksJson;
+    private List<Map<String, Object>> subtasks;
     private Boolean isPublic;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    public static CalendarEventDto fromEntity(CalendarEvent entity, List<String> attendeeList) {
+    public static CalendarEventDto fromEntity(CalendarEvent entity, List<String> attendeeList, List<Map<String, Object>> subtaskList) {
         if (entity == null) return null;
         return CalendarEventDto.builder()
                 .id(entity.getId())
@@ -62,10 +68,19 @@ public class CalendarEventDto {
                 .attendeesJson(entity.getAttendeesJson())
                 .attendees(attendeeList != null ? attendeeList : Collections.emptyList())
                 .reminderMinutesBefore(entity.getReminderMinutesBefore())
+                .progress(entity.getProgress() != null ? entity.getProgress() : 0)
+                .assigneeUsername(entity.getAssigneeUsername())
+                .assigneeFullName(entity.getAssigneeFullName())
+                .subtasksJson(entity.getSubtasksJson())
+                .subtasks(subtaskList != null ? subtaskList : Collections.emptyList())
                 .isPublic(entity.getIsPublic())
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
                 .build();
+    }
+
+    public static CalendarEventDto fromEntity(CalendarEvent entity, List<String> attendeeList) {
+        return fromEntity(entity, attendeeList, Collections.emptyList());
     }
 }
 

@@ -83,6 +83,19 @@ public class CalendarEvent {
     @Builder.Default
     private Integer reminderMinutesBefore = 15;
 
+    @Column(name = "progress")
+    @Builder.Default
+    private Integer progress = 0; // Tiến độ công việc (0 - 100%)
+
+    @Column(name = "assignee_username", length = 50)
+    private String assigneeUsername; // Người phụ trách chính
+
+    @Column(name = "assignee_full_name", length = 100)
+    private String assigneeFullName;
+
+    @Column(name = "subtasks_json", columnDefinition = "TEXT")
+    private String subtasksJson; // Danh sách công việc con (Checklist JSON)
+
     @Column(name = "is_public", nullable = false)
     @Builder.Default
     private Boolean isPublic = true;
@@ -103,6 +116,7 @@ public class CalendarEvent {
         if (this.priority == null) this.priority = EventPriority.MEDIUM;
         if (this.status == null) this.status = EventStatus.SCHEDULED;
         if (this.colorHex == null || this.colorHex.trim().isEmpty()) this.colorHex = "#2563eb";
+        if (this.progress == null) this.progress = 0;
         if (this.isPublic == null) this.isPublic = true;
     }
 

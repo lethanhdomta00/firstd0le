@@ -3,7 +3,10 @@ package com.erp.calendar.controller;
 import com.erp.calendar.dto.CalendarEventDto;
 import com.erp.calendar.dto.CalendarStatsDto;
 import com.erp.calendar.dto.CreateEventRequest;
+import com.erp.calendar.dto.RescheduleEventRequest;
 import com.erp.calendar.dto.UpdateEventRequest;
+import com.erp.calendar.dto.UpdateProgressRequest;
+import com.erp.calendar.dto.UpdateSubtasksRequest;
 import com.erp.calendar.model.EventType;
 import com.erp.calendar.service.CalendarEventService;
 import jakarta.validation.Valid;
@@ -94,6 +97,61 @@ public class CalendarController {
                 "message", "Đã xóa sự kiện thành công!",
                 "deletedId", id
         ));
+    }
+
+    /**
+     * Chuyển đổi trạng thái hoàn thành nhanh (Toggle Completed)
+     */
+    @PatchMapping("/events/{id}/toggle-status")
+    public ResponseEntity<CalendarEventDto> toggleStatus(
+            @PathVariable Long id,
+            Authentication authentication
+    ) {
+        String currentUsername = authentication.getName();
+        CalendarEventDto updated = calendarEventService.toggleEventStatus(id, currentUsername);
+        return ResponseEntity.ok(updated);
+    }
+
+    /**
+     * Cập nhật tiến độ % của sự kiện / công việc
+     */
+    @PatchMapping("/events/{id}/progress")
+    public ResponseEntity<CalendarEventDto> updateProgress(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateProgressRequest request,
+            Authentication authentication
+    ) {
+        String currentUsername = authentication.getName();
+        CalendarEventDto updated = calendarEventService.updateProgress(id, request.getProgress(), currentUsername);
+        return ResponseEntity.ok(updated);
+    }
+
+    /**
+     * Cập nhật danh sách công việc con (Subtasks Checklist)
+     */
+    @PatchMapping("/events/{id}/subtasks")
+    public ResponseEntity<CalendarEventDto> updateSubtasks(
+            @PathVariable Long id,
+            @RequestBody UpdateSubtasksRequest request,
+            Authentication authentication
+    ) {
+        String currentUsername = authentication.getName();
+        CalendarEventDto updated = calendarEventService.updateSubtasks(id, request.getSubtasks(), currentUsername);
+        return ResponseEntity.ok(updated);
+    }
+
+    /**
+     * Dời ngày sự kiện (Drag & Drop Reschedule)
+     */
+    @PatchMapping("/events/{id}/reschedule")
+    public ResponseEntity<CalendarEventDto> rescheduleEvent(
+            @PathVariable Long id,
+            @Valid @RequestBody RescheduleEventRequest request,
+            Authentication authentication
+    ) {
+        String currentUsername = authentication.getName();
+        CalendarEventDto updated = calendarEventService.rescheduleEvent(id, request.getStartTime(), request.getEndTime(), currentUsername);
+        return ResponseEntity.ok(updated);
     }
 
     /**

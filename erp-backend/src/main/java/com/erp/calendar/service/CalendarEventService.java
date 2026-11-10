@@ -190,11 +190,24 @@ public class CalendarEventService {
         String creatorName = creator != null && creator.getFullName() != null ? creator.getFullName() : currentUsername;
 
         String attendeesJson = serializeAttendees(req.getAttendees());
+        String subtasksJson = serializeSubtasks(req.getSubtasks());
+
+        String assigneeFullName = null;
+        if (req.getAssigneeUsername() != null && !req.getAssigneeUsername().trim().isEmpty()) {
+            User assignee = userRepository.findByUsername(req.getAssigneeUsername().trim()).orElse(null);
+            assigneeFullName = assignee != null && assignee.getFullName() != null ? assignee.getFullName() : req.getAssigneeUsername();
+        }
 
         // Tự động gán màu sắc mặc định theo loại sự kiện nếu người dùng không chọn
         String color = req.getColorHex();
         if (color == null || color.trim().isEmpty()) {
             color = getDefaultColorForType(req.getEventType());
+        }
+
+        Integer initialProgress = req.getProgress() != null ? req.getProgress() : 0;
+        EventStatus initialStatus = req.getStatus() != null ? req.getStatus() : EventStatus.SCHEDULED;
+        if (initialProgress >= 100) {
+            initialStatus = EventStatus.COMPLETED;
         }
 
         CalendarEvent event = CalendarEvent.builder()
@@ -207,13 +220,17 @@ public class CalendarEventService {
                 .meetingUrl(req.getMeetingUrl())
                 .eventType(req.getEventType() != null ? req.getEventType() : EventType.MEETING)
                 .priority(req.getPriority() != null ? req.getPriority() : EventPriority.MEDIUM)
-                .status(req.getStatus() != null ? req.getStatus() : EventStatus.SCHEDULED)
+                .status(initialStatus)
                 .colorHex(color)
                 .creatorUsername(currentUsername)
                 .creatorFullName(creatorName)
                 .department(req.getDepartment() != null ? req.getDepartment() : "Chung")
                 .attendeesJson(attendeesJson)
                 .reminderMinutesBefore(req.getReminderMinutesBefore() != null ? req.getReminderMinutesBefore() : 15)
+                .progress(initialProgress)
+                .assigneeUsername(req.getAssigneeUsername())
+                .assigneeFullName(assigneeFullName)
+                .subtasksJson(subtasksJson)
                 .isPublic(req.getIsPublic() != null ? req.getIsPublic() : true)
                 .build();
 
@@ -252,6 +269,29 @@ public class CalendarEventService {
         if (req.getAttendees() != null) event.setAttendeesJson(serializeAttendees(req.getAttendees()));
         if (req.getReminderMinutesBefore() != null) event.setReminderMinutesBefore(req.getReminderMinutesBefore());
         if (req.getIsPublic() != null) event.setIsPublic(req.getIsPublic());
+
+        if (req.getAssigneeUsername() != null) {
+            event.setAssigneeUsername(req.getAssigneeUsername());
+            if (!req.getAssigneeUsername().trim().isEmpty()) {
+                User assignee = userRepository.findByUsername(req.getAssigneeUsername().trim()).orElse(null);
+                event.setAssigneeFullName(assignee != null && assignee.getFullName() != null ? assignee.getFullName() : req.getAssigneeUsername());
+            } else {
+                event.setAssigneeFullName(null);
+            }
+        }
+
+        if (req.getProgress() != null) {
+            event.setProgress(req.getProgress());
+            if (req.getProgress() >= 100) {
+                event.setStatus(EventStatus.COMPLETED);
+            } else if (event.getStatus() == EventStatus.COMPLETED) {
+                event.setStatus(EventStatus.IN_PROGRESS);
+            }
+        }
+
+        if (req.getSubtasks() != null) {
+            event.setSubtasksJson(serializeSubtasks(req.getSubtasks()));
+        }
 
         CalendarEvent updated = eventRepository.save(event);
         log.info("Người dùng [{}] đã cập nhật sự kiện [{}] (ID: {})", currentUsername, updated.getTitle(), updated.getId());
@@ -310,6 +350,100 @@ public class CalendarEventService {
                 .build();
     }
 
+    /**
+     * Chuyển đổi trạng thái hoàn thành nhanh (Toggle Status)
+     */
+    @Transactional
+    public CalendarEventDto toggleEventStatus(Long id, String currentUsername) {
+        CalendarEvent event = eventRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy sự kiện với ID: " + id));
+
+        if (event.getStatus() == EventStatus.COMPLETED) {
+            event.setStatus(EventStatus.IN_PROGRESS);
+            event.setProgress(0);
+        } else {
+            event.setStatus(EventStatus.COMPLETED);
+            event.setProgress(100);
+        }
+
+        CalendarEvent updated = eventRepository.save(event);
+        log.info("Người dùng [{}] đã toggle trạng thái sự kiện [{}] sang {}", currentUsername, event.getTitle(), event.getStatus());
+        return toDto(updated);
+    }
+
+    /**
+     * Cập nhật tiến độ % công việc
+     */
+    @Transactional
+    public CalendarEventDto updateProgress(Long id, Integer progress, String currentUsername) {
+        CalendarEvent event = eventRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy sự kiện với ID: " + id));
+
+        int p = Math.max(0, Math.min(100, progress != null ? progress : 0));
+        event.setProgress(p);
+
+        if (p >= 100) {
+            event.setStatus(EventStatus.COMPLETED);
+        } else if (event.getStatus() == EventStatus.COMPLETED) {
+            event.setStatus(EventStatus.IN_PROGRESS);
+        }
+
+        CalendarEvent updated = eventRepository.save(event);
+        log.info("Người dùng [{}] đã cập nhật tiến độ sự kiện [{}] thành {}%", currentUsername, event.getTitle(), p);
+        return toDto(updated);
+    }
+
+    /**
+     * Cập nhật danh sách công việc con (Subtasks) và tự động tính lại % tiến độ
+     */
+    @Transactional
+    public CalendarEventDto updateSubtasks(Long id, List<Map<String, Object>> subtasks, String currentUsername) {
+        CalendarEvent event = eventRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy sự kiện với ID: " + id));
+
+        event.setSubtasksJson(serializeSubtasks(subtasks));
+
+        if (subtasks != null && !subtasks.isEmpty()) {
+            long completedCount = subtasks.stream()
+                    .filter(s -> Boolean.TRUE.equals(s.get("completed")) || "true".equalsIgnoreCase(String.valueOf(s.get("completed"))))
+                    .count();
+            int calcProgress = (int) Math.round(((double) completedCount / subtasks.size()) * 100);
+            event.setProgress(calcProgress);
+
+            if (calcProgress >= 100) {
+                event.setStatus(EventStatus.COMPLETED);
+            } else if (event.getStatus() == EventStatus.COMPLETED) {
+                event.setStatus(EventStatus.IN_PROGRESS);
+            }
+        }
+
+        CalendarEvent updated = eventRepository.save(event);
+        log.info("Người dùng [{}] đã cập nhật subtasks sự kiện [{}] ({} việc con)", currentUsername, event.getTitle(), subtasks != null ? subtasks.size() : 0);
+        return toDto(updated);
+    }
+
+    /**
+     * Dời ngày sự kiện (Drag & Drop Reschedule)
+     */
+    @Transactional
+    public CalendarEventDto rescheduleEvent(Long id, LocalDateTime startTime, LocalDateTime endTime, String currentUsername) {
+        CalendarEvent event = eventRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy sự kiện với ID: " + id));
+
+        checkPermission(event, currentUsername);
+
+        if (endTime.isBefore(startTime)) {
+            throw new IllegalArgumentException("Thời gian kết thúc phải diễn ra sau thời gian bắt đầu!");
+        }
+
+        event.setStartTime(startTime);
+        event.setEndTime(endTime);
+
+        CalendarEvent updated = eventRepository.save(event);
+        log.info("Người dùng [{}] đã dời lịch sự kiện [{}] sang [{} -> {}]", currentUsername, event.getTitle(), startTime, endTime);
+        return toDto(updated);
+    }
+
     // =========================================================================
     //                            HELPER METHODS
     // =========================================================================
@@ -328,7 +462,8 @@ public class CalendarEventService {
 
     private CalendarEventDto toDto(CalendarEvent event) {
         List<String> attendeesList = parseAttendees(event.getAttendeesJson());
-        return CalendarEventDto.fromEntity(event, attendeesList);
+        List<Map<String, Object>> subtasksList = parseSubtasks(event.getSubtasksJson());
+        return CalendarEventDto.fromEntity(event, attendeesList, subtasksList);
     }
 
     private String serializeAttendees(List<String> attendees) {
@@ -351,6 +486,30 @@ public class CalendarEventService {
             return objectMapper.readValue(json, new TypeReference<List<String>>() {});
         } catch (Exception e) {
             log.warn("Không thể parse danh sách attendees json: {}", e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
+    private String serializeSubtasks(List<Map<String, Object>> subtasks) {
+        if (subtasks == null || subtasks.isEmpty()) {
+            return "[]";
+        }
+        try {
+            return objectMapper.writeValueAsString(subtasks);
+        } catch (Exception e) {
+            log.warn("Không thể serialize danh sách subtasks: {}", e.getMessage());
+            return "[]";
+        }
+    }
+
+    private List<Map<String, Object>> parseSubtasks(String json) {
+        if (json == null || json.trim().isEmpty() || "[]".equals(json.trim())) {
+            return Collections.emptyList();
+        }
+        try {
+            return objectMapper.readValue(json, new TypeReference<List<Map<String, Object>>>() {});
+        } catch (Exception e) {
+            log.warn("Không thể parse danh sách subtasks json: {}", e.getMessage());
             return Collections.emptyList();
         }
     }
