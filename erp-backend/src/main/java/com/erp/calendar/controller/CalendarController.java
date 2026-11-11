@@ -1,5 +1,6 @@
 package com.erp.calendar.controller;
 
+import com.erp.calendar.dto.CalendarAnalyticsDto;
 import com.erp.calendar.dto.CalendarEventDto;
 import com.erp.calendar.dto.CalendarStatsDto;
 import com.erp.calendar.dto.CreateEventRequest;
@@ -7,17 +8,23 @@ import com.erp.calendar.dto.RescheduleEventRequest;
 import com.erp.calendar.dto.UpdateEventRequest;
 import com.erp.calendar.dto.UpdateProgressRequest;
 import com.erp.calendar.dto.UpdateSubtasksRequest;
+import com.erp.calendar.model.CalendarEvent;
 import com.erp.calendar.model.EventType;
 import com.erp.calendar.service.CalendarEventService;
+import com.erp.calendar.service.CalendarIcsService;
+import com.erp.calendar.service.CalendarReminderScheduler;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +36,8 @@ import java.util.Map;
 public class CalendarController {
 
     private final CalendarEventService calendarEventService;
+    private final CalendarIcsService calendarIcsService;
+    private final CalendarReminderScheduler calendarReminderScheduler;
 
     /**
      * Lấy danh sách sự kiện theo khoảng thời gian và bộ lọc
@@ -173,6 +182,71 @@ public class CalendarController {
         String currentUsername = authentication != null ? authentication.getName() : "anonymous";
         CalendarStatsDto stats = calendarEventService.getStats(currentUsername);
         return ResponseEntity.ok(stats);
+    }
+
+    /**
+     * Báo cáo & Phân tích KPI hiệu suất Lịch biểu & Công việc
+     */
+    @GetMapping("/analytics")
+    public ResponseEntity<CalendarAnalyticsDto> getCalendarAnalytics(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end
+    ) {
+        CalendarAnalyticsDto analytics = calendarEventService.getAnalytics(start, end);
+        return ResponseEntity.ok(analytics);
+    }
+
+    /**
+     * Xuất 1 sự kiện ra file iCalendar (.ics) chuẩn RFC 5545 (import Google/Outlook Calendar)
+     */
+    @GetMapping({"/events/{id}/export.ics", "/events/{id}/export-ics"})
+    public ResponseEntity<byte[]> exportSingleEventToIcs(@PathVariable Long id) {
+        CalendarEvent event = calendarEventService.getEventEntityById(id);
+        String icsContent = calendarIcsService.generateIcsForSingleEvent(event);
+        byte[] bytes = icsContent.getBytes(StandardCharsets.UTF_8);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType("text/calendar; charset=utf-8"));
+        headers.setContentDispositionFormData("attachment", "erp-event-" + id + ".ics");
+        return new ResponseEntity<>(bytes, headers, HttpStatus.OK);
+    }
+
+    /**
+     * Xuất toàn bộ lịch trong khoảng thời gian ra file iCalendar (.ics)
+     */
+    @GetMapping({"/export.ics", "/export-ics"})
+    public ResponseEntity<byte[]> exportCalendarToIcs(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end,
+            @RequestParam(required = false) EventType type
+    ) {
+        List<CalendarEvent> events = calendarEventService.getEventsEntitiesInRange(start, end, type);
+        String icsContent = calendarIcsService.generateIcsForEvents(events, "ERP Cloud - Lich bieu & Cong viec");
+        byte[] bytes = icsContent.getBytes(StandardCharsets.UTF_8);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType("text/calendar; charset=utf-8"));
+        headers.setContentDispositionFormData("attachment", "erp-calendar-sync.ics");
+        return new ResponseEntity<>(bytes, headers, HttpStatus.OK);
+    }
+
+    /**
+     * Gửi thông báo Nhắc hẹn tức thì qua WebSocket tới người tham gia
+     */
+    @PostMapping("/events/{id}/remind-now")
+    public ResponseEntity<Map<String, Object>> sendImmediateReminder(
+            @PathVariable Long id,
+            Authentication authentication
+    ) {
+        String currentUsername = authentication != null ? authentication.getName() : "admin";
+        CalendarEvent event = calendarEventService.getEventEntityById(id);
+        int recipientsCount = calendarReminderScheduler.sendImmediateReminder(event, currentUsername);
+
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Đã gửi thông báo nhắc hẹn tới " + recipientsCount + " thành viên!",
+                "recipientsCount", recipientsCount
+        ));
     }
 }
 

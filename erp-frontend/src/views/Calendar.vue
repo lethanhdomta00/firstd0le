@@ -21,6 +21,47 @@
       </div>
 
       <div class="header-right-col">
+        <!-- Nút Bật thông báo nhắc hẹn trình duyệt -->
+        <button
+          type="button"
+          class="btn-header-secondary"
+          :class="{ 'is-enabled': desktopNotificationGranted }"
+          title="Nhận thông báo nhắc hẹn ngay cả khi đang mở tab khác"
+          @click="handleToggleDesktopNotification"
+        >
+          <span>{{ desktopNotificationGranted ? '🔔 Đã bật nhắc hẹn' : '🔕 Bật nhắc hẹn' }}</span>
+        </button>
+
+        <!-- Nút Xuất lịch chuẩn quốc tế .ics -->
+        <button
+          type="button"
+          class="btn-header-secondary"
+          title="Xuất dữ liệu lịch sang định dạng iCalendar (.ics) để nhập vào Google Calendar / Outlook"
+          @click="handleExportCalendarIcs"
+        >
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          <span>Xuất .ics</span>
+        </button>
+
+        <!-- Nút Mở Báo cáo & Phân tích KPI -->
+        <button
+          type="button"
+          class="btn-header-secondary"
+          title="Xem báo cáo phân tích KPI công việc & hiệu suất nhân sự"
+          @click="openAnalyticsModal"
+        >
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="20" x2="18" y2="10"></line>
+            <line x1="12" y1="20" x2="12" y2="4"></line>
+            <line x1="6" y1="20" x2="6" y2="14"></line>
+          </svg>
+          <span>Báo cáo KPI</span>
+        </button>
+
         <!-- Nút Bật/Tắt Bảng Công việc & To-do -->
         <button
           type="button"
@@ -1094,6 +1135,26 @@
                 </div>
               </div>
 
+              <!-- Cài đặt nhắc hẹn & Công khai -->
+              <div class="form-row-2col">
+                <div class="form-group-field">
+                  <label class="field-label">Thông báo nhắc hẹn trước</label>
+                  <el-select v-model="form.reminderMinutesBefore" style="width: 100%">
+                    <el-option label="🔕 Không nhắc hẹn" :value="0" />
+                    <el-option label="🔔 Trước 5 phút" :value="5" />
+                    <el-option label="🔔 Trước 10 phút" :value="10" />
+                    <el-option label="🔔 Trước 15 phút (Mặc định)" :value="15" />
+                    <el-option label="🔔 Trước 30 phút" :value="30" />
+                    <el-option label="⏰ Trước 1 giờ (60 phút)" :value="60" />
+                    <el-option label="📅 Trước 1 ngày" :value="1440" />
+                  </el-select>
+                </div>
+
+                <div class="form-group-field" style="display: flex; align-items: flex-end; padding-bottom: 6px;">
+                  <el-checkbox v-model="form.isPublic">Hiển thị công khai trên lịch chung công ty</el-checkbox>
+                </div>
+              </div>
+
               <!-- Mô tả chi tiết -->
               <div class="form-group-field">
                 <label class="field-label">Nội dung / Ghi chú cuộc họp</label>
@@ -1251,6 +1312,15 @@
               </div>
             </div>
 
+            <!-- Nhắc hẹn tự động -->
+            <div class="detail-info-row">
+              <span class="detail-row-icon">🔔</span>
+              <div class="detail-row-content">
+                <strong>Nhắc hẹn tự động:</strong>
+                <span>{{ getReminderLabel(selectedEvent.reminderMinutesBefore) }}</span>
+              </div>
+            </div>
+
             <!-- Mô tả chi tiết -->
             <div v-if="selectedEvent.description" class="detail-desc-box">
               <strong>Nội dung cuộc họp:</strong>
@@ -1267,6 +1337,23 @@
                 @click="handleDeleteEvent(selectedEvent)"
               >
                 Xóa sự kiện
+              </button>
+              <button
+                type="button"
+                class="btn-detail-secondary"
+                title="Tải tệp lịch .ics nhập vào Google Calendar / Outlook"
+                @click="handleExportSingleEventIcs(selectedEvent)"
+              >
+                📅 Tải .ics
+              </button>
+              <button
+                type="button"
+                class="btn-detail-secondary"
+                :disabled="isSendingReminder"
+                title="Gửi thông báo nhắc họp Realtime ngay lập tức tới các thành viên tham gia"
+                @click="handleRemindNow(selectedEvent)"
+              >
+                {{ isSendingReminder ? 'Đang gửi...' : '🔔 Nhắc ngay' }}
               </button>
             </div>
             <div class="detail-footer-right">
@@ -1301,6 +1388,150 @@
         </div>
       </div>
     </Teleport>
+
+    <!-- MODAL 3: BÁO CÁO & PHÂN TÍCH KPI LỊCH BIỂU - CÔNG VIỆC (ANALYTICS MODAL) -->
+    <Teleport to="body">
+      <div v-if="showAnalyticsModal" class="modal-backdrop-overlay" @click.self="showAnalyticsModal = false">
+        <div class="custom-modal-card analytics-modal-card">
+          <div class="modal-card-header">
+            <div class="header-icon-title">
+              <div class="modal-header-icon" style="background: linear-gradient(135deg, #2563eb, #4f46e5); color: #fff;">
+                📊
+              </div>
+              <div class="modal-title-group">
+                <h3 class="modal-card-title">Báo cáo & Phân tích KPI Công việc</h3>
+                <span class="modal-card-desc">Tổng hợp hiệu suất hoàn thành công việc • {{ currentPeriodTitle }}</span>
+              </div>
+            </div>
+            <button type="button" class="btn-close-modal" @click="showAnalyticsModal = false">✕</button>
+          </div>
+
+          <div v-loading="isLoadingAnalytics" class="modal-card-body analytics-body-scroll">
+            <!-- 4 Thẻ KPI Tổng quan -->
+            <div class="analytics-summary-grid">
+              <div class="analytics-kpi-box kpi-blue">
+                <span class="kpi-box-num">{{ analyticsData.totalEvents }}</span>
+                <span class="kpi-box-label">Tổng Sự kiện & Việc</span>
+              </div>
+              <div class="analytics-kpi-box kpi-green">
+                <span class="kpi-box-num">{{ analyticsData.completedEvents }} <small>({{ analyticsData.overallCompletionRate }}%)</small></span>
+                <span class="kpi-box-label">Đã hoàn thành</span>
+              </div>
+              <div class="analytics-kpi-box kpi-amber">
+                <span class="kpi-box-num">{{ analyticsData.inProgressEvents }}</span>
+                <span class="kpi-box-label">Đang thực hiện</span>
+              </div>
+              <div class="analytics-kpi-box kpi-red">
+                <span class="kpi-box-num">{{ analyticsData.overdueEvents }}</span>
+                <span class="kpi-box-label">Trễ hạn (Overdue)</span>
+              </div>
+            </div>
+
+            <!-- 2 Cột phân bổ -->
+            <div class="analytics-charts-2col">
+              <!-- Cột trái: Theo Loại sự kiện -->
+              <div class="analytics-panel-card">
+                <h4 class="analytics-panel-title">📂 Phân bổ theo Loại sự kiện</h4>
+                <div v-if="!analyticsData.byEventType || analyticsData.byEventType.length === 0" class="analytics-empty">
+                  Chưa có dữ liệu trong khoảng thời gian này
+                </div>
+                <div v-else class="breakdown-bars-list">
+                  <div v-for="item in analyticsData.byEventType" :key="item.key" class="breakdown-row">
+                    <div class="breakdown-label-line">
+                      <span class="breakdown-name">
+                        <span class="color-dot-sm" :style="{ backgroundColor: item.colorHex }"></span>
+                        {{ item.label }}
+                      </span>
+                      <span class="breakdown-count">{{ item.count }} ({{ item.percentage }}%)</span>
+                    </div>
+                    <div class="breakdown-track">
+                      <div class="breakdown-fill" :style="{ width: item.percentage + '%', backgroundColor: item.colorHex }"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Cột phải: Theo Mức độ ưu tiên -->
+              <div class="analytics-panel-card">
+                <h4 class="analytics-panel-title">⚡ Phân bổ theo Mức độ ưu tiên</h4>
+                <div v-if="!analyticsData.byPriority || analyticsData.byPriority.length === 0" class="analytics-empty">
+                  Chưa có dữ liệu trong khoảng thời gian này
+                </div>
+                <div v-else class="breakdown-bars-list">
+                  <div v-for="item in analyticsData.byPriority" :key="item.key" class="breakdown-row">
+                    <div class="breakdown-label-line">
+                      <span class="breakdown-name">
+                        <span class="color-dot-sm" :style="{ backgroundColor: item.colorHex }"></span>
+                        {{ item.label }}
+                      </span>
+                      <span class="breakdown-count">{{ item.count }} ({{ item.percentage }}%)</span>
+                    </div>
+                    <div class="breakdown-track">
+                      <div class="breakdown-fill" :style="{ width: item.percentage + '%', backgroundColor: item.colorHex }"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Bảng hiệu suất Nhân sự -->
+            <div class="analytics-panel-card">
+              <h4 class="analytics-panel-title">🏆 Bảng Hiệu suất theo Người phụ trách (Assignee Performance)</h4>
+              <div v-if="!analyticsData.assigneePerformance || analyticsData.assigneePerformance.length === 0" class="analytics-empty">
+                Chưa có dữ liệu nhân sự thực hiện công việc
+              </div>
+              <div v-else class="assignee-table-wrap">
+                <table class="analytics-table">
+                  <thead>
+                    <tr>
+                      <th>Nhân sự</th>
+                      <th class="text-center">Tổng việc</th>
+                      <th class="text-center">Hoàn thành</th>
+                      <th class="text-center">Quá hạn</th>
+                      <th>Tỷ lệ KPI</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="emp in analyticsData.assigneePerformance" :key="emp.username">
+                      <td>
+                        <div class="emp-cell-info">
+                          <span class="assignee-avatar-mini">{{ getAvatarInitial(emp.fullName || emp.username) }}</span>
+                          <div>
+                            <div class="emp-fullname">{{ emp.fullName }}</div>
+                            <div class="emp-username">@{{ emp.username }}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="text-center"><strong>{{ emp.totalAssigned }}</strong></td>
+                      <td class="text-center"><span class="badge-kpi-green">{{ emp.completedCount }}</span></td>
+                      <td class="text-center">
+                        <span v-if="emp.overdueCount > 0" class="badge-kpi-red">{{ emp.overdueCount }}</span>
+                        <span v-else class="text-muted">0</span>
+                      </td>
+                      <td>
+                        <div class="emp-rate-wrap">
+                          <div class="emp-rate-track">
+                            <div class="emp-rate-fill" :style="{ width: emp.completionRate + '%' }"></div>
+                          </div>
+                          <span class="emp-rate-val">{{ emp.completionRate }}%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-card-footer">
+            <button type="button" class="btn-header-secondary" @click="handleExportCalendarIcs">
+              📥 Xuất báo cáo lịch (.ics)
+            </button>
+            <button type="button" class="btn-modal-primary" @click="showAnalyticsModal = false">Đóng</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -1309,6 +1540,7 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import api from '../api'
 import { useAuthStore } from '../store/auth'
+import { requestNotificationPermission } from '../utils/soundNotification'
 
 const authStore = useAuthStore()
 
@@ -1368,6 +1600,24 @@ const form = ref({
 const showDetailModal = ref(false)
 const selectedEvent = ref(null)
 
+// State Báo cáo KPI & Analytics (Buổi 4)
+const showAnalyticsModal = ref(false)
+const isLoadingAnalytics = ref(false)
+const analyticsData = ref({
+  totalEvents: 0,
+  completedEvents: 0,
+  inProgressEvents: 0,
+  overdueEvents: 0,
+  overallCompletionRate: 0,
+  byEventType: [],
+  byPriority: [],
+  assigneePerformance: []
+})
+
+// State Nhắc hẹn & Đồng bộ .ics
+const desktopNotificationGranted = ref(typeof Notification !== 'undefined' && Notification.permission === 'granted')
+const isSendingReminder = ref(false)
+
 // State Kéo thả khoảng ngày & kéo thả sự kiện
 const isSelectingRange = ref(false)
 const isMouseDown = ref(false)
@@ -1389,6 +1639,11 @@ const toDateKey = (date) => {
   return `${y}-${m}-${day}`
 }
 const formatDateKey = toDateKey
+
+const formatToIsoString = (d) => {
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+}
 
 // =========================================================================
 //                           COMPUTED PROPERTIES
@@ -1855,13 +2110,23 @@ const fetchStats = async () => {
 
 const fetchColleagues = async () => {
   try {
-    const res = await api.get('/chat/colleagues')
-    colleagueOptions.value = res.data || []
+    const res = await api.get('/realtime-chat/colleagues')
+    const list = Array.isArray(res.data) ? [...res.data] : []
+    // Đưa chính bản thân người dùng hiện tại lên đầu để có thể tự giao việc cho mình
+    if (authStore.user && authStore.user.username) {
+      const myName = authStore.user.username.toLowerCase()
+      const exists = list.some(u => u.username && u.username.toLowerCase() === myName)
+      if (!exists) {
+        list.unshift({
+          username: authStore.user.username,
+          fullName: authStore.user.fullName || authStore.user.username
+        })
+      }
+    }
+    colleagueOptions.value = list
   } catch (err) {
-    try {
-      const userRes = await api.get('/users')
-      colleagueOptions.value = userRes.data || []
-    } catch (e) {}
+    console.warn('Không thể tải danh sách đồng nghiệp:', err)
+    colleagueOptions.value = []
   }
 }
 
@@ -2144,8 +2409,8 @@ const editEvent = (evt) => {
     colorHex: evt.colorHex || '#2563eb',
     department: evt.department || 'Toàn công ty',
     attendees: Array.isArray(evt.attendees) ? [...evt.attendees] : [],
-    reminderMinutesBefore: evt.reminderMinutesBefore || 15,
-    progress: evt.progress !== undefined ? evt.progress : 0,
+    reminderMinutesBefore: evt.reminderMinutesBefore ?? 15,
+    progress: evt.progress ?? 0,
     assigneeUsername: evt.assigneeUsername || '',
     subtasks: Array.isArray(evt.subtasks) ? JSON.parse(JSON.stringify(evt.subtasks)) : [],
     isPublic: evt.isPublic !== undefined ? evt.isPublic : true
@@ -2355,6 +2620,128 @@ const handleToggleStatusInDetail = async () => {
   await toggleTaskStatus(selectedEvent.value)
 }
 
+// =========================================================================
+//      ACTION METHODS BUỔI 4: NHẮC HẸN, ĐỒNG BỘ .ICS & PHÂN TÍCH KPI
+// =========================================================================
+
+const handleToggleDesktopNotification = async () => {
+  if (typeof Notification === 'undefined') {
+    ElMessage.warning('Trình duyệt của bạn không hỗ trợ thông báo Desktop!')
+    return
+  }
+  if (Notification.permission === 'granted') {
+    desktopNotificationGranted.value = true
+    ElMessage.success('Thông báo nhắc hẹn trình duyệt đã đang ở trạng thái BẬT!')
+    return
+  }
+  const granted = await requestNotificationPermission()
+  desktopNotificationGranted.value = granted
+  if (granted) {
+    ElMessage.success('🔔 Đã bật thông báo nhắc hẹn trình duyệt thành công!')
+  } else {
+    ElMessage.warning('Bạn chưa cấp quyền thông báo cho trình duyệt!')
+  }
+}
+
+const getQueryRangeForFocus = () => {
+  const focus = currentFocusDate.value
+  const year = focus.getFullYear()
+  const month = focus.getMonth()
+  let start, end
+  if (currentViewMode.value === 'year') {
+    start = formatToIsoString(new Date(year, 0, 1, 0, 0, 0))
+    end = formatToIsoString(new Date(year, 11, 31, 23, 59, 59))
+  } else if (currentViewMode.value === 'quarter') {
+    const q = Math.floor(month / 3)
+    start = formatToIsoString(new Date(year, q * 3, 1, 0, 0, 0))
+    const lastDayOfQ = new Date(year, q * 3 + 3, 0)
+    end = formatToIsoString(new Date(year, q * 3 + 2, lastDayOfQ.getDate(), 23, 59, 59))
+  } else {
+    start = formatToIsoString(new Date(year, month, 1, 0, 0, 0))
+    const lastDayOfM = new Date(year, month + 1, 0)
+    end = formatToIsoString(new Date(year, month, lastDayOfM.getDate(), 23, 59, 59))
+  }
+  return { start, end }
+}
+
+const downloadBlobFile = (blobData, filename) => {
+  const url = window.URL.createObjectURL(new Blob([blobData], { type: 'text/calendar;charset=utf-8' }))
+  const link = document.createElement('a')
+  link.href = url
+  link.setAttribute('download', filename)
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  window.URL.revokeObjectURL(url)
+}
+
+const handleExportCalendarIcs = async () => {
+  try {
+    const { start, end } = getQueryRangeForFocus()
+    const res = await api.get('/calendar/export-ics', {
+      params: { start, end, type: selectedTypeFilter.value || undefined },
+      responseType: 'blob'
+    })
+    downloadBlobFile(res.data, 'erp-calendar-sync.ics')
+    ElMessage.success('📥 Đã xuất file lịch .ics thành công! Bạn có thể import vào Google Calendar / Outlook.')
+  } catch (err) {
+    console.error('Lỗi xuất file .ics:', err)
+    ElMessage.error('Không thể xuất file lịch .ics!')
+  }
+}
+
+const handleExportSingleEventIcs = async (evt) => {
+  if (!evt) return
+  try {
+    const res = await api.get(`/calendar/events/${evt.id}/export-ics`, {
+      responseType: 'blob'
+    })
+    downloadBlobFile(res.data, `erp-event-${evt.id}.ics`)
+    ElMessage.success(`📅 Đã tải xuống file sự kiện "${evt.title}" (.ics)!`)
+  } catch (err) {
+    console.error('Lỗi xuất sự kiện .ics:', err)
+    ElMessage.error('Không thể tải xuống file .ics!')
+  }
+}
+
+const handleRemindNow = async (evt) => {
+  if (!evt) return
+  isSendingReminder.value = true
+  try {
+    const res = await api.post(`/calendar/events/${evt.id}/remind-now`)
+    ElMessage.success(res.data?.message || '🔔 Đã gửi thông báo nhắc hẹn tức thì tới các thành viên!')
+  } catch (err) {
+    console.error('Lỗi gửi nhắc hẹn:', err)
+    ElMessage.error('Không thể gửi thông báo nhắc hẹn!')
+  } finally {
+    isSendingReminder.value = false
+  }
+}
+
+const openAnalyticsModal = async () => {
+  showAnalyticsModal.value = true
+  isLoadingAnalytics.value = true
+  try {
+    const { start, end } = getQueryRangeForFocus()
+    const res = await api.get('/calendar/analytics', { params: { start, end } })
+    if (res.data) {
+      analyticsData.value = res.data
+    }
+  } catch (err) {
+    console.error('Lỗi tải báo cáo KPI:', err)
+    ElMessage.error('Không thể tải dữ liệu phân tích KPI!')
+  } finally {
+    isLoadingAnalytics.value = false
+  }
+}
+
+const getReminderLabel = (mins) => {
+  if (!mins || mins <= 0) return 'Không nhắc hẹn'
+  if (mins >= 1440) return `Trước ${Math.round(mins / 1440)} ngày`
+  if (mins >= 60 && mins % 60 === 0) return `Trước ${mins / 60} giờ`
+  return `Trước ${mins} phút`
+}
+
 const canModifyEvent = (evt) => {
   if (!evt) return false
   if (authStore.user?.role === 'ADMIN') return true
@@ -2415,11 +2802,6 @@ const formatFullDate = (dateObjOrStr) => {
   const d = new Date(dateObjOrStr)
   const weekdays = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy']
   return `${weekdays[d.getDay()]}, ngày ${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`
-}
-
-const formatToIsoString = (d) => {
-  const pad = (n) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`
 }
 
 const getDurationText = (startStr, endStr) => {
@@ -2494,7 +2876,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 10px 16px 20px;
+  padding: 10px 16px 76px;
   background: #f8fafc;
   min-height: calc(100vh - 64px);
   user-select: none;
@@ -2504,6 +2886,8 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 16px;
   background: #ffffff;
   padding: 10px 16px;
   border-radius: 10px;
@@ -2515,6 +2899,8 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex: 1 1 360px;
+  min-width: 0;
 }
 
 .header-icon-box {
@@ -2533,6 +2919,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .header-title {
@@ -2540,6 +2927,7 @@ onBeforeUnmount(() => {
   font-weight: 700;
   color: #1e293b;
   margin: 0;
+  white-space: nowrap;
 }
 
 .pro-tag-badge {
@@ -2550,6 +2938,7 @@ onBeforeUnmount(() => {
   border: 1px solid #bfdbfe;
   padding: 1px 6px;
   border-radius: 10px;
+  white-space: nowrap;
 }
 
 .header-subtitle {
@@ -2561,20 +2950,24 @@ onBeforeUnmount(() => {
 .header-right-col {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .btn-toggle-task-board {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
+  height: 32px;
   background: #f1f5f9;
   color: #334155;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
-  padding: 6.5px 12px;
-  font-size: 13px;
+  padding: 0 10px;
+  font-size: 12.5px;
   font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -2609,14 +3002,17 @@ onBeforeUnmount(() => {
 .btn-create-event {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
+  height: 32px;
   background: linear-gradient(135deg, #2563eb, #1d4ed8);
   color: #ffffff;
   border: none;
   border-radius: 8px;
-  padding: 7px 14px;
-  font-size: 13px;
+  padding: 0 12px;
+  font-size: 12.5px;
   font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
   cursor: pointer;
   box-shadow: 0 2px 5px rgba(37, 99, 235, 0.22);
   transition: all 0.2s ease;
@@ -2895,6 +3291,8 @@ onBeforeUnmount(() => {
   border: 1px solid #e2e8f0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
   overflow: hidden;
+  min-width: 0;
+  width: 100%;
 }
 
 /* =========================================================================
@@ -3309,13 +3707,16 @@ onBeforeUnmount(() => {
 }
 
 .weekday-header-cell {
-  padding: 7px 10px;
-  font-size: 11.5px;
+  padding: 7px 4px;
+  font-size: 11px;
   font-weight: 600;
   color: #64748b;
   text-align: center;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .month-grid-cells {
@@ -3333,6 +3734,8 @@ onBeforeUnmount(() => {
   background: #ffffff;
   transition: background 0.12s ease, border-color 0.12s ease;
   min-height: 76px;
+  min-width: 0;
+  overflow: hidden;
   position: relative;
   cursor: pointer;
 }
@@ -4400,13 +4803,25 @@ onBeforeUnmount(() => {
 .calendar-workspace-layout {
   display: block;
   width: 100%;
+  container-type: inline-size;
+  container-name: cal-workspace;
 }
 
 .calendar-workspace-layout.with-task-board {
   display: grid;
-  grid-template-columns: 1fr 340px;
+  grid-template-columns: minmax(0, 1fr) 310px;
   gap: 12px;
   align-items: start;
+}
+
+@container cal-workspace (max-width: 920px) {
+  .calendar-workspace-layout.with-task-board {
+    grid-template-columns: 1fr;
+  }
+  .task-board-panel {
+    position: static;
+    max-height: none;
+  }
 }
 
 .task-board-panel {
@@ -4523,9 +4938,8 @@ onBeforeUnmount(() => {
 /* Filter pills */
 .task-filter-pills {
   display: flex;
+  flex-wrap: wrap;
   gap: 5px;
-  overflow-x: auto;
-  padding-bottom: 2px;
 }
 
 .task-filter-pill {
@@ -4603,6 +5017,7 @@ onBeforeUnmount(() => {
   overflow-y: auto;
   max-height: calc(100vh - 350px);
   padding-right: 2px;
+  padding-bottom: 64px;
 }
 
 .task-list-empty {
@@ -5026,6 +5441,303 @@ onBeforeUnmount(() => {
 }
 
 /* =========================================================================
+   BUỔI 4: HEADER BUTTONS, DETAIL ACTIONS & ANALYTICS KPI MODAL
+   ========================================================================= */
+.header-right-col {
+  flex-wrap: wrap;
+}
+
+.btn-header-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  background: #ffffff;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 0 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.btn-header-secondary:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+.btn-header-secondary.is-enabled {
+  background: #f0fdf4;
+  color: #15803d;
+  border-color: #bbf7d0;
+}
+
+.detail-footer-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.btn-detail-secondary {
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+  transition: all 0.15s ease;
+}
+
+.btn-detail-secondary:hover:not(:disabled) {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.btn-detail-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ANALYTICS KPI MODAL */
+.analytics-modal-card {
+  width: 100%;
+  max-width: 820px;
+}
+
+.analytics-body-scroll {
+  padding: 16px 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.analytics-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.analytics-kpi-box {
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.analytics-kpi-box.kpi-blue { background: #eff6ff; border-color: #bfdbfe; }
+.analytics-kpi-box.kpi-green { background: #f0fdf4; border-color: #bbf7d0; }
+.analytics-kpi-box.kpi-amber { background: #fffbeb; border-color: #fde68a; }
+.analytics-kpi-box.kpi-red { background: #fef2f2; border-color: #fecaca; }
+
+.kpi-box-num {
+  font-size: 20px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.kpi-box-num small {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #15803d;
+}
+
+.kpi-box-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.analytics-charts-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.analytics-panel-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.analytics-panel-title {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.analytics-empty {
+  text-align: center;
+  padding: 20px 10px;
+  color: #94a3b8;
+  font-size: 12.5px;
+}
+
+.breakdown-bars-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.breakdown-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.breakdown-label-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+
+.breakdown-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.color-dot-sm {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.breakdown-count {
+  font-weight: 700;
+  color: #475569;
+}
+
+.breakdown-track {
+  width: 100%;
+  height: 6px;
+  background: #f1f5f9;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.breakdown-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.35s ease;
+}
+
+.assignee-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.analytics-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.analytics-table th {
+  text-align: left;
+  padding: 8px 10px;
+  background: #f8fafc;
+  color: #475569;
+  font-weight: 700;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.analytics-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #1e293b;
+}
+
+.text-center {
+  text-align: center !important;
+}
+
+.text-muted {
+  color: #94a3b8;
+}
+
+.emp-cell-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.emp-fullname {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.emp-username {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.badge-kpi-green {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #dcfce7;
+  color: #15803d;
+  font-weight: 700;
+}
+
+.badge-kpi-red {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #fee2e2;
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.emp-rate-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.emp-rate-track {
+  flex: 1;
+  min-width: 70px;
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.emp-rate-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #10b981);
+  border-radius: 3px;
+}
+
+.emp-rate-val {
+  font-weight: 700;
+  color: #2563eb;
+  min-width: 40px;
+  text-align: right;
+}
+
+/* =========================================================================
    RESPONSIVE DESIGN (TABLET & MOBILE)
    ========================================================================= */
 @media (max-width: 1200px) {
@@ -5038,8 +5750,21 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 992px) {
+  .calendar-workspace-layout.with-task-board {
+    grid-template-columns: 1fr;
+  }
+  .task-board-panel {
+    position: static;
+    max-height: none;
+  }
   .calendar-metrics-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+  .analytics-summary-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .analytics-charts-2col {
+    grid-template-columns: 1fr;
   }
   .calendar-toolbar-card {
     flex-direction: column;
@@ -5063,7 +5788,7 @@ onBeforeUnmount(() => {
     align-items: flex-start;
     gap: 10px;
   }
-  .calendar-metrics-grid {
+  .calendar-metrics-grid, .analytics-summary-grid {
     grid-template-columns: 1fr;
   }
   .toolbar-actions-right {

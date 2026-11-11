@@ -1,5 +1,6 @@
 package com.erp.calendar.service;
 
+import com.erp.calendar.dto.CalendarAnalyticsDto;
 import com.erp.calendar.dto.CalendarEventDto;
 import com.erp.calendar.dto.CalendarStatsDto;
 import com.erp.calendar.dto.CreateEventRequest;
@@ -254,6 +255,13 @@ public class CalendarEventService {
             throw new IllegalArgumentException("Thời gian kết thúc phải diễn ra sau thời gian bắt đầu!");
         }
 
+        boolean timeChanged = !Objects.equals(event.getStartTime(), req.getStartTime());
+        boolean reminderChanged = req.getReminderMinutesBefore() != null
+                && !Objects.equals(event.getReminderMinutesBefore(), req.getReminderMinutesBefore());
+        if (timeChanged || reminderChanged) {
+            event.setReminderSent(false);
+        }
+
         event.setTitle(req.getTitle().trim());
         event.setDescription(req.getDescription());
         event.setStartTime(req.getStartTime());
@@ -438,10 +446,139 @@ public class CalendarEventService {
 
         event.setStartTime(startTime);
         event.setEndTime(endTime);
+        event.setReminderSent(false);
 
         CalendarEvent updated = eventRepository.save(event);
         log.info("Người dùng [{}] đã dời lịch sự kiện [{}] sang [{} -> {}]", currentUsername, event.getTitle(), startTime, endTime);
         return toDto(updated);
+    }
+
+    /**
+     * Lấy Entity gốc (phục vụ xuất file .ics hoặc gửi nhắc hẹn tức thì)
+     */
+    @Transactional(readOnly = true)
+    public CalendarEvent getEventEntityById(Long id) {
+        return eventRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy sự kiện với ID: " + id));
+    }
+
+    /**
+     * Lấy danh sách Entity trong khoảng thời gian (phục vụ xuất lịch .ics)
+     */
+    @Transactional(readOnly = true)
+    public List<CalendarEvent> getEventsEntitiesInRange(LocalDateTime start, LocalDateTime end, EventType eventType) {
+        LocalDateTime queryStart = start != null ? start : LocalDate.now(VIETNAM_ZONE).withDayOfMonth(1).atStartOfDay();
+        LocalDateTime queryEnd = end != null ? end : LocalDate.now(VIETNAM_ZONE).plusMonths(1).atTime(23, 59, 59);
+
+        return eventRepository.findEventsInRange(queryStart, queryEnd).stream()
+                .filter(e -> eventType == null || e.getEventType() == eventType)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Phân tích & Thống kê KPI Lịch biểu - Công việc
+     */
+    @Transactional(readOnly = true)
+    public CalendarAnalyticsDto getAnalytics(LocalDateTime start, LocalDateTime end) {
+        LocalDateTime queryStart = start != null ? start : LocalDate.now(VIETNAM_ZONE).withDayOfMonth(1).atStartOfDay();
+        LocalDateTime queryEnd = end != null ? end : LocalDate.now(VIETNAM_ZONE).withDayOfMonth(1).plusMonths(1).atStartOfDay().minusSeconds(1);
+
+        List<CalendarEvent> events = eventRepository.findEventsInRange(queryStart, queryEnd);
+        LocalDateTime now = LocalDateTime.now(VIETNAM_ZONE);
+
+        long total = events.size();
+        long completed = events.stream()
+                .filter(e -> e.getStatus() == EventStatus.COMPLETED || (e.getProgress() != null && e.getProgress() >= 100))
+                .count();
+        long overdue = events.stream()
+                .filter(e -> e.getStatus() != EventStatus.COMPLETED
+                        && (e.getProgress() == null || e.getProgress() < 100)
+                        && e.getEndTime() != null && e.getEndTime().isBefore(now))
+                .count();
+        long inProgress = Math.max(0, total - completed);
+        double completionRate = total > 0 ? Math.round(((double) completed / total) * 1000.0) / 10.0 : 0.0;
+
+        // 1. Thống kê theo Loại sự kiện
+        Map<EventType, Long> typeCounts = events.stream()
+                .collect(Collectors.groupingBy(e -> e.getEventType() != null ? e.getEventType() : EventType.EVENT, Collectors.counting()));
+        List<CalendarAnalyticsDto.BreakdownItem> byType = typeCounts.entrySet().stream()
+                .sorted(Map.Entry.<EventType, Long>comparingByValue().reversed())
+                .map(entry -> CalendarAnalyticsDto.BreakdownItem.builder()
+                        .key(entry.getKey().name())
+                        .label(getTypeLabel(entry.getKey()))
+                        .count(entry.getValue())
+                        .colorHex(getDefaultColorForType(entry.getKey()))
+                        .percentage(total > 0 ? Math.round(((double) entry.getValue() / total) * 1000.0) / 10.0 : 0.0)
+                        .build())
+                .collect(Collectors.toList());
+
+        // 2. Thống kê theo Độ ưu tiên
+        Map<EventPriority, Long> priorityCounts = events.stream()
+                .collect(Collectors.groupingBy(e -> e.getPriority() != null ? e.getPriority() : EventPriority.MEDIUM, Collectors.counting()));
+        List<CalendarAnalyticsDto.BreakdownItem> byPriority = priorityCounts.entrySet().stream()
+                .sorted(Map.Entry.<EventPriority, Long>comparingByValue().reversed())
+                .map(entry -> CalendarAnalyticsDto.BreakdownItem.builder()
+                        .key(entry.getKey().name())
+                        .label(getPriorityLabel(entry.getKey()))
+                        .count(entry.getValue())
+                        .colorHex(getPriorityColor(entry.getKey()))
+                        .percentage(total > 0 ? Math.round(((double) entry.getValue() / total) * 1000.0) / 10.0 : 0.0)
+                        .build())
+                .collect(Collectors.toList());
+
+        // 3. Thống kê hiệu suất theo Người phụ trách (hoặc người tạo nếu chưa phân công)
+        Map<String, List<CalendarEvent>> byAssigneeMap = events.stream()
+                .collect(Collectors.groupingBy(e -> {
+                    if (e.getAssigneeUsername() != null && !e.getAssigneeUsername().trim().isEmpty()) {
+                        return e.getAssigneeUsername().trim();
+                    }
+                    return e.getCreatorUsername() != null ? e.getCreatorUsername().trim() : "unknown";
+                }));
+
+        List<CalendarAnalyticsDto.AssigneeStat> assigneeStats = byAssigneeMap.entrySet().stream()
+                .map(entry -> {
+                    String username = entry.getKey();
+                    List<CalendarEvent> userEvents = entry.getValue();
+                    String fullName = userEvents.stream()
+                            .map(e -> e.getAssigneeUsername() != null && e.getAssigneeUsername().equals(username)
+                                    ? e.getAssigneeFullName() : e.getCreatorFullName())
+                            .filter(Objects::nonNull)
+                            .findFirst()
+                            .orElse("@" + username);
+
+                    long userTotal = userEvents.size();
+                    long userDone = userEvents.stream()
+                            .filter(e -> e.getStatus() == EventStatus.COMPLETED || (e.getProgress() != null && e.getProgress() >= 100))
+                            .count();
+                    long userOverdue = userEvents.stream()
+                            .filter(e -> e.getStatus() != EventStatus.COMPLETED
+                                    && (e.getProgress() == null || e.getProgress() < 100)
+                                    && e.getEndTime() != null && e.getEndTime().isBefore(now))
+                            .count();
+                    double rate = userTotal > 0 ? Math.round(((double) userDone / userTotal) * 1000.0) / 10.0 : 0.0;
+
+                    return CalendarAnalyticsDto.AssigneeStat.builder()
+                            .username(username)
+                            .fullName(fullName)
+                            .totalAssigned(userTotal)
+                            .completedCount(userDone)
+                            .overdueCount(userOverdue)
+                            .completionRate(rate)
+                            .build();
+                })
+                .sorted(Comparator.comparingLong(CalendarAnalyticsDto.AssigneeStat::getTotalAssigned).reversed())
+                .collect(Collectors.toList());
+
+        return CalendarAnalyticsDto.builder()
+                .totalEvents(total)
+                .completedEvents(completed)
+                .inProgressEvents(inProgress)
+                .overdueEvents(overdue)
+                .overallCompletionRate(completionRate)
+                .byEventType(byType)
+                .byPriority(byPriority)
+                .assigneePerformance(assigneeStats)
+                .build();
     }
 
     // =========================================================================
@@ -529,6 +666,48 @@ public class CalendarEventService {
             case MAINTENANCE -> "#64748b";      // Xám đá
             case HOLIDAY -> "#10b981";          // Xanh lá cây
             case EVENT -> "#6366f1";            // Xanh chàm
+        };
+    }
+
+    private String getTypeLabel(EventType type) {
+        if (type == null) return "Sự kiện";
+        return switch (type) {
+            case MEETING -> "Cuộc họp nội bộ";
+            case CLIENT_MEETING -> "Gặp khách hàng";
+            case DEADLINE -> "Deadline dự án";
+            case TASK -> "Nhiệm vụ công việc";
+            case TRAINING -> "Đào tạo / Workshop";
+            case INTERVIEW -> "Phỏng vấn tuyển dụng";
+            case BUSINESS_TRIP -> "Đi công tác";
+            case REVIEW -> "Đánh giá KPI";
+            case TEAM_BUILDING -> "Team Building";
+            case MAINTENANCE -> "Bảo trì hệ thống";
+            case HOLIDAY -> "Nghỉ lễ / Phép";
+            case EVENT -> "Sự kiện chung";
+        };
+    }
+
+    private String getPriorityLabel(EventPriority priority) {
+        if (priority == null) return "Bình thường";
+        return switch (priority) {
+            case CRITICAL -> "Tối khẩn (Critical)";
+            case URGENT -> "Khẩn cấp (Urgent)";
+            case HIGH -> "Quan trọng / Cao (High)";
+            case MEDIUM -> "Bình thường (Medium)";
+            case LOW -> "Thấp (Low)";
+            case OPTIONAL -> "Tùy chọn (Optional)";
+        };
+    }
+
+    private String getPriorityColor(EventPriority priority) {
+        if (priority == null) return "#3b82f6";
+        return switch (priority) {
+            case CRITICAL -> "#dc2626";
+            case URGENT -> "#ea580c";
+            case HIGH -> "#d97706";
+            case MEDIUM -> "#2563eb";
+            case LOW -> "#10b981";
+            case OPTIONAL -> "#64748b";
         };
     }
 }

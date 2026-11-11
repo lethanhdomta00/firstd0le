@@ -46,5 +46,17 @@ public interface CalendarEventRepository extends JpaRepository<CalendarEvent, Lo
      * Đếm sự kiện theo người tạo và loại
      */
     long countByCreatorUsernameAndEventType(String creatorUsername, EventType eventType);
+
+    /**
+     * Tìm các sự kiện cần kiểm tra gửi nhắc hẹn trong khung thời gian tới
+     */
+    @Query("SELECT e FROM CalendarEvent e WHERE (e.reminderSent = false OR e.reminderSent IS NULL) " +
+           "AND e.status <> com.erp.calendar.model.EventStatus.COMPLETED " +
+           "AND e.reminderMinutesBefore > 0 " +
+           "AND e.startTime >= :windowStart AND e.startTime <= :windowEnd")
+    List<CalendarEvent> findEventsPendingReminder(
+            @Param("windowStart") LocalDateTime windowStart,
+            @Param("windowEnd") LocalDateTime windowEnd
+    );
 }
 

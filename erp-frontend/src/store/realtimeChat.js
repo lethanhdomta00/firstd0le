@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
+import { ElNotification } from 'element-plus'
 import api from '../api'
 import { useAuthStore } from './auth'
 import { 
@@ -283,6 +284,17 @@ export const useRealtimeChatStore = defineStore('realtimeChat', {
         }
       })
       this.subscriptions.push(callSub)
+
+      // 9. Kênh nhận Thông báo Nhắc hẹn Lịch biểu & Công việc (Smart Calendar Reminders)
+      const reminderSub = this.client.subscribe('/user/queue/calendar-reminders', (message) => {
+        try {
+          const payload = JSON.parse(message.body)
+          this.handleCalendarReminder(payload)
+        } catch (e) {
+          console.error('Lỗi parse calendar reminder:', e)
+        }
+      })
+      this.subscriptions.push(reminderSub)
     },
 
     /**
@@ -2073,6 +2085,48 @@ export const useRealtimeChatStore = defineStore('realtimeChat', {
         status: 'IDLE',
         offerData: null
       }
+    },
+
+    /**
+     * Xử lý thông báo Nhắc hẹn Lịch biểu & Công việc thời gian thực
+     */
+    handleCalendarReminder(payload) {
+      if (!payload) return
+      if (this.isSoundEnabled) {
+        playNotificationSound()
+      }
+
+      const timeStr = payload.formattedTime || ''
+      const locStr = payload.location ? `Tại: ${payload.location}` : ''
+      const pingText = payload.isManualPing && payload.triggeredBy
+        ? `(Nhắc bởi @${payload.triggeredBy})`
+        : `(Trước ${payload.reminderMinutesBefore || 15} phút)`
+
+      const bodyDesc = `${payload.title} • Lúc ${timeStr} ${locStr}`.trim()
+
+      showDesktopNotification('⏰ Nhắc hẹn lịch biểu ERP', {
+        body: bodyDesc,
+        tag: `cal-reminder-${payload.eventId}`
+      })
+
+      const msgLines = [
+        `🕒 Thời gian: ${timeStr} ${pingText}`,
+        payload.location ? `📍 Địa điểm: ${payload.location}` : '',
+        payload.meetingUrl ? `🔗 Nhấn vào thông báo để mở phòng họp` : ''
+      ].filter(Boolean).join(' • ')
+
+      ElNotification({
+        title: `⏰ Nhắc hẹn: ${payload.title}`,
+        message: msgLines,
+        type: payload.priority === 'CRITICAL' || payload.priority === 'URGENT' ? 'warning' : 'info',
+        duration: 12000,
+        position: 'top-right',
+        onClick: () => {
+          if (payload.meetingUrl) {
+            window.open(payload.meetingUrl, '_blank')
+          }
+        }
+      })
     }
   }
 })

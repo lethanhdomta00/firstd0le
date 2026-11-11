@@ -83,6 +83,10 @@ public class CalendarEvent {
     @Builder.Default
     private Integer reminderMinutesBefore = 15;
 
+    @Column(name = "reminder_sent")
+    @Builder.Default
+    private Boolean reminderSent = false; // Cờ đánh dấu đã bắn thông báo nhắc hẹn chưa
+
     @Column(name = "progress")
     @Builder.Default
     private Integer progress = 0; // Tiến độ công việc (0 - 100%)
@@ -117,6 +121,7 @@ public class CalendarEvent {
         if (this.status == null) this.status = EventStatus.SCHEDULED;
         if (this.colorHex == null || this.colorHex.trim().isEmpty()) this.colorHex = "#2563eb";
         if (this.progress == null) this.progress = 0;
+        if (this.reminderSent == null) this.reminderSent = false;
         if (this.isPublic == null) this.isPublic = true;
     }
 

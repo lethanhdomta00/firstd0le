@@ -18,6 +18,7 @@ Mày có thể chỉnh sửa, bổ sung thêm các điều khoản mới vào fi
 - 🚫 **Không tự khởi động file `.jar` Backend**: Không tự ý spawn tiến trình java chạy background file jar ngoài tầm kiểm soát.
 - 🔗 **Quy chuẩn Link File**: Mọi đường dẫn file trong đoạn chat phải viết theo cú pháp markdown `[basename](file:///path)` để mày có thể click mở trực tiếp trên editor.
 - 🔍 **Kiểm soát chất lượng JavaScript / Frontend**: Rà soát kỹ lưỡng phạm vi biến, thứ tự khai báo (hoisting trong Vue 3 `<script setup>`), tuyệt đối không để xảy ra lỗi runtime (`ReferenceError`, `undefined variable/function`) trước khi bàn giao.
+- 🔌 **Zero API Errors (Không để phát sinh lỗi 404 / 403 / 500 / CORS trên Network Tab)**: Trước khi viết bất kỳ lời gọi API nào ở Frontend (`api.get`, `api.post`, ...), bắt buộc phải đọc trực tiếp `@RestController` và `SecurityConfig.java` bên Backend để đối chiếu chính xác URL, HTTP Method (bao gồm `PATCH`), quyền `@PreAuthorize` và cấu trúc JSON trả về (`List` vs `Page`). Không tự đoán URL rồi fallback bằng `try/catch`.
 - 🎓 **Tóm tắt & Cô đọng kiến thức cốt lõi**: Luôn có phần tóm tắt ngắn gọn, cô đọng các kiến thức, bài học công nghệ hoặc lưu ý quan trọng ở cuối mỗi buổi học / phản hồi.
 
 ---
@@ -40,8 +41,12 @@ Mày có thể chỉnh sửa, bổ sung thêm các điều khoản mới vào fi
 
 ## 4. 🎨 Tiêu chuẩn Giao diện & Thẩm mỹ (UI/UX Standards)
 - **Chuẩn mẫu thiết kế**: Bám sát 100% mẫu thiết kế trong thư mục template (`erp-frontend/src/template/`). Không tự ý biến tấu màu sắc hay bố cục sai lệch mẫu.
-- **Tính phản hồi (Responsive)**: Đảm bảo hiển thị chuẩn trên cả màn hình Desktop lớn, Tablet và Mobile.
-- **Trải nghiệm người dùng (UX)**: Các trạng thái tương tác như hover, active, focus, disabled, loading, captcha, thông báo lỗi/thành công (`ElMessage`) phải mượt mà, trực quan.
+- **Tính phản hồi (Responsive Audit nghiêm ngặt)**:
+  - Đảm bảo hiển thị chuẩn trên Desktop lớn, Laptop nhỏ, Tablet, Mobile và cả khi mở DevTools chia màn hình.
+  - **Header & Toolbars**: Các nút bấm giữ `white-space: nowrap`, `flex-wrap: wrap`, chiều cao đồng nhất; cụm tiêu đề giữ đủ không gian (`flex: 1 1 ...`) để không bị bẻ chữ thành 2 dòng hay rớt nút lộn xộn.
+  - **CSS Grid & Split Layout**: Mọi cột `1fr` chứa bảng/lịch bắt buộc có `min-width: 0` (`minmax(0, 1fr)`). Kết hợp `@container` và `@media` tự động chuyển về 1 cột ở không gian hẹp để không làm co bóp nội dung.
+  - **Filter Pills & Floating Widgets**: Dùng `flex-wrap: wrap` thay vì `overflow-x: auto` cho nhóm nút lọc; luôn chừa `padding-bottom: 64px` cho danh sách cuộn dọc ở trang có nút AI Copilot nổi góc dưới phải.
+- **Trải nghiệm người dùng (UX)**: Các trạng thái tương tác như hover, active, focus, disabled, loading, captcha, thông báo lỗi/thành công (`ElMessage`), `z-index` của Element Plus Popper trên modal phải mượt mà, trực quan.
 
 ---
 
@@ -50,5 +55,7 @@ Mày có thể chỉnh sửa, bổ sung thêm các điều khoản mới vào fi
 
 1. **[Đã ghi nhận]**: Mày là Dev PHP Laravel chuyển qua Java -> Luôn cô đọng kiến thức cuối buổi và đối chiếu kiến trúc Laravel vs Spring Boot.
 2. **[Kiểm soát chất lượng Frontend & JS]**: Tuyệt đối kiểm tra kỹ lưỡng scope, tên biến/hàm và thứ tự khai báo (hoisting trong `<script setup>`), không để xảy ra bất kỳ lỗi runtime JavaScript nào (như `ReferenceError`, `undefined function`, v.v.) khi người dùng mở trang. Luôn kiểm tra tính toàn vẹn của code trước khi bàn giao.
-3. ...
+3. **[Zero API Errors]**: Tuyệt đối không để phát sinh lỗi API (404 / 403 / 500 / CORS) trên DevTools Network Tab. Luôn đọc Controller & SecurityConfig đối chiếu chính xác endpoint, method (`PATCH`, `GET`...), phân quyền `@PreAuthorize` và payload trước khi gọi từ Frontend.
+4. **[Responsive Audit]**: Kiểm tra kỹ Responsive cho Header (không gãy chữ, rớt nút lộn xộn), Grid/Split Layout (`min-width: 0`, Container Query khi bật DevTools/màn vừa), Filter Pills (`flex-wrap: wrap` không thanh cuộn ngang che chữ) và khoảng đệm dưới cho Floating AI Widget.
+5. ...
 
