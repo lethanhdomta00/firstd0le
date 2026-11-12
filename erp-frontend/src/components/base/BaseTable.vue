@@ -21,6 +21,7 @@
         :data="data"
         v-loading="loading && !useSkeleton"
         :style="{ width: '100%', minWidth: minWidth }"
+        size="small"
         stripe
         class="custom-el-table"
         v-bind="$attrs"
@@ -42,7 +43,7 @@
         :current-page="pagination.currentPage"
         :page-size="pagination.pageSize"
         :total="pagination.total"
-        :page-sizes="[10, 20, 50, 100]"
+        :page-sizes="[10, 15, 25, 50, 100]"
         layout="total, sizes, prev, pager, next"
         @size-change="(size) => $emit('sizeChange', size)"
         @current-change="(page) => $emit('pageChange', page)"
@@ -102,20 +103,28 @@ defineEmits(['sizeChange', 'pageChange'])
 
 <style scoped>
 .base-table-card {
-  border-radius: 14px;
+  border-radius: 12px;
   border: 1px solid #e2e8f0;
   overflow: hidden;
 }
 
+.base-table-card :deep(.el-card__body) {
+  padding: 12px 14px;
+}
+
+.custom-el-table :deep(.el-table__cell) {
+  padding: 7px 0;
+}
+
 .table-toolbar {
-  padding-bottom: 16px;
-  margin-bottom: 16px;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
   border-bottom: 1px solid #f1f5f9;
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
 }
 
 .table-responsive-wrapper {
@@ -125,7 +134,7 @@ defineEmits(['sizeChange', 'pageChange'])
 }
 
 .table-pagination {
-  margin-top: 18px;
+  margin-top: 12px;
   display: flex;
   justify-content: flex-end;
 }

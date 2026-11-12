@@ -5,12 +5,12 @@ Tệp quy tắc thường trực (`always_on`) dành cho trợ lý AI khi làm v
 ## 1. Giao tiếp & Phong cách
 - **Xưng hô bắt buộc**: Xưng hô thẳng thắn, thân thiết **Mày - Tao** (AI là *Tao*, User là *Mày*).
 - **Chèn emoji/icon sinh động** trong phản hồi (🌿, 🚀, 💼, ⚡, 🛡️, 🎯).
-- **Bối cảnh người dùng**: Mày là **Dev PHP Laravel lâu năm chuyển sang Java Spring Boot**. Cuối mỗi buổi học hoặc tính năng lớn, luôn tóm tắt cô đọng kiến thức và lập bảng đối chiếu **PHP Laravel ⮂ Java Spring Boot**.
+- **Bối cảnh người dùng**: Mày là **Dev PHP Laravel lâu năm chuyển sang Java Spring Boot**. Cuối mỗi buổi học hoặc khi chốt nghỉ buổi, **BẮT BUỘC phải viết trọn vẹn phần Bài học cuối buổi** (giải thích sâu các cơ chế Java 17 / Spring Boot / JPA vừa dùng kèm bài tập/tình huống thực tế) và lập bảng đối chiếu **PHP Laravel ⮂ Java Spring Boot**.
 - **Quy chuẩn Link File**: Mọi file/symbol nhắc tới phải dùng clickable markdown link `[basename](file:///path)`.
 
 ## 2. An toàn Quy trình & Kiểm soát Mã nguồn
 - 🚫 **Không tự ý Git Commit / Push** khi chưa có lệnh trực tiếp từ mày.
-- 🚫 **Không tự chạy script kiểm thử API Backend** và **không tự khởi động file `.jar` Backend** (`để tao tự test`). Chỉ chạy build compile kiểm tra cú pháp (`./mvnw.cmd test-compile` hoặc `npm --prefix erp-frontend run build`).
+- 🧪 **Bắt buộc viết & chạy Unit Test / Integration Test chuẩn (JUnit 5 + MockMvc + `@Transactional` rollback)** qua `./erp-backend/mvnw.cmd -f erp-backend/pom.xml test` và build Vite (`npm --prefix erp-frontend run build`) đạt xanh 100% trước khi bàn giao; vẫn 🚫 **không tự chạy script curl/Python kiểm thử API ngoài** và **không tự khởi động file `.jar` Backend** (`để tao tự test`).
 - 🎯 **Tập trung đúng phạm vi**: Không sửa lan man ngoài yêu cầu hiện tại.
 
 ## 3. Tiêu chuẩn Không Lỗi API & Không Lỗi JavaScript (Zero Runtime / Network Errors)
@@ -34,3 +34,13 @@ Tệp quy tắc thường trực (`always_on`) dành cho trợ lý AI khi làm v
   - **Filter Pills & Floating Widgets**: Dùng `flex-wrap: wrap` cho thanh lọc (tránh `overflow-x: auto` làm thanh cuộn ngang che chữ). Luôn chừa `padding-bottom: 64px` ở vùng cuộn cuối trang để tránh bị nút AI Copilot nổi góc dưới phải che khuất.
 - **Modal & Element Plus Popper (`z-index`)**:
   - Mọi custom modal overlay giữ `z-index: 1050` (trên Sidebar `100` / Header `9`), còn `.el-popper`, `.el-select__popper`, `.el-picker__popper`, `.el-color-dropdown` luôn có `z-index: 12000 !important` trong `style.css` để không bao giờ bị kẹt bên dưới modal.
+- **UI/UX Simplicity & Visual Hierarchy (Đơn giản, Thoáng mắt, Chuẩn Thương mại)**:
+  - **Chống "Hộp chồng hộp" (Zero Nested Box Overload)**: Trong Modal/Drawer, không đóng khung viền từng khối con lồng nhau; ưu tiên bố cục phẳng với khoảng trắng rộng rãi, đường kẻ phân tách mảnh (`1px solid #f1f5f9`) và phân cấp cỡ chữ.
+  - **Không lặp dữ liệu thừa (DRY UI)**: Thông tin đã hiển thị ở Header hoặc Bảng (người tạo, trạng thái, tổng số lượng) không lặp lại ở khối Metadata bên dưới.
+  - **Bảng dữ liệu dễ quét (Scannable Tables)**: Mã chứng từ/tiền tệ giữ `white-space: nowrap`, tên dài cắt gọn `text-overflow: ellipsis`, gộp thuộc tính phụ (SKU dưới tên chính), gom action ít dùng (`Sửa`/`Xóa`) vào menu `⋯`, và gộp các nút xuất file phụ thành dropdown.
+  - **Bố cục Hóa đơn & Modal Footer chuẩn**: Khối tổng tiền (`Tạm tính`, `VAT`, `Tổng cộng`) gom gọn `260px–300px` căn phải sát số tiền; Footer tách nút hủy nhẹ bên trái khỏi nút `Đóng` + CTA chính bên phải.
+
+## 5. Tiêu chuẩn Hiệu năng Hàng Triệu Dữ liệu (High-Scale Performance)
+- ⚡ **Zero `findAll()` OOM trong Service / BI**: Tuyệt đối không dùng `repository.findAll()` nạp toàn bộ bảng vào RAM JVM để đếm, tính tổng hay vẽ biểu đồ. Mọi thống kê (`stats`, `analytics`, báo cáo BI) bắt buộc dùng **SQL Aggregate (`COUNT`, `SUM`, `AVG`, `GROUP BY`)** hoặc projection DTO ngay tại tầng Database.
+- 🗂️ **Database Indexing bắt buộc**: Mọi cột thường xuyên lọc, sắp xếp, join hoặc quét khoảng thời gian (`created_at`, `status`, `payment_status`, `order_code`, `product_id`, `product_sku`, `movement_type`) phải khai báo `@Index` ngay trong `@Table(indexes = ...)`.
+- 🚫 **Chống N+1 Query & Chặn Export không giới hạn**: Luôn dùng `@EntityGraph` / `JOIN FETCH` hoặc `WHERE ... IN (...)` batching khi đọc quan hệ `@OneToMany` trong danh sách; API phân trang (`Page<T>`) luôn giới hạn `size` tối đa (e.g. `<= 100`), và export file lớn phải lọc theo khoảng thời gian/giới hạn an toàn hoặc stream cursor (`Stream<T>` / `ScrollableResults`).

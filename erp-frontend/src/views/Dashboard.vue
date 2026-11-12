@@ -65,7 +65,7 @@
       </div>
 
       <!-- Card 2: Đơn hàng mới -->
-      <div class="kpi-card">
+      <div class="kpi-card" @click="$router.push('/orders')">
         <div class="kpi-header">
           <span class="kpi-category">LƯU LƯỢNG GIAO DỊCH</span>
           <div class="kpi-icon-box purple">
@@ -76,13 +76,13 @@
             </svg>
           </div>
         </div>
-        <div class="kpi-title">Đơn hàng mới</div>
+        <div class="kpi-title">Đơn hàng</div>
         <div class="kpi-value-row">
-          <span class="kpi-number">45</span>
-          <span class="trend-badge highlight-blue">⚡ 45 hôm nay</span>
+          <span class="kpi-number">{{ stats.totalOrders }}</span>
+          <span class="trend-badge highlight-blue">⚡ {{ stats.todayOrders }} hôm nay</span>
         </div>
         <div class="kpi-footer">
-          <span class="footer-sub">18 đơn đang chờ xuất kho</span>
+          <span class="footer-sub">{{ stats.pendingFulfillment }} đơn đang chờ xuất kho</span>
           <span class="footer-link">Xử lý ngay ›</span>
         </div>
       </div>
@@ -538,15 +538,20 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import api from '../api'
+import { useAuthStore } from '../store/auth'
 
 const router = useRouter()
+const authStore = useAuthStore()
 const showBanner = ref(true)
 const chartTab = ref('week')
 const announcementMessage = ref('🎉 Chào mừng bạn đến với ERP Cloud System! Chúc bạn một ngày làm việc hiệu quả, năng lượng và hoàn thành xuất sắc mọi mục tiêu.')
 
 const stats = reactive({
-  products: 120,
-  users: 12
+  products: 0,
+  users: 0,
+  totalOrders: 0,
+  todayOrders: 0,
+  pendingFulfillment: 0
 })
 
 async function fetchActiveAnnouncement() {
@@ -562,18 +567,33 @@ async function fetchActiveAnnouncement() {
 
 async function fetchRealStats() {
   try {
-    const [prodRes, userRes] = await Promise.allSettled([
-      api.get('/products'),
-      api.get('/users')
-    ])
-    if (prodRes.status === 'fulfilled' && Array.isArray(prodRes.value.data)) {
-      stats.products = prodRes.value.data.length || 120
+    const requests = [
+      api.get('/products', { params: { page: 0, size: 1 } }),
+      api.get('/orders/stats')
+    ]
+    if (authStore.isAdmin) {
+      requests.push(api.get('/users', { params: { page: 0, size: 1 } }))
     }
-    if (userRes.status === 'fulfilled' && Array.isArray(userRes.value.data)) {
-      stats.users = userRes.value.data.length || 12
+    const results = await Promise.allSettled(requests)
+    const prodRes = results[0]
+    const orderRes = results[1]
+    const userRes = results[2]
+
+    if (prodRes?.status === 'fulfilled') {
+      const data = prodRes.value.data
+      stats.products = data?.totalElements ?? (Array.isArray(data) ? data.length : 0)
+    }
+    if (orderRes?.status === 'fulfilled' && orderRes.value.data) {
+      stats.totalOrders = orderRes.value.data.totalOrders ?? 0
+      stats.todayOrders = orderRes.value.data.todayOrders ?? 0
+      stats.pendingFulfillment = orderRes.value.data.pendingFulfillmentCount ?? 0
+    }
+    if (userRes?.status === 'fulfilled') {
+      const data = userRes.value.data
+      stats.users = data?.totalElements ?? (Array.isArray(data) ? data.length : 0)
     }
   } catch {
-    // Keep mock figures
+    // Keep fallback
   }
 }
 

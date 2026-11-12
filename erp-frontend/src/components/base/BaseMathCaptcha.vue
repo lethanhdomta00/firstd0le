@@ -1,5 +1,5 @@
 <template>
-  <div class="base-captcha-container">
+  <div class="base-captcha-container" :class="{ 'is-compact': compact }">
     <div v-if="label" class="captcha-label-row">
       <span class="captcha-label">
         <el-icon class="shield-icon"><ShieldCheck /></el-icon>
@@ -48,7 +48,7 @@
     <div v-else-if="errorMessage" class="captcha-hint error">
       ⚠️ {{ errorMessage }}
     </div>
-    <div v-else-if="!isVerified" class="captcha-hint info">
+    <div v-else-if="!isVerified && !compact" class="captcha-hint info">
       💡 Vui lòng tính kết quả phép toán trên để tiếp tục.
     </div>
   </div>
@@ -87,6 +87,10 @@ const props = defineProps({
   cooldownDuration: {
     type: Number,
     default: 10 // seconds
+  },
+  compact: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -274,10 +278,11 @@ defineExpose({
 .captcha-box {
   display: flex;
   align-items: center;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 8px;
   background: #f8fafc;
   border: 1.5px solid #cbd5e1;
-  border-radius: 12px;
+  border-radius: 10px;
   padding: 6px 10px;
   transition: all 0.25s ease;
 }
@@ -364,6 +369,7 @@ defineExpose({
 /* User Input */
 .captcha-input-wrap {
   flex: 1;
+  min-width: 80px;
 }
 
 .captcha-input {
@@ -399,6 +405,37 @@ defineExpose({
   0%, 100% { transform: translateX(0); }
   20%, 60% { transform: translateX(-4px); }
   40%, 80% { transform: translateX(4px); }
+}
+
+.base-captcha-container.is-compact {
+  gap: 4px;
+}
+
+.base-captcha-container.is-compact .captcha-label {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  color: #2f463a;
+}
+
+.base-captcha-container.is-compact .captcha-box {
+  padding: 4px 8px;
+  border-radius: 5px;
+  border-width: 1px;
+}
+
+.base-captcha-container.is-compact .equation-display {
+  padding: 4px 8px;
+  border-radius: 5px;
+}
+
+.base-captcha-container.is-compact .equation-text {
+  font-size: 13.5px;
+}
+
+.base-captcha-container.is-compact .captcha-input {
+  padding: 3px 6px;
+  font-size: 13px;
 }
 </style>
 

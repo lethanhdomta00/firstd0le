@@ -16,8 +16,9 @@
       :data="users" 
       :loading="loading" 
       :skeleton-columns="6" 
-      :skeleton-rows="4"
-      min-width="840px"
+      :skeleton-rows="6"
+      min-width="760px"
+      class="users-desktop-table"
       :show-pagination="true"
       :pagination="{
         currentPage: page + 1,
@@ -81,13 +82,13 @@
       </template>
 
       <!-- ID Column -->
-      <el-table-column prop="id" label="ID" width="70" align="center" />
+      <el-table-column prop="id" label="ID" width="56" align="center" />
 
       <!-- User Profile (Avatar + Username + Email) -->
-      <el-table-column label="Thông tin tài khoản" min-width="220">
+      <el-table-column label="Thông tin tài khoản" min-width="200">
         <template #default="{ row }">
           <div class="user-cell">
-            <el-avatar :size="36" class="user-cell-avatar">
+            <el-avatar :size="30" class="user-cell-avatar">
               {{ (row.username || 'U').charAt(0).toUpperCase() }}
             </el-avatar>
             <div class="user-cell-info">
@@ -104,17 +105,17 @@
       </el-table-column>
 
       <!-- Role Badge -->
-      <el-table-column prop="role" label="Phân quyền (Role)" width="180" align="center">
+      <el-table-column prop="role" label="Phân quyền" width="155" align="center">
         <template #default="{ row }">
           <BaseStatusBadge
             :type="row.role === 'ADMIN' ? 'danger' : 'info'"
-            :text="row.role === 'ADMIN' ? 'Quản trị viên (ADMIN)' : 'Nhân viên (USER)'"
+            :text="row.role === 'ADMIN' ? 'Quản trị (ADMIN)' : 'Nhân viên (USER)'"
           />
         </template>
       </el-table-column>
 
       <!-- Account Status with Quick Toggle -->
-      <el-table-column label="Trạng thái" width="160" align="center">
+      <el-table-column label="Trạng thái" width="146" align="center">
         <template #default="{ row }">
           <div class="status-cell">
             <BaseStatusBadge
@@ -136,19 +137,19 @@
       </el-table-column>
 
       <!-- Created Date -->
-      <el-table-column label="Ngày tạo" width="160" align="center">
+      <el-table-column label="Ngày tạo" width="132" align="center">
         <template #default="{ row }">
           <span class="created-date">{{ formatDate(row.createdAt) }}</span>
         </template>
       </el-table-column>
 
       <!-- Action Buttons -->
-      <el-table-column label="Hành động" width="210" align="center" fixed="right">
+      <el-table-column label="Hành động" width="215" align="center">
         <template #default="{ row }">
           <div class="action-btn-group">
             <el-button size="small" @click="openEditDialog(row)">Sửa</el-button>
             <el-button size="small" type="warning" plain @click="openResetPasswordDialog(row)">
-              Đổi mật khẩu
+              Đổi MK
             </el-button>
             <el-button 
               size="small" 
@@ -163,6 +164,55 @@
         </template>
       </el-table-column>
     </BaseTable>
+
+    <!-- Mobile Card View (< 768px) -->
+    <div class="users-mobile-list">
+      <div v-for="u in users" :key="'mu-' + u.id" class="mobile-user-card">
+        <div class="mu-top">
+          <div class="user-cell">
+            <el-avatar :size="32" class="user-cell-avatar">
+              {{ (u.username || 'U').charAt(0).toUpperCase() }}
+            </el-avatar>
+            <div class="user-cell-info">
+              <div class="user-name-row">
+                <span class="user-name">{{ u.username }}</span>
+                <el-tag v-if="u.username === currentUsername" size="small" type="success" effect="dark" class="current-badge">
+                  Bạn
+                </el-tag>
+              </div>
+              <span class="user-email">{{ u.email || 'Chưa cập nhật email' }}</span>
+            </div>
+          </div>
+          <BaseStatusBadge
+            :type="u.role === 'ADMIN' ? 'danger' : 'info'"
+            :text="u.role"
+          />
+        </div>
+        <div class="mu-meta">
+          <div class="status-cell">
+            <BaseStatusBadge
+              :type="u.status === 'LOCKED' ? 'danger' : 'success'"
+              :text="u.status === 'LOCKED' ? 'Đã khóa' : 'Hoạt động'"
+            />
+            <el-button
+              size="small"
+              link
+              :type="u.status === 'LOCKED' ? 'success' : 'warning'"
+              :disabled="u.username === currentUsername"
+              @click="toggleUserStatus(u)"
+            >
+              {{ u.status === 'LOCKED' ? 'Mở khóa' : 'Khóa' }}
+            </el-button>
+          </div>
+          <span class="created-date">{{ formatDate(u.createdAt) }}</span>
+        </div>
+        <div class="mu-actions">
+          <el-button size="small" @click="openEditDialog(u)">Sửa</el-button>
+          <el-button size="small" type="warning" plain @click="openResetPasswordDialog(u)">Đổi MK</el-button>
+          <el-button size="small" type="danger" plain :disabled="u.username === currentUsername" @click="deleteUser(u)">Xóa</el-button>
+        </div>
+      </div>
+    </div>
 
     <!-- Create User Dialog -->
     <BaseDialog 
@@ -298,7 +348,7 @@ const users = ref([])
 const totalElements = ref(0)
 const totalPages = ref(0)
 const page = ref(0)
-const size = ref(10)
+const size = ref(15)
 const loading = ref(false)
 const saving = ref(false)
 
@@ -564,7 +614,8 @@ onMounted(() => {
 .users-container {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 8px;
+  padding-bottom: 64px;
 }
 
 /* Filter Toolbar */
@@ -574,22 +625,26 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
 }
 
 .filter-group {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
+  flex: 1 1 520px;
+  min-width: 0;
 }
 
 .filter-search {
-  width: 260px;
+  flex: 1 1 240px;
+  max-width: 300px;
+  min-width: 190px;
 }
 
 .filter-select {
-  width: 180px;
+  width: 158px;
 }
 
 .btn-reset {
@@ -599,29 +654,31 @@ onMounted(() => {
 }
 
 .count-tag {
-  font-size: 13px;
+  font-size: 12.5px;
   color: #64748b;
+  white-space: nowrap;
 }
 
 /* User Profile Cell */
 .user-cell {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .user-cell-avatar {
   background: linear-gradient(135deg, #6366f1 0%, #06b6d4 100%);
   color: #ffffff;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 12px;
   flex-shrink: 0;
 }
 
 .user-cell-info {
   display: flex;
   flex-direction: column;
-  line-height: 1.3;
+  line-height: 1.25;
+  min-width: 0;
 }
 
 .user-name-row {
@@ -632,19 +689,23 @@ onMounted(() => {
 
 .user-name {
   font-weight: 600;
+  font-size: 13px;
   color: #0f172a;
 }
 
 .current-badge {
   font-size: 10px;
   padding: 0 4px;
-  height: 18px;
-  line-height: 18px;
+  height: 17px;
+  line-height: 17px;
 }
 
 .user-email {
-  font-size: 12px;
+  font-size: 11.5px;
   color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Status Cell */
@@ -652,25 +713,86 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .status-toggle-btn {
   font-size: 12px;
+  margin-left: 0 !important;
 }
 
 .created-date {
-  font-size: 13px;
+  font-size: 12px;
   color: #475569;
+  white-space: nowrap;
 }
 
 .action-btn-group {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.action-btn-group :deep(.el-button + .el-button) {
+  margin-left: 0;
+}
+
+.action-btn-group :deep(.el-button) {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.users-mobile-list {
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mobile-user-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 11px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mu-top,
+.mu-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mu-meta {
+  padding: 6px 0;
+  border-top: 1px solid #f1f5f9;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.mu-actions {
+  display: flex;
   gap: 6px;
+  flex-wrap: wrap;
+}
+
+.mu-actions :deep(.el-button + .el-button) {
+  margin-left: 0;
 }
 
 @media (max-width: 768px) {
+  .users-desktop-table :deep(.table-responsive-wrapper) {
+    display: none;
+  }
+
+  .users-mobile-list {
+    display: flex;
+  }
+
   .filter-search,
   .filter-select,
   .btn-add {

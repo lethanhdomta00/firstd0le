@@ -41,42 +41,42 @@ defineProps({
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 16px;
-  margin-bottom: 20px;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 
 .header-info {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex: 1;
   min-width: 240px;
 }
 
 .header-icon-box {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
   background: #e0f2fe;
   color: #0284c7;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
+  font-size: 19px;
   flex-shrink: 0;
 }
 
 .header-title {
   margin: 0;
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 700;
   color: #0f172a;
   letter-spacing: -0.3px;
 }
 
 .header-subtitle {
-  margin: 4px 0 0 0;
-  font-size: 13px;
+  margin: 2px 0 0 0;
+  font-size: 12.5px;
   color: #64748b;
 }
 

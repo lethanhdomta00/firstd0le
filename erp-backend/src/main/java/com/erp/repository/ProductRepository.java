@@ -8,8 +8,15 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
+import java.util.Optional;
 
 public interface ProductRepository extends JpaRepository<Product, Long> {
+
+    Optional<Product> findBySku(String sku);
+
+    // Native FOR UPDATE works across MariaDB and MySQL (avoids Hibernate MySQLDialect "FOR UPDATE OF alias" syntax error)
+    @Query(value = "SELECT * FROM products WHERE id = :id FOR UPDATE", nativeQuery = true)
+    Optional<Product> findByIdForUpdate(@Param("id") Long id);
 
     @Query("SELECT p FROM Product p WHERE " +
            "(:keyword IS NULL OR :keyword = '' OR LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR LOWER(p.sku) LIKE LOWER(CONCAT('%', :keyword, '%'))) AND " +

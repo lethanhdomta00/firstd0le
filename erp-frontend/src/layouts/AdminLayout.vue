@@ -67,7 +67,7 @@
           </template>
         </el-menu-item>
 
-        <el-menu-item index="/orders" @click.prevent="notifyFeature('Quản lý Đơn hàng')">
+        <el-menu-item index="/orders">
           <el-icon><Tickets /></el-icon>
           <template #title>
             <span class="menu-title-text">Quản lý Đơn hàng</span>
@@ -182,6 +182,10 @@
         <el-menu-item index="/products">
           <el-icon><Goods /></el-icon>
           <template #title>Quản lý Sản phẩm</template>
+        </el-menu-item>
+        <el-menu-item index="/orders">
+          <el-icon><Tickets /></el-icon>
+          <template #title>Quản lý Đơn hàng</template>
         </el-menu-item>
         <el-menu-item v-if="authStore.isAdmin" index="/users">
           <el-icon><User /></el-icon>
@@ -1004,10 +1008,10 @@ onBeforeUnmount(() => {
 }
 
 .top-header {
-  height: 64px;
+  height: 52px;
   background-color: #ffffff;
   border-bottom: 1px solid #e2e8f0;
-  padding: 0 24px;
+  padding: 0 18px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1453,13 +1457,13 @@ onBeforeUnmount(() => {
 
 /* ==================== CONTENT BODY ==================== */
 .content-body {
-  padding: 24px;
+  padding: 12px 16px;
   flex: 1;
   background: #f8fafc;
 }
 
 .content-container {
-  max-width: 1440px;
+  max-width: 1600px;
   margin: 0 auto;
 }
 

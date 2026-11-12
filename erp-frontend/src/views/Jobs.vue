@@ -957,8 +957,8 @@ onMounted(() => {
 
 <style scoped>
 .jobs-management-page {
-  padding: 20px;
-  max-width: 1400px;
+  padding: 0 0 64px;
+  max-width: 1600px;
   margin: 0 auto;
 }
 
@@ -966,13 +966,13 @@ onMounted(() => {
 .page-header-card {
   background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
   border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 20px 24px;
+  border-radius: 11px;
+  padding: 12px 16px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  margin-bottom: 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .header-content-left {
@@ -1078,12 +1078,12 @@ onMounted(() => {
 .metric-card {
   background: #ffffff;
   border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 16px 18px;
+  border-radius: 10px;
+  padding: 10px 14px;
   display: flex;
   align-items: center;
-  gap: 14px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  gap: 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 
 .metric-icon-wrap {
