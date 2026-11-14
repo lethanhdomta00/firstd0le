@@ -10,6 +10,7 @@ Tệp quy tắc thường trực (`always_on`) dành cho trợ lý AI khi làm v
 
 ## 2. An toàn Quy trình & Kiểm soát Mã nguồn
 - 🚫 **Không tự ý Git Commit / Push** khi chưa có lệnh trực tiếp từ mày.
+- 🛡️ **Bảo toàn 100% Logic Cũ (Zero Business Logic Regression)**: Khi nâng cấp giao diện, sửa CSS hoặc thêm hiệu ứng JS, **BẮT BUỘC giữ nguyên vẹn toàn bộ logic nghiệp vụ hiện hữu** (state, form validation, API endpoints, payload, flow OTP, countdown, authentication handlers). Tuyệt đối không tự ý cắt xén, lược bỏ hay thay đổi luồng hoạt động cũ.
 - 🧪 **Bắt buộc viết & chạy Unit Test / Integration Test chuẩn (JUnit 5 + MockMvc + `@Transactional` rollback)** qua `./erp-backend/mvnw.cmd -f erp-backend/pom.xml test` và build Vite (`npm --prefix erp-frontend run build`) đạt xanh 100% trước khi bàn giao; vẫn 🚫 **không tự chạy script curl/Python kiểm thử API ngoài** và **không tự khởi động file `.jar` Backend** (`để tao tự test`).
 - 🎯 **Tập trung đúng phạm vi**: Không sửa lan man ngoài yêu cầu hiện tại.
 

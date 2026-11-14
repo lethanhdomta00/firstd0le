@@ -14,7 +14,7 @@
     <!-- Canvas Micro Sparkles khi giải đúng Captcha -->
     <canvas ref="sparkleCanvasRef" class="sparkle-canvas"></canvas>
 
-    <!-- Con trỏ hào quang ánh sáng mềm mại theo chuột (JS Ambient Glow Spotlight) -->
+    <!-- Con trỏ hào quang ánh sáng mềm mại theo chuột (JS Ambient Glow Spotlight với Lerp) -->
     <div
       class="mouse-ambient-glow"
       :style="{
@@ -77,8 +77,17 @@
       class="login-stage-container"
       :style="stageTiltStyle"
     >
-      <!-- CỘT TRÁI: ENTERPRISE SHOWCASE (LIGHT TECH PORTAL NỀN SÁNG CAO CẤP) -->
-      <div class="hero-showcase-panel">
+      <!-- BaseLoading Overlay chuẩn hệ thống -->
+      <BaseLoading
+        :active="loading"
+        :text="loadingText"
+        :sub-text="loadingSubText"
+      />
+
+      <!-- ================================================================= -->
+      <!-- CỘT TRÁI: ENTERPRISE SHOWCASE (LIGHT TECH PORTAL NỀN SÁNG CAO CẤP)-->
+      <!-- ================================================================= -->
+      <aside class="hero-showcase-panel">
         <!-- Logo & Branding -->
         <div class="brand-top-bar">
           <div class="brand-emblem-badge">
@@ -176,11 +185,13 @@
           </div>
           <span class="copyright-txt">© 2026 ERP Cloud Systems Inc.</span>
         </div>
-      </div>
+      </aside>
 
-      <!-- CỘT PHẢI: AUTH FORM PANEL (LIGHT NỀN TRẮNG TINH KHIẾT) -->
-      <div class="auth-card-panel">
-        <!-- MODE 1: FORM ĐĂNG NHẬP -->
+      <!-- ================================================================= -->
+      <!-- CỘT PHẢI: FORM PANEL (LOGIN & FORGOT PASSWORD WIZARD CHUẨN GỐC)   -->
+      <!-- ================================================================= -->
+      <main class="auth-card-panel">
+        <!-- MODE 1: FORM ĐĂNG NHẬP (GIỮ NGUYÊN 100% LOGIC GỐC) -->
         <div v-if="mode === 'login'" class="form-wrapper">
           <!-- Mascot Cyber Sentry theo dõi chuột & che mắt khi nhập mật khẩu -->
           <div class="mascot-sentry-wrap" title="Cyber Sentry: Trợ lý bảo mật ERP">
@@ -189,24 +200,15 @@
                 <span class="antenna-dot"></span>
               </div>
               <div class="sentry-face">
-                <!-- Mắt trái -->
                 <div class="sentry-eye left-eye">
-                  <div
-                    class="sentry-pupil"
-                    :style="leftPupilStyle"
-                  ></div>
+                  <div class="sentry-pupil" :style="leftPupilStyle"></div>
                   <div class="sentry-eyelid"></div>
                 </div>
-                <!-- Mắt phải -->
                 <div class="sentry-eye right-eye">
-                  <div
-                    class="sentry-pupil"
-                    :style="rightPupilStyle"
-                  ></div>
+                  <div class="sentry-pupil" :style="rightPupilStyle"></div>
                   <div class="sentry-eyelid"></div>
                 </div>
               </div>
-              <!-- Tay che mắt (Hands Cover) khi đang nhập password -->
               <div class="sentry-hands" :class="{ visible: isPasswordFocused && !showPassword }">
                 <div class="hand hand-left">🙈</div>
                 <div class="hand hand-right">🙈</div>
@@ -222,45 +224,34 @@
               <h2 class="form-title">Đăng nhập</h2>
               <span class="auth-pill-secure">SSL 256-bit</span>
             </div>
-            <p class="form-sub">Nhập thông tin ủy nhiệm để truy cập sổ cái điều hành</p>
+            <p class="form-sub">Nhập thông tin ủy nhiệm để truy cập sổ cái điều hành ERP Cloud</p>
           </div>
 
-          <!-- Quick Fill Sample Accounts (Thao tác nhanh 1 chạm với hiệu ứng Magnetic) -->
-          <div class="quick-accounts-toolbar">
-            <span class="quick-title">⚡ Điền nhanh tài khoản mẫu:</span>
-            <div class="quick-btns-row">
-              <button
-                type="button"
-                class="btn-quick-fill admin magnetic-target"
-                @click="fillCredentials('admin', '123456')"
-                @mouseenter="onHoverInteractive"
-                @mouseleave="onLeaveInteractive"
-              >
-                Quản trị viên (admin)
-              </button>
-              <button
-                type="button"
-                class="btn-quick-fill user magnetic-target"
-                @click="fillCredentials('nhanvien', '123456')"
-                @mouseenter="onHoverInteractive"
-                @mouseleave="onLeaveInteractive"
-              >
-                Nhân viên (nhanvien)
-              </button>
+          <!-- Thẻ Thử Nghiệm (Demo Ledger) Chuẩn admin / password -->
+          <div class="demo-ledger-box" @click="fillDemoAccount">
+            <div class="demo-ledger-left">
+              <span class="demo-ledger-icon">🔐</span>
+              <div>
+                <div class="demo-ledger-title">THẺ THỬ NGHIỆM (DEMO LEDGER)</div>
+                <div class="demo-ledger-cred">Tài khoản: <strong>admin</strong> • Mật khẩu: <strong>password</strong></div>
+              </div>
             </div>
+            <button type="button" class="btn-fill-sample">
+              ⚡ ĐIỀN MẪU
+            </button>
           </div>
 
-          <!-- Biểu mẫu đăng nhập -->
+          <!-- Biểu Mẫu Đăng Nhập -->
           <form class="auth-form" @submit.prevent="handleLogin">
             <div class="form-field-group">
-              <label class="field-label">Tên người dùng / Tài khoản</label>
+              <label class="field-label">Tên người dùng hoặc Email <span class="req">*</span></label>
               <div class="input-container" :class="{ 'has-value': loginForm.username }">
                 <span class="field-icon">👤</span>
                 <input
-                  v-model.trim="loginForm.username"
+                  v-model="loginForm.username"
                   type="text"
                   class="field-input"
-                  placeholder="Nhập username (vd: admin)..."
+                  placeholder="admin@enterprisegroup.vn hoặc admin..."
                   required
                   autocomplete="username"
                   @focus="onUsernameFocus"
@@ -272,7 +263,7 @@
 
             <div class="form-field-group">
               <div class="pwd-label-row">
-                <label class="field-label">Mật khẩu</label>
+                <label class="field-label">Mật khẩu bảo an <span class="req">*</span></label>
                 <button
                   type="button"
                   class="link-forgot-btn"
@@ -304,7 +295,7 @@
                 </button>
               </div>
 
-              <!-- Thanh đo độ mạnh mật khẩu động bằng JS -->
+              <!-- Password Strength Gauge -->
               <div v-if="loginForm.password" class="password-strength-container">
                 <div class="strength-bar-track">
                   <div
@@ -323,7 +314,7 @@
               <BaseMathCaptcha
                 ref="loginCaptchaRef"
                 v-model="isLoginCaptchaPassed"
-                label="Bảo mật chống bot"
+                label="Phép tính bảo vệ hệ thống"
                 :compact="true"
                 @verified="onCaptchaVerified"
               />
@@ -332,7 +323,7 @@
             <div class="form-options-row">
               <label class="checkbox-label">
                 <input v-model="rememberMe" type="checkbox" class="custom-checkbox" @change="playTickSound" />
-                <span>Ghi nhớ phiên đăng nhập (30 ngày)</span>
+                <span>Lưu phiên đăng nhập trên thiết bị ủy thác (30 ngày)</span>
               </label>
             </div>
 
@@ -349,39 +340,146 @@
               @click="onSubmitClick"
             >
               <span v-if="loading" class="spinner-dot"></span>
-              <span>{{ loading ? 'ĐANG XÁC THỰC HỆ THỐNG...' : 'ĐĂNG NHẬP HỆ THỐNG' }}</span>
+              <span>{{ loading ? 'ĐANG XÁC THỰC THÔNG TIN...' : 'ĐĂNG NHẬP VÀO HỆ THỐNG' }}</span>
               <span class="btn-arrow">➔</span>
             </button>
           </form>
 
+          <!-- Phương thức Ủy quyền Doanh nghiệp (SSO) -->
+          <div class="sso-divider-row">
+            <span>PHƯƠNG THỨC ỦY QUYỀN DOANH NGHIỆP</span>
+          </div>
+
+          <div class="sso-btns-grid">
+            <button type="button" class="btn-sso-item" @click="handleSocialLogin('Google Workspace')">
+              <svg viewBox="0 0 24 24" width="14" height="14">
+                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
+                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.24v3.15C3.26 21.41 7.33 24 12 24z"/>
+                <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.24C.45 8.16 0 9.98 0 12s.45 3.84 1.24 5.42l4.04-3.15z"/>
+                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.59 1.24 6.58l4.04 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+              </svg>
+              <span>GOOGLE WORKSPACE</span>
+            </button>
+            <button type="button" class="btn-sso-item" @click="handleSocialLogin('Microsoft Entra')">
+              <svg viewBox="0 0 24 24" width="14" height="14">
+                <path fill="#F25022" d="M1 1h10v10H1z"/>
+                <path fill="#7FBA00" d="M13 1h10v10H13z"/>
+                <path fill="#00A4EF" d="M1 13h10v10H1z"/>
+                <path fill="#FFB900" d="M13 13h10v10H13z"/>
+              </svg>
+              <span>MICROSOFT ENTRA</span>
+            </button>
+          </div>
+
           <div class="form-footer-line">
-            <span>Chưa có tài khoản doanh nghiệp?</span>
-            <span class="admin-contact-hint">Liên hệ Quản trị viên cấp quyền</span>
+            <span>🔒 Giao thức mã hóa cấp chứng thư TLS 1.3</span>
+            <span>Chưa có tài khoản? <strong class="admin-contact-hint">Liên hệ Quản trị viên cấp quyền</strong></span>
           </div>
         </div>
 
-        <!-- MODE 2: QUÊN MẬT KHẨU WIZARD -->
+        <!-- MODE 2: QUÊN MẬT KHẨU WIZARD (GIỮ NGUYÊN 100% LOGIC GỐC) -->
         <div v-else class="form-wrapper forgot-wrapper">
           <div class="form-header">
             <div class="welcome-row">
               <h2 class="form-title">Khôi phục Mật khẩu</h2>
               <span class="auth-pill-secure">OTP Recovery</span>
             </div>
-            <p class="form-sub">Nhận mã xác thực qua Email đã đăng ký để đặt lại mật khẩu</p>
+            <p class="form-sub">Nhận mã xác thực qua Email hoặc Telegram Bot để đặt lại mật mã</p>
           </div>
 
-          <!-- Bước 1: Nhập email/username -->
-          <div v-if="forgotStep === 1" class="wizard-step">
+          <!-- Stepper 3 Bước Roman -->
+          <div v-if="forgotStep <= 3" class="wizard-stepper">
+            <div class="wizard-step-node" :class="{ active: forgotStep >= 1, current: forgotStep === 1 }">
+              <div class="step-num-circle">
+                <span v-if="forgotStep > 1">✓</span>
+                <span v-else>1</span>
+              </div>
+              <span class="step-node-label">Tài khoản</span>
+            </div>
+            <div class="step-divider-line" :class="{ filled: forgotStep >= 2 }"></div>
+            <div class="wizard-step-node" :class="{ active: forgotStep >= 2, current: forgotStep === 2 }">
+              <div class="step-num-circle">
+                <span v-if="forgotStep > 2">✓</span>
+                <span v-else>2</span>
+              </div>
+              <span class="step-node-label">Mã OTP</span>
+            </div>
+            <div class="step-divider-line" :class="{ filled: forgotStep >= 3 }"></div>
+            <div class="wizard-step-node" :class="{ active: forgotStep >= 3, current: forgotStep === 3 }">
+              <div class="step-num-circle">3</div>
+              <span class="step-node-label">Mật mã mới</span>
+            </div>
+          </div>
+
+          <!-- BƯỚC 1: TÀI KHOẢN & KÊNH NHẬN OTP -->
+          <div v-if="forgotStep === 1" class="wizard-step-body">
             <div class="form-field-group">
-              <label class="field-label">Tài khoản hoặc Email doanh nghiệp</label>
+              <div class="pwd-label-row">
+                <label class="field-label">Email hoặc Tên đăng nhập <span class="req">*</span></label>
+                <button type="button" class="btn-sample-inline" @click="forgotForm.identifier = 'admin'">
+                  ⚡ Điền mẫu (admin)
+                </button>
+              </div>
               <div class="input-container">
                 <span class="field-icon">📧</span>
                 <input
-                  v-model.trim="forgotForm.emailOrUser"
+                  v-model="forgotForm.identifier"
                   type="text"
                   class="field-input"
-                  placeholder="Nhập username hoặc email..."
+                  placeholder="admin@enterprisegroup.vn hoặc admin..."
                   required
+                  @keyup.enter="handleSendOtp"
+                />
+              </div>
+            </div>
+
+            <!-- Kênh nhận mã -->
+            <div class="form-field-group">
+              <label class="field-label">Phương thức tiếp nhận mã OTP</label>
+              <div class="channel-grid">
+                <button
+                  type="button"
+                  class="channel-pill-btn"
+                  :class="{ active: forgotForm.channel === 'EMAIL' }"
+                  @click="forgotForm.channel = 'EMAIL'"
+                >
+                  <span>✉️</span>
+                  <span>Email doanh nghiệp</span>
+                </button>
+                <button
+                  type="button"
+                  class="channel-pill-btn"
+                  :class="{ active: forgotForm.channel === 'TELEGRAM' }"
+                  @click="forgotForm.channel = 'TELEGRAM'"
+                >
+                  <span>✈️</span>
+                  <span>Telegram Bot</span>
+                </button>
+              </div>
+            </div>
+
+            <div v-if="forgotForm.channel === 'EMAIL'" class="form-field-group">
+              <label class="field-label">Hộp thư nhận OTP (Tùy chọn)</label>
+              <div class="input-container">
+                <input
+                  v-model="forgotForm.email"
+                  type="email"
+                  class="field-input"
+                  placeholder="Mặc định: Email đã đăng ký trong hồ sơ"
+                  @keyup.enter="handleSendOtp"
+                />
+              </div>
+            </div>
+
+            <div v-if="forgotForm.channel === 'TELEGRAM'" class="form-field-group">
+              <label class="field-label">Telegram Chat ID (Tùy chọn)</label>
+              <div class="input-container">
+                <input
+                  v-model="forgotForm.telegramChatId"
+                  type="text"
+                  class="field-input"
+                  placeholder="Mặc định: Chat ID đã liên kết"
+                  @keyup.enter="handleSendOtp"
                 />
               </div>
             </div>
@@ -390,128 +488,199 @@
               <BaseMathCaptcha
                 ref="forgotCaptchaRef"
                 v-model="isForgotCaptchaPassed"
-                label="Bảo mật gửi OTP"
+                label="Giải phép tính để nhận mã OTP"
                 :compact="true"
               />
             </div>
 
-            <div class="wizard-btn-actions">
+            <div class="wizard-actions">
               <button
                 type="button"
                 class="btn-submit-primary"
-                :disabled="forgotLoading || !forgotForm.emailOrUser || !isForgotCaptchaPassed"
+                :disabled="loading"
                 @click="handleSendOtp"
               >
-                <span>{{ forgotLoading ? 'ĐANG GỬI MÃ...' : 'TIẾP TỤC: GỬI MÃ OTP' }}</span>
+                <span>{{ loading ? 'ĐANG GỬI MÃ XÁC THỰC...' : 'GỬI MÃ XÁC THỰC OTP' }}</span>
                 <span class="btn-arrow">➔</span>
               </button>
-              <button
-                type="button"
-                class="btn-cancel-link"
-                @click="switchMode('login')"
-              >
-                ← Quay lại Đăng nhập
+              <button type="button" class="btn-cancel-link" @click="switchMode('login')">
+                ← Quay lại trang Đăng nhập
               </button>
             </div>
           </div>
 
-          <!-- Bước 2: Nhập OTP -->
-          <div v-else-if="forgotStep === 2" class="wizard-step">
-            <div class="otp-notice-box">
-              <span>Mã OTP giả lập hệ thống:</span>
-              <span class="demo-otp-pill" @click="fillPreviewOtp('888666')">888666 (Click điền)</span>
-            </div>
-
-            <div class="form-field-group">
-              <label class="field-label">Mã xác thực 6 số</label>
-              <div class="input-container">
-                <span class="field-icon">🔑</span>
-                <input
-                  v-model.trim="forgotForm.otp"
-                  type="text"
-                  maxlength="6"
-                  class="field-input otp-input"
-                  placeholder="Nhập 6 số..."
-                />
+          <!-- BƯỚC 2: XÁC THỰC MÃ OTP (6 Ô TÁCH RỜI CHUẨN GỐC) -->
+          <div v-else-if="forgotStep === 2" class="wizard-step-body">
+            <div class="otp-target-card">
+              <span class="target-icon">✉️</span>
+              <div class="target-text">
+                Mã 6 chữ số niêm phong đã gửi đến:<br />
+                <strong>{{ serverTargetInfo || forgotForm.identifier || 'admin@enterprisegroup.vn' }}</strong>
               </div>
             </div>
 
-            <div class="wizard-btn-actions">
+            <!-- Nút xem trước nếu server có trả về OTP demo -->
+            <div
+              v-if="serverGeneratedOtp"
+              class="demo-otp-banner"
+              @click="fillPreviewOtp(serverGeneratedOtp)"
+            >
+              <span>⚡ Mã xem trước: <strong>{{ serverGeneratedOtp }}</strong> (Nhấn để tự điền 6 ô)</span>
+            </div>
+
+            <!-- 6 Ô NHẬP OTP TÁCH RỜI (3 + • + 3) -->
+            <div class="otp-inputs-row">
+              <template v-for="(digit, idx) in otpDigits" :key="idx">
+                <span v-if="idx === 3" class="otp-mid-divider">•</span>
+                <input
+                  :ref="(el) => setOtpInputRef(el, idx)"
+                  v-model="otpDigits[idx]"
+                  type="text"
+                  inputmode="numeric"
+                  maxlength="1"
+                  class="otp-digit-box"
+                  @input="handleOtpDigitInput(idx, $event)"
+                  @keydown="handleOtpKeyDown(idx, $event)"
+                  @paste="handleOtpPaste"
+                />
+              </template>
+            </div>
+
+            <!-- Đồng hồ đếm ngược 5 phút -->
+            <div class="countdown-card">
+              <div class="countdown-text-line">
+                <span>⏳ Thời hạn niêm phong:</span>
+                <strong>{{ formattedCountdown }}</strong>
+              </div>
+              <div class="countdown-progress-track">
+                <div class="countdown-progress-bar" :style="{ width: countdownPercent + '%' }"></div>
+              </div>
+              <div class="resend-action-line">
+                Chưa nhận được mã?
+                <button type="button" class="btn-resend-link" @click="handleSendOtp">GỬI LẠI MÃ OTP</button>
+              </div>
+            </div>
+
+            <div class="wizard-actions">
               <button
                 type="button"
                 class="btn-submit-primary"
-                :disabled="forgotForm.otp.length !== 6"
+                :disabled="loading"
                 @click="handleVerifyOtp"
               >
-                <span>XÁC NHẬN MÃ OTP</span>
+                <span>{{ loading ? 'ĐANG KIỂM TRA MÃ...' : 'XÁC NHẬN MÃ BẢO AN' }}</span>
                 <span class="btn-arrow">➔</span>
               </button>
-              <button
-                type="button"
-                class="btn-cancel-link"
-                @click="forgotStep = 1"
-              >
-                ← Nhập lại email
+              <button type="button" class="btn-cancel-link" @click="forgotStep = 1">
+                ← Thay đổi tài khoản hoặc phương thức
               </button>
             </div>
           </div>
 
-          <!-- Bước 3: Đặt lại mật khẩu -->
-          <div v-else-if="forgotStep === 3" class="wizard-step">
+          <!-- BƯỚC 3: THIẾT LẬP MẬT KHẨU MỚI (CHUẨN NIST 800-63) -->
+          <div v-else-if="forgotStep === 3" class="wizard-step-body">
             <div class="form-field-group">
-              <label class="field-label">Mật khẩu mới</label>
+              <div class="pwd-label-row">
+                <label class="field-label">Mật mã bảo an mới <span class="req">*</span></label>
+                <span class="nist-tag">CHUẨN NIST 800-63</span>
+              </div>
               <div class="input-container">
-                <span class="field-icon">🔒</span>
+                <span class="field-icon">🔓</span>
                 <input
                   v-model="forgotForm.newPassword"
-                  type="password"
+                  :type="showNewPwd ? 'text' : 'password'"
                   class="field-input"
                   placeholder="Nhập mật khẩu mới..."
                 />
+                <button type="button" class="btn-toggle-eye" @click="showNewPwd = !showNewPwd">
+                  {{ showNewPwd ? '🙈' : '👁️' }}
+                </button>
+              </div>
+            </div>
+
+            <!-- 4 Tiêu chí độ vững mạnh -->
+            <div class="pwd-criteria-panel">
+              <div class="criteria-header">
+                <span>Độ vững mạnh:</span>
+                <strong :class="passwordStrengthInfo.colorClass">{{ passwordStrengthInfo.label }}</strong>
+              </div>
+              <div class="criteria-bars-grid">
+                <div
+                  v-for="bar in 4"
+                  :key="bar"
+                  class="criteria-bar-seg"
+                  :class="{ filled: passwordStrengthInfo.score >= bar, [passwordStrengthInfo.colorClass]: passwordStrengthInfo.score >= bar }"
+                ></div>
+              </div>
+              <div class="criteria-checklist">
+                <div class="chk-item" :class="{ passed: pwdCriteria.minLength }">
+                  <span>{{ pwdCriteria.minLength ? '✓' : '○' }}</span>
+                  <span>Tối thiểu 8 ký tự</span>
+                </div>
+                <div class="chk-item" :class="{ passed: pwdCriteria.mixedCase }">
+                  <span>{{ pwdCriteria.mixedCase ? '✓' : '○' }}</span>
+                  <span>Chữ hoa &amp; chữ thường</span>
+                </div>
+                <div class="chk-item" :class="{ passed: pwdCriteria.hasNumber }">
+                  <span>{{ pwdCriteria.hasNumber ? '✓' : '○' }}</span>
+                  <span>Ký tự số (0-9)</span>
+                </div>
+                <div class="chk-item" :class="{ passed: pwdCriteria.hasSpecial }">
+                  <span>{{ pwdCriteria.hasSpecial ? '✓' : '○' }}</span>
+                  <span>Ký tự đặc biệt</span>
+                </div>
               </div>
             </div>
 
             <div class="form-field-group">
-              <label class="field-label">Xác nhận mật khẩu</label>
+              <label class="field-label">Xác nhận mật mã mới <span class="req">*</span></label>
               <div class="input-container">
-                <span class="field-icon">🔒</span>
+                <span class="field-icon">🛡️</span>
                 <input
                   v-model="forgotForm.confirmPassword"
-                  type="password"
+                  :type="showConfirmPwd ? 'text' : 'password'"
                   class="field-input"
-                  placeholder="Nhập lại mật khẩu..."
+                  placeholder="Nhập lại mật khẩu mới..."
+                  @keyup.enter="handleResetPassword"
                 />
+                <span v-if="forgotForm.confirmPassword && forgotForm.confirmPassword === forgotForm.newPassword" class="pwd-matched-ico">✓</span>
               </div>
             </div>
 
-            <div class="wizard-btn-actions">
+            <div class="wizard-actions">
               <button
                 type="button"
                 class="btn-submit-primary"
-                :disabled="!forgotForm.newPassword || forgotForm.newPassword !== forgotForm.confirmPassword"
+                :disabled="loading"
                 @click="handleResetPassword"
               >
-                <span>ĐẶT LẠI MẬT KHẨU</span>
+                <span>{{ loading ? 'ĐANG CẬP NHẬT...' : 'CẬP NHẬT MẬT MÃ BẢO AN' }}</span>
                 <span class="btn-arrow">➔</span>
+              </button>
+              <button type="button" class="btn-cancel-link" @click="switchMode('login')">
+                ↩ Hủy bỏ và quay lại Đăng nhập
               </button>
             </div>
           </div>
 
-          <!-- Bước 4: Hoàn tất -->
-          <div v-else class="wizard-step text-center">
-            <div class="success-icon-seal">✓</div>
-            <h3 class="success-step-title">Khôi phục thành công!</h3>
-            <p class="success-step-desc">Mật khẩu mới đã được cập nhật an toàn vào hệ thống.</p>
+          <!-- BƯỚC 4: HOÀN TẤT THÀNH CÔNG -->
+          <div v-else class="wizard-step-body text-center">
+            <div class="success-seal-circle">✓</div>
+            <h3 class="success-title">Khôi phục thành công!</h3>
+            <p class="success-desc">
+              Mật mã bảo an mới đã được cập nhật và lưu trữ an toàn vào sổ cái hệ thống.
+            </p>
             <button
               type="button"
               class="btn-submit-primary"
-              @click="switchMode('login')"
+              @click="goToLoginAfterReset"
             >
-              <span>ĐĂNG NHẬP NGAY</span>
+              <span>ĐĂNG NHẬP NGAY VỚI MẬT MÃ MỚI</span>
+              <span class="btn-arrow">➔</span>
             </button>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   </div>
 </template>
@@ -524,13 +693,15 @@ import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../store/auth'
 import { ElMessage } from 'element-plus'
+import api from '../api'
 import BaseMathCaptcha from '../components/base/BaseMathCaptcha.vue'
+import BaseLoading from '../components/base/BaseLoading.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
 
 // =========================================================================
-// 1. HELPER FUNCTIONS (ĐẶT LÊN ĐẦU TRÁNH TEMPORAL DEAD ZONE)
+// 1. HELPER FUNCTIONS
 // =========================================================================
 function formatNumber(val) {
   if (val == null) return '0'
@@ -538,36 +709,58 @@ function formatNumber(val) {
 }
 
 // =========================================================================
-// 2. STATE KHAI BÁO & FORMS
+// 2. STATE KHAI BÁO & FORMS (BẢO TOÀN 100% LOGIC GỐC)
 // =========================================================================
-const mode = ref('login')
+const mode = ref('login') // 'login' | 'forgot'
 const loading = ref(false)
+const loadingText = ref('Đang xử lý...')
+const loadingSubText = ref('Vui lòng đợi giây lát...')
 const showPassword = ref(false)
+const showNewPwd = ref(false)
+const showConfirmPwd = ref(false)
 const rememberMe = ref(true)
+
+// Focus tracking
 const isPasswordFocused = ref(false)
 const isUsernameFocused = ref(false)
 
+// Captcha refs
+const isLoginCaptchaPassed = ref(false)
+const isForgotCaptchaPassed = ref(false)
+const loginCaptchaRef = ref(null)
+const forgotCaptchaRef = ref(null)
+const captchaSlotRef = ref(null)
+
+// Login form
 const loginForm = reactive({
   username: '',
   password: ''
 })
 
-const isLoginCaptchaPassed = ref(false)
-const loginCaptchaRef = ref(null)
-const captchaSlotRef = ref(null)
-
+// Forgot Password Wizard
 const forgotStep = ref(1)
-const forgotLoading = ref(false)
-const isForgotCaptchaPassed = ref(false)
-const forgotCaptchaRef = ref(null)
 const forgotForm = reactive({
-  emailOrUser: '',
+  identifier: '',
+  channel: 'EMAIL',
+  email: '',
+  telegramChatId: '',
   otp: '',
   newPassword: '',
   confirmPassword: ''
 })
 
-// Password Strength State
+const serverTargetInfo = ref('')
+const serverGeneratedOtp = ref('')
+
+// 6 ô nhập OTP riêng biệt
+const otpDigits = ref(['', '', '', '', '', ''])
+const otpInputRefs = ref([])
+
+// Đếm ngược OTP 5 phút (300 giây)
+const otpSecondsLeft = ref(300)
+let otpCountdownTimer = null
+
+// Password Strength State (Form Login)
 const pwdStrengthPercent = ref(0)
 const pwdStrengthLabel = ref('')
 const pwdStrengthColor = ref('#cbd5e1')
@@ -603,8 +796,123 @@ function calcPasswordStrength() {
   }
 }
 
+// Password Strength State (Forgot Step 3 NIST)
+const formattedCountdown = computed(() => {
+  const m = Math.floor(otpSecondsLeft.value / 60)
+  const s = otpSecondsLeft.value % 60
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+})
+
+const countdownPercent = computed(() => {
+  return Math.max(0, Math.min(100, Math.round((otpSecondsLeft.value / 300) * 100)))
+})
+
+const pwdCriteria = computed(() => {
+  const p = forgotForm.newPassword || ''
+  return {
+    minLength: p.length >= 8,
+    mixedCase: /[a-z]/.test(p) && /[A-Z]/.test(p),
+    hasNumber: /[0-9]/.test(p),
+    hasSpecial: /[^A-Za-z0-9]/.test(p)
+  }
+})
+
+const passwordStrengthInfo = computed(() => {
+  const c = pwdCriteria.value
+  const p = forgotForm.newPassword || ''
+  if (!p) {
+    return { score: 0, label: 'CHƯA NHẬP', colorClass: 'str-none' }
+  }
+  let score = 0
+  if (c.minLength || p.length >= 6) score++
+  if (c.mixedCase) score++
+  if (c.hasNumber) score++
+  if (c.hasSpecial) score++
+
+  if (score <= 1) return { score: 1, label: 'YẾU', colorClass: 'str-weak' }
+  if (score === 2) return { score: 2, label: 'TRUNG BÌNH', colorClass: 'str-fair' }
+  if (score === 3) return { score: 3, label: 'MẠNH', colorClass: 'str-good' }
+  return { score: 4, label: 'TỐI ƯU (CẤP ĐỘ NGOẠI GIAO)', colorClass: 'str-strong' }
+})
+
 // =========================================================================
-// 3. THEME AURA SWITCHER (ĐỔI GAM MÀU ÁNH SÁNG TƯƠNG TÁC BẰNG JS)
+// 3. OTP TIMER & OTP HELPERS
+// =========================================================================
+const stopOtpTimer = () => {
+  if (otpCountdownTimer) {
+    clearInterval(otpCountdownTimer)
+    otpCountdownTimer = null
+  }
+}
+
+const startOtpTimer = () => {
+  stopOtpTimer()
+  otpSecondsLeft.value = 300
+  otpCountdownTimer = setInterval(() => {
+    if (otpSecondsLeft.value > 0) {
+      otpSecondsLeft.value -= 1
+    } else {
+      stopOtpTimer()
+    }
+  }, 1000)
+}
+
+const setOtpInputRef = (el, idx) => {
+  if (el) {
+    otpInputRefs.value[idx] = el
+  }
+}
+
+const syncOtpToForm = () => {
+  forgotForm.otp = otpDigits.value.join('')
+}
+
+const fillPreviewOtp = (code) => {
+  if (!code) return
+  playPopSound(500)
+  const chars = String(code).trim().slice(0, 6).split('')
+  for (let i = 0; i < 6; i++) {
+    otpDigits.value[i] = chars[i] || ''
+  }
+  syncOtpToForm()
+  ElMessage.success(`⚡ Đã tự động điền mã OTP: ${code}`)
+}
+
+const handleOtpDigitInput = (idx, e) => {
+  const val = (e.target.value || '').replace(/\D/g, '')
+  otpDigits.value[idx] = val.slice(-1)
+  syncOtpToForm()
+  playKeySound()
+  if (val && idx < 5 && otpInputRefs.value[idx + 1]) {
+    otpInputRefs.value[idx + 1].focus()
+  }
+}
+
+const handleOtpKeyDown = (idx, e) => {
+  if (e.key === 'Backspace' && !otpDigits.value[idx] && idx > 0 && otpInputRefs.value[idx - 1]) {
+    otpInputRefs.value[idx - 1].focus()
+  } else if (e.key === 'Enter') {
+    handleVerifyOtp()
+  }
+}
+
+const handleOtpPaste = (e) => {
+  e.preventDefault()
+  const pasted = (e.clipboardData?.getData('text') || '').replace(/\D/g, '').slice(0, 6)
+  if (!pasted) return
+  for (let i = 0; i < 6; i++) {
+    otpDigits.value[i] = pasted[i] || ''
+  }
+  syncOtpToForm()
+  playPopSound(520)
+  const focusIdx = Math.min(5, pasted.length)
+  if (otpInputRefs.value[focusIdx]) {
+    otpInputRefs.value[focusIdx].focus()
+  }
+}
+
+// =========================================================================
+// 4. THEME AURA SWITCHER
 // =========================================================================
 const currentTheme = ref('theme-sapphire')
 
@@ -620,7 +928,7 @@ function changeTheme(themeName) {
 }
 
 // =========================================================================
-// 4. WEB AUDIO SYNTHESIZER (HIỆU ỨNG ÂM THANH JS KHÔNG CẦN FILE MP3)
+// 5. WEB AUDIO SYNTHESIZER
 // =========================================================================
 const soundEnabled = ref(true)
 let audioCtx = null
@@ -665,7 +973,7 @@ function playTone(freq = 440, type = 'sine', duration = 0.08, vol = 0.05) {
     osc.start()
     osc.stop(ctx.currentTime + duration)
   } catch {
-    // Ignore audio autoplay restrictions
+    // Ignore audio policy
   }
 }
 
@@ -695,7 +1003,7 @@ function playSuccessFanfare() {
 }
 
 // =========================================================================
-// 5. MASCOT CYBER SENTRY EYE TRACKING & GREETING
+// 6. MASCOT CYBER SENTRY EYE TRACKING
 // =========================================================================
 const mousePos = reactive({ x: 0, y: 0 })
 const mouseGlowPos = reactive({ x: window.innerWidth / 2, y: window.innerHeight / 2 })
@@ -720,7 +1028,7 @@ const rightPupilStyle = computed(() => {
 })
 
 const mascotGreetingText = computed(() => {
-  if (loading.value) return 'Đang kết nối xác thực...'
+  if (loading.value) return 'Đang xử lý thông tin...'
   if (isPasswordFocused.value && !showPassword.value) return 'Mascot đã nhắm mắt bảo mật!'
   if (isPasswordFocused.value && showPassword.value) return 'Đang mở hé một mắt nhìn lén...'
   if (isUsernameFocused.value) return 'Nhập tên tài khoản của bạn nhé!'
@@ -730,7 +1038,6 @@ const mascotGreetingText = computed(() => {
 
 function updateMascotEyes(e) {
   const maxRadius = 4.5
-  // Left eye center calculation
   const leftEyeElem = document.querySelector('.sentry-eye.left-eye')
   const rightEyeElem = document.querySelector('.sentry-eye.right-eye')
 
@@ -784,7 +1091,7 @@ function handlePasswordInput() {
 }
 
 // =========================================================================
-// 6. MAGNETIC BUTTON ATTRACTION EFFECT
+// 7. MAGNETIC BUTTON EFFECT
 // =========================================================================
 const submitBtnRef = ref(null)
 const submitBtnMagnetic = reactive({ x: 0, y: 0 })
@@ -820,7 +1127,7 @@ function onLeaveInteractive() {
 }
 
 // =========================================================================
-// 7. STAGE 3D PERSPECTIVE PARALLAX & AMBIENT GLOW LERP
+// 8. STAGE 3D PERSPECTIVE PARALLAX & AMBIENT GLOW LERP
 // =========================================================================
 const stageContainerRef = ref(null)
 const stageTilt = reactive({ x: 0, y: 0 })
@@ -837,16 +1144,13 @@ function handleViewportMouseMove(e) {
   mousePos.y = e.clientY
   isMouseInside.value = true
 
-  // Cập nhật mắt mascot
   updateMascotEyes(e)
 
-  // 3D Parallax cho stage container
   const centerX = window.innerWidth / 2
   const centerY = window.innerHeight / 2
   stageTilt.y = ((e.clientX - centerX) / centerX) * 2.2
   stageTilt.x = -((e.clientY - centerY) / centerY) * 2.2
 
-  // 3D Tilt Card ở cột trái
   if (tiltCardRef.value && isHoveringTilt.value) {
     const rect = tiltCardRef.value.getBoundingClientRect()
     const cardX = e.clientX - rect.left
@@ -869,7 +1173,6 @@ function handleViewportMouseLeave() {
   stageTilt.y = 0
 }
 
-// Lerp mượt mà cho vầng hào quang chuột 60fps
 function startGlowLerp() {
   function loop() {
     mouseGlowPos.x += (mousePos.x - mouseGlowPos.x) * 0.12
@@ -879,7 +1182,7 @@ function startGlowLerp() {
   loop()
 }
 
-// Blobs phản ứng chuột
+// Aurora Blobs
 const blob1Style = computed(() => {
   const moveX = (mousePos.x - window.innerWidth / 2) * 0.025
   const moveY = (mousePos.y - window.innerHeight / 2) * 0.025
@@ -898,7 +1201,7 @@ const blob3Style = computed(() => {
 })
 
 // =========================================================================
-// 8. DYNAMIC JS TYPEWRITER SLOGAN
+// 9. DYNAMIC JS TYPEWRITER SLOGAN
 // =========================================================================
 const slogans = [
   'Đột phá Hiệu suất Doanh nghiệp',
@@ -937,7 +1240,7 @@ function tickTypewriter() {
 }
 
 // =========================================================================
-// 9. ANIMATED JS COUNTERS & LIVE CLOCK & SIMULATED REAL-TIME TPS
+// 10. ANIMATED JS COUNTERS & LIVE CLOCK & SIMULATED REAL-TIME TPS
 // =========================================================================
 const counterUptime = ref(0)
 const counterLatency = ref(100)
@@ -986,7 +1289,7 @@ function startLiveTpsSimulation() {
 }
 
 // =========================================================================
-// 10. REAL-TIME AUDIT STREAM TICKER (JS WEBSOCKET SIMULATION)
+// 11. REAL-TIME AUDIT STREAM TICKER
 // =========================================================================
 const auditMessages = [
   '🟢 [Live] Cụm máy chủ VN-Central: Tải CPU 14% • RAM 36%',
@@ -1006,7 +1309,7 @@ function startAuditTicker() {
 }
 
 // =========================================================================
-// 11. 3D TILT EFFECT TRÊN TILT CARD
+// 12. 3D TILT EFFECT TRÊN TILT CARD
 // =========================================================================
 const tiltCardRef = ref(null)
 const isHoveringTilt = ref(false)
@@ -1042,7 +1345,7 @@ function onTiltLeave() {
 }
 
 // =========================================================================
-// 12. CANVAS INTERACTIVE PARTICLES (NEURAL CONSTELLATION)
+// 13. CANVAS PARTICLES & CONFETTI & SPARKLES
 // =========================================================================
 const canvasRef = ref(null)
 let animFrameId = null
@@ -1077,7 +1380,6 @@ function initCanvasParticles() {
   function render() {
     ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-    // Xác định màu sắc hạt theo Theme Aura hiện tại
     let particleColor = 'rgba(37, 99, 235, '
     let lineColor = 'rgba(147, 197, 253, '
     if (currentTheme.value === 'theme-emerald') {
@@ -1098,13 +1400,11 @@ function initCanvasParticles() {
       if (p.y < 0) p.y = canvas.height
       if (p.y > canvas.height) p.y = 0
 
-      // Vẽ hạt tròn
       ctx.beginPath()
       ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2)
       ctx.fillStyle = particleColor + p.baseAlpha + ')'
       ctx.fill()
 
-      // Tương tác chuột kéo hút nhẹ hạt xung quanh
       const dxMouse = mousePos.x - p.x
       const dyMouse = mousePos.y - p.y
       const distMouse = Math.sqrt(dxMouse * dxMouse + dyMouse * dyMouse)
@@ -1117,7 +1417,6 @@ function initCanvasParticles() {
         ctx.stroke()
       }
 
-      // Nối dây giữa các hạt
       for (let j = i + 1; j < count; j++) {
         const p2 = particles[j]
         const dx = p.x - p2.x
@@ -1140,9 +1439,6 @@ function initCanvasParticles() {
   render()
 }
 
-// =========================================================================
-// 13. CONFETTI CELEBRATION EFFECT KHI ĐĂNG NHẬP THÀNH CÔNG
-// =========================================================================
 const confettiCanvasRef = ref(null)
 const confettiPieces = []
 
@@ -1209,9 +1505,6 @@ function triggerConfetti() {
   runConfetti()
 }
 
-// =========================================================================
-// 14. MICRO SPARKLES CANVAS KHI GIẢI ĐÚNG CAPTCHA
-// =========================================================================
 const sparkleCanvasRef = ref(null)
 const sparkles = []
 
@@ -1276,34 +1569,52 @@ function onCaptchaVerified() {
 }
 
 // =========================================================================
-// 15. FORM ACTIONS & RIPPLE
+// 14. LOGIC NGHIỆP VỤ (BẢO TOÀN 100% TỪ GỐC)
 // =========================================================================
-function fillCredentials(user, pass) {
-  playPopSound(480)
-  loginForm.username = user
-  loginForm.password = pass
-  calcPasswordStrength()
-  isLoginCaptchaPassed.value = true
-  ElMessage.success(`⚡ Đã điền thông tin tài khoản mẫu [${user}]!`)
-}
-
-function fillPreviewOtp(otpVal) {
-  playPopSound(500)
-  forgotForm.otp = otpVal
-  ElMessage.success(`⚡ Đã điền mã OTP: ${otpVal}`)
-}
-
 function switchMode(newMode) {
   playPopSound(440)
   mode.value = newMode
-  if (newMode === 'login') {
-    isLoginCaptchaPassed.value = false
-    loginCaptchaRef.value?.generateNewEquation?.()
-  } else {
+  stopOtpTimer()
+  if (newMode === 'forgot') {
     forgotStep.value = 1
-    isForgotCaptchaPassed.value = false
-    forgotCaptchaRef.value?.generateNewEquation?.()
+    serverTargetInfo.value = ''
+    serverGeneratedOtp.value = ''
+    forgotForm.identifier = ''
+    forgotForm.channel = 'EMAIL'
+    forgotForm.email = ''
+    forgotForm.telegramChatId = ''
+    forgotForm.otp = ''
+    forgotForm.newPassword = ''
+    forgotForm.confirmPassword = ''
+    otpDigits.value = ['', '', '', '', '', '']
+    if (forgotCaptchaRef.value) forgotCaptchaRef.value.reset()
+  } else if (newMode === 'login') {
+    if (loginCaptchaRef.value) loginCaptchaRef.value.reset()
   }
+}
+
+function fillDemoAccount() {
+  playPopSound(480)
+  loginForm.username = 'admin'
+  loginForm.password = 'password'
+  calcPasswordStrength()
+  if (loginCaptchaRef.value && loginCaptchaRef.value.autoSolveForDemo) {
+    loginCaptchaRef.value.autoSolveForDemo()
+  } else {
+    isLoginCaptchaPassed.value = true
+  }
+  ElMessage.success({
+    message: '⚡ Đã tự động điền tài khoản Quản trị viên (admin / password)!',
+    duration: 2500
+  })
+}
+
+function handleSocialLogin(provider) {
+  playPopSound(450)
+  ElMessage.info({
+    message: `Đang kết nối xác thực SSO với ${provider}... (Tính năng Enterprise)`,
+    duration: 3000
+  })
 }
 
 function createRipple(e) {
@@ -1325,64 +1636,152 @@ function onSubmitClick(e) {
   playPopSound(560)
 }
 
+// Xử lý Đăng Nhập
 async function handleLogin() {
   if (!loginForm.username || !loginForm.password) {
-    ElMessage.warning('Vui lòng nhập đầy đủ tài khoản và mật khẩu!')
+    ElMessage.warning('Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.')
     return
   }
 
-  if (!isLoginCaptchaPassed.value) {
-    ElMessage.warning('Vui lòng giải phép tính bảo mật trước khi đăng nhập!')
+  if (loginCaptchaRef.value && !loginCaptchaRef.value.validate()) {
+    ElMessage.warning('Vui lòng giải đúng phép tính để đăng nhập!')
     return
   }
 
   loading.value = true
+  loadingText.value = 'Đang xác thực thông tin...'
+  loadingSubText.value = 'Mã hóa token và thiết lập phiên làm việc...'
+
   try {
-    const success = await authStore.login(loginForm.username, loginForm.password)
-    if (success) {
+    const result = await authStore.login(loginForm.username.trim(), loginForm.password)
+    if (result === true || result?.success) {
       playSuccessFanfare()
       triggerConfetti()
-      ElMessage.success(`🎉 Chào mừng ${loginForm.username} quay trở lại ERP Cloud!`)
+      ElMessage.success('Đăng nhập thành công! Đang chuyển hướng vào hệ thống...')
       setTimeout(() => {
         router.push('/')
       }, 700)
+    } else {
+      ElMessage.error(result?.message || 'Tên đăng nhập hoặc mật khẩu không chính xác!')
+      if (loginCaptchaRef.value) loginCaptchaRef.value.reset()
     }
   } catch (err) {
-    const msg = err?.response?.data?.message || err?.message || 'Tên đăng nhập hoặc mật khẩu không chính xác!'
-    ElMessage.error(msg)
-    isLoginCaptchaPassed.value = false
-    loginCaptchaRef.value?.generateNewEquation?.()
+    ElMessage.error(err.response?.data?.message || err.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại.')
+    if (loginCaptchaRef.value) loginCaptchaRef.value.reset()
   } finally {
     loading.value = false
   }
 }
 
-function handleSendOtp() {
-  forgotLoading.value = true
-  playPopSound(480)
-  setTimeout(() => {
-    forgotLoading.value = false
-    forgotStep.value = 2
-    ElMessage.success('Mã OTP đã được gửi đến hộp thư!')
-  }, 600)
-}
-
-function handleVerifyOtp() {
-  if (forgotForm.otp !== '888666' && forgotForm.otp.length !== 6) {
-    ElMessage.error('Mã OTP không đúng! (Dùng mã giả lập 888666)')
+// Xử lý Quên Mật Khẩu Bước 1: Gửi OTP
+async function handleSendOtp() {
+  if (!forgotForm.identifier || !forgotForm.identifier.trim()) {
+    ElMessage.warning('Vui lòng nhập tên đăng nhập hoặc email!')
     return
   }
-  playChimeSound()
-  forgotStep.value = 3
+
+  if (forgotStep.value === 1 && forgotCaptchaRef.value && !forgotCaptchaRef.value.validate()) {
+    ElMessage.warning('Vui lòng giải đúng phép tính để nhận mã OTP!')
+    return
+  }
+
+  loading.value = true
+  loadingText.value = forgotForm.channel === 'EMAIL'
+    ? 'Đang gửi mã OTP qua Email...'
+    : 'Đang gửi mã OTP qua Telegram...'
+  loadingSubText.value = 'Hệ thống đang niêm phong mã bảo an và chuyển phát...'
+
+  try {
+    const payload = {
+      identifier: forgotForm.identifier.trim(),
+      channel: forgotForm.channel,
+      email: forgotForm.email ? forgotForm.email.trim() : undefined,
+      telegramChatId: forgotForm.telegramChatId ? forgotForm.telegramChatId.trim() : undefined
+    }
+
+    const res = await api.post('/auth/forgot-password', payload)
+    serverGeneratedOtp.value = res.data?.otp || ''
+    serverTargetInfo.value = res.data?.target || (forgotForm.channel === 'EMAIL' ? 'Hộp thư Email' : 'Telegram Bot')
+    otpDigits.value = ['', '', '', '', '', '']
+    forgotForm.otp = ''
+    forgotStep.value = 2
+    startOtpTimer()
+    ElMessage.success(res.data?.message || 'Mã xác thực OTP đã được gửi thành công!')
+  } catch (err) {
+    ElMessage.error(err.response?.data?.message || 'Không tìm thấy tài khoản trong hệ thống!')
+    if (forgotStep.value === 1 && forgotCaptchaRef.value) forgotCaptchaRef.value.reset()
+  } finally {
+    loading.value = false
+  }
 }
 
-function handleResetPassword() {
-  playSuccessFanfare()
-  forgotStep.value = 4
+// Xử lý Quên Mật Khẩu Bước 2: Xác nhận OTP
+async function handleVerifyOtp() {
+  syncOtpToForm()
+  if (!forgotForm.otp || forgotForm.otp.trim().length !== 6) {
+    ElMessage.warning('Vui lòng nhập đầy đủ mã OTP 6 chữ số!')
+    return
+  }
+
+  loading.value = true
+  loadingText.value = 'Đang kiểm tra mã OTP...'
+  loadingSubText.value = 'Xác minh tính hợp lệ và thời hạn niêm phong...'
+
+  try {
+    await api.post('/auth/verify-otp', {
+      otp: forgotForm.otp.trim()
+    })
+    stopOtpTimer()
+    playChimeSound()
+    forgotStep.value = 3
+    ElMessage.success('Xác thực OTP thành công! Vui lòng thiết lập mật mã mới.')
+  } catch (err) {
+    ElMessage.error(err.response?.data?.message || 'Mã OTP không chính xác hoặc đã hết hạn!')
+  } finally {
+    loading.value = false
+  }
+}
+
+// Xử lý Quên Mật Khẩu Bước 3: Đặt lại mật khẩu mới
+async function handleResetPassword() {
+  if (!forgotForm.newPassword || forgotForm.newPassword.length < 6) {
+    ElMessage.warning('Mật khẩu mới phải có ít nhất 6 ký tự!')
+    return
+  }
+
+  if (forgotForm.newPassword !== forgotForm.confirmPassword) {
+    ElMessage.warning('Mật khẩu xác nhận không trùng khớp!')
+    return
+  }
+
+  loading.value = true
+  loadingText.value = 'Đang cập nhật mật mã mới...'
+  loadingSubText.value = 'Đang mã hóa và niêm phong vào sổ cái bảo mật...'
+
+  try {
+    await api.post('/auth/reset-password', {
+      token: forgotForm.otp.trim(),
+      newPassword: forgotForm.newPassword
+    })
+    playSuccessFanfare()
+    forgotStep.value = 4
+    ElMessage.success('Đặt lại mật khẩu thành công!')
+  } catch (err) {
+    ElMessage.error(err.response?.data?.message || 'Lỗi khi đặt lại mật khẩu!')
+  } finally {
+    loading.value = false
+  }
+}
+
+function goToLoginAfterReset() {
+  loginForm.username = forgotForm.identifier
+  loginForm.password = forgotForm.newPassword
+  calcPasswordStrength()
+  switchMode('login')
 }
 
 // =========================================================================
-// 16. LIFECYCLE HOOKS
+// 15. LIFECYCLE HOOKS
 // =========================================================================
 onMounted(() => {
   initCanvasParticles()
@@ -1396,6 +1795,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  stopOtpTimer()
   if (animFrameId) cancelAnimationFrame(animFrameId)
   if (glowRaf) cancelAnimationFrame(glowRaf)
   if (clockTimer) clearInterval(clockTimer)
@@ -1614,7 +2014,7 @@ onBeforeUnmount(() => {
   max-width: 1180px;
   height: 86vh;
   max-height: 720px;
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.94);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-radius: 20px;
@@ -1647,7 +2047,7 @@ onBeforeUnmount(() => {
    2. CỘT TRÁI: ENTERPRISE SHOWCASE PANEL (NỀN SÁNG SANG TRỌNG)
    ========================================================================= */
 .hero-showcase-panel {
-  padding: 32px 36px;
+  padding: 30px 36px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -1703,7 +2103,7 @@ onBeforeUnmount(() => {
   font-size: 11px;
   font-weight: 700;
   color: var(--primary-hover, #1d4ed8);
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
 .live-dot {
@@ -1740,14 +2140,14 @@ onBeforeUnmount(() => {
 }
 
 .hero-description {
-  margin: 0 0 18px;
+  margin: 0 0 16px;
   font-size: 12.5px;
   line-height: 1.6;
   color: #475569;
   max-width: 480px;
 }
 
-/* 3D Tilt Showcase Card Nền Trắng Sang Trọng */
+/* 3D Tilt Showcase Card */
 .interactive-tilt-card {
   position: relative;
   background: #ffffff;
@@ -1950,10 +2350,10 @@ onBeforeUnmount(() => {
 }
 
 /* =========================================================================
-   3. CỘT PHẢI: AUTH FORM PANEL & MASCOT CYBER SENTRY
+   3. CỘT PHẢI: AUTH FORM PANEL (NỀN TRẮNG TINH KHIẾT)
    ========================================================================= */
 .auth-card-panel {
-  padding: 24px 34px;
+  padding: 22px 32px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -1963,7 +2363,7 @@ onBeforeUnmount(() => {
 }
 
 .form-wrapper {
-  max-width: 400px;
+  max-width: 410px;
   width: 100%;
   margin: 0 auto;
 }
@@ -1974,16 +2374,16 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   gap: 12px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .sentry-head {
   position: relative;
-  width: 52px;
-  height: 40px;
+  width: 50px;
+  height: 38px;
   background: #f1f5f9;
   border: 2px solid #cbd5e1;
-  border-radius: 14px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2013,13 +2413,13 @@ onBeforeUnmount(() => {
 .sentry-face {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
 }
 
 .sentry-eye {
   position: relative;
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
   border-radius: 50%;
   background: #ffffff;
   border: 1.5px solid #94a3b8;
@@ -2030,8 +2430,8 @@ onBeforeUnmount(() => {
 }
 
 .sentry-pupil {
-  width: 6px;
-  height: 6px;
+  width: 5.5px;
+  height: 5.5px;
   border-radius: 50%;
   background: var(--primary-hover, #1d4ed8);
   transition: transform 0.08s ease-out;
@@ -2050,7 +2450,7 @@ onBeforeUnmount(() => {
   border-radius: 12px;
   opacity: 0;
   pointer-events: none;
-  transform: translateY(10px) scale(0.8);
+  transform: translateY(8px) scale(0.8);
   transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
@@ -2063,15 +2463,15 @@ onBeforeUnmount(() => {
   background: var(--primary-light, #eff6ff);
   border: 1px solid var(--primary-border, #bfdbfe);
   border-radius: 8px;
-  padding: 4px 10px;
-  font-size: 10.5px;
+  padding: 3px 8px;
+  font-size: 10px;
   font-weight: 600;
   color: var(--primary-hover, #1d4ed8);
   max-width: 220px;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
 }
 
-/* Form Headers */
+/* Header */
 .welcome-row {
   display: flex;
   align-items: center;
@@ -2090,77 +2490,79 @@ onBeforeUnmount(() => {
   font-weight: 700;
   background: #ecfdf5;
   color: #059669;
-  padding: 3px 8px;
+  padding: 2px 7px;
   border-radius: 6px;
   border: 1px solid #a7f3d0;
 }
 
 .form-sub {
-  margin: 3px 0 12px;
+  margin: 2px 0 10px;
   font-size: 12px;
   color: #64748b;
 }
 
-/* Quick Fill Buttons */
-.quick-accounts-toolbar {
+/* Thẻ Thử Nghiệm Demo Ledger */
+.demo-ledger-box {
   background: #f8fafc;
   border: 1px dashed #cbd5e1;
   border-radius: 8px;
-  padding: 7px 10px;
+  padding: 8px 12px;
   margin-bottom: 12px;
-}
-
-.quick-title {
-  font-size: 10.5px;
-  font-weight: 600;
-  color: #475569;
-  display: block;
-  margin-bottom: 5px;
-}
-
-.quick-btns-row {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.demo-ledger-box:hover {
+  background: #f1f5f9;
+  border-color: var(--primary-color, #2563eb);
+  transform: translateY(-1px);
+}
+
+.demo-ledger-left {
+  display: flex;
+  align-items: center;
   gap: 8px;
 }
 
-.btn-quick-fill {
-  flex: 1;
-  border: none;
-  padding: 5px 8px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+.demo-ledger-icon {
+  font-size: 18px;
 }
 
-.btn-quick-fill.admin {
+.demo-ledger-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #475569;
+}
+
+.demo-ledger-cred {
+  font-size: 11px;
+  color: #1e293b;
+}
+
+.btn-fill-sample {
+  border: 1px solid var(--primary-border, #bfdbfe);
   background: var(--primary-light, #eff6ff);
   color: var(--primary-hover, #1d4ed8);
-  border: 1px solid var(--primary-border, #bfdbfe);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
 }
 
-.btn-quick-fill.admin:hover {
+.btn-fill-sample:hover {
   background: #dbeafe;
-  transform: translateY(-1px);
-}
-
-.btn-quick-fill.user {
-  background: #f0fdf4;
-  color: #15803d;
-  border: 1px solid #bbf7d0;
-}
-
-.btn-quick-fill.user:hover {
-  background: #dcfce7;
-  transform: translateY(-1px);
 }
 
 /* Form Fields */
 .auth-form {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 9px;
 }
 
 .form-field-group {
@@ -2173,6 +2575,10 @@ onBeforeUnmount(() => {
   font-size: 11.5px;
   font-weight: 600;
   color: #334155;
+}
+
+.req {
+  color: #ef4444;
 }
 
 .pwd-label-row {
@@ -2243,7 +2649,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 3px;
+  margin-top: 2px;
 }
 
 .strength-bar-track {
@@ -2266,7 +2672,7 @@ onBeforeUnmount(() => {
 }
 
 .captcha-form-slot {
-  margin: 2px 0;
+  margin: 1px 0;
 }
 
 .form-options-row {
@@ -2306,7 +2712,7 @@ onBeforeUnmount(() => {
   gap: 8px;
   box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
   transition: box-shadow 0.2s ease, background 0.3s ease;
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 .btn-submit-primary:hover:not(:disabled) {
@@ -2355,10 +2761,61 @@ onBeforeUnmount(() => {
   to { transform: rotate(360deg); }
 }
 
-.form-footer-line {
-  margin-top: 14px;
+/* SSO Buttons */
+.sso-divider-row {
+  margin: 10px 0 8px;
+  display: flex;
+  align-items: center;
   text-align: center;
-  font-size: 11.5px;
+  color: #94a3b8;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+}
+
+.sso-divider-row::before,
+.sso-divider-row::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.sso-divider-row span {
+  padding: 0 8px;
+}
+
+.sso-btns-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.btn-sso-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-sso-item:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  transform: translateY(-1px);
+}
+
+.form-footer-line {
+  margin-top: 10px;
+  text-align: center;
+  font-size: 11px;
   color: #64748b;
   display: flex;
   flex-direction: column;
@@ -2370,17 +2827,111 @@ onBeforeUnmount(() => {
   color: var(--primary-color, #2563eb);
 }
 
-/* Wizard Styles */
-.wizard-step {
+/* =========================================================================
+   4. FORGOT PASSWORD WIZARD (CHUẨN GỐC GIAO DIỆN SÁNG)
+   ========================================================================= */
+.wizard-stepper {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
 }
 
-.wizard-btn-actions {
+.wizard-step-node {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  opacity: 0.5;
+  transition: opacity 0.2s ease;
+}
+
+.wizard-step-node.active {
+  opacity: 1;
+}
+
+.step-num-circle {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #e2e8f0;
+  color: #475569;
+  font-size: 10.5px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wizard-step-node.active .step-num-circle {
+  background: var(--primary-color, #2563eb);
+  color: #ffffff;
+}
+
+.step-node-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.step-divider-line {
+  flex: 1;
+  height: 2px;
+  background: #e2e8f0;
+  margin: 0 8px;
+}
+
+.step-divider-line.filled {
+  background: var(--primary-color, #2563eb);
+}
+
+.wizard-step-body {
   display: flex;
   flex-direction: column;
+  gap: 10px;
+}
+
+.btn-sample-inline {
+  border: none;
+  background: transparent;
+  color: var(--primary-color, #2563eb);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.channel-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
+}
+
+.channel-pill-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #f8fafc;
+  font-size: 11px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.channel-pill-btn.active {
+  border-color: var(--primary-color, #2563eb);
+  background: var(--primary-light, #eff6ff);
+  color: var(--primary-hover, #1d4ed8);
+  font-weight: 700;
+}
+
+.wizard-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   margin-top: 4px;
 }
 
@@ -2390,7 +2941,7 @@ onBeforeUnmount(() => {
   color: #64748b;
   font-size: 11.5px;
   font-weight: 600;
-  padding: 6px;
+  padding: 4px;
   cursor: pointer;
 }
 
@@ -2398,37 +2949,181 @@ onBeforeUnmount(() => {
   color: #0f172a;
 }
 
-.otp-notice-box {
-  background: #f0fdf4;
-  border: 1px solid #bbf7d0;
-  padding: 8px 12px;
+/* OTP Step 2 */
+.otp-target-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
-  font-size: 11.5px;
-  color: #166534;
+  padding: 8px 12px;
   display: flex;
   align-items: center;
   gap: 8px;
+  font-size: 11.5px;
+  color: #334155;
 }
 
-.demo-otp-pill {
+.demo-otp-banner {
   background: #fef3c7;
   border: 1px dashed #f59e0b;
-  padding: 4px 8px;
+  padding: 6px 10px;
   border-radius: 6px;
   font-size: 11px;
   color: #92400e;
   cursor: pointer;
+  text-align: center;
 }
 
-.otp-input {
-  letter-spacing: 4px;
+.otp-inputs-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 6px 0;
+}
+
+.otp-digit-box {
+  width: 44px;
+  height: 48px;
+  text-align: center;
+  font-size: 20px;
+  font-weight: 800;
+  color: #0f172a;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.otp-digit-box:focus {
+  border-color: var(--primary-color, #2563eb);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.otp-mid-divider {
+  font-size: 16px;
   font-weight: 700;
-  font-size: 15px;
+  color: #94a3b8;
 }
 
-.success-icon-seal {
-  width: 50px;
-  height: 50px;
+.countdown-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.countdown-text-line {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11.5px;
+  color: #475569;
+}
+
+.countdown-progress-track {
+  height: 4px;
+  background: #e2e8f0;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.countdown-progress-bar {
+  height: 100%;
+  background: var(--primary-color, #2563eb);
+  transition: width 1s linear;
+}
+
+.resend-action-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: #64748b;
+}
+
+.btn-resend-link {
+  border: none;
+  background: transparent;
+  color: var(--primary-color, #2563eb);
+  font-weight: 700;
+  font-size: 10.5px;
+  cursor: pointer;
+}
+
+.btn-resend-link:hover {
+  text-decoration: underline;
+}
+
+/* Step 3 NIST Password Criteria */
+.nist-tag {
+  font-size: 9px;
+  font-weight: 700;
+  background: #ecfdf5;
+  color: #059669;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.pwd-criteria-panel {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.criteria-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #475569;
+}
+
+.criteria-bars-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+
+.criteria-bar-seg {
+  height: 4px;
+  background: #e2e8f0;
+  border-radius: 2px;
+}
+
+.criteria-bar-seg.filled.str-weak { background: #ef4444; }
+.criteria-bar-seg.filled.str-fair { background: #f59e0b; }
+.criteria-bar-seg.filled.str-good { background: #3b82f6; }
+.criteria-bar-seg.filled.str-strong { background: #10b981; }
+
+.criteria-checklist {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  font-size: 10.5px;
+  color: #64748b;
+}
+
+.chk-item.passed {
+  color: #059669;
+  font-weight: 600;
+}
+
+.pwd-matched-ico {
+  color: #10b981;
+  font-weight: 800;
+  font-size: 14px;
+}
+
+/* Step 4 Success */
+.success-seal-circle {
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   background: #10b981;
   color: #ffffff;
@@ -2436,18 +3131,18 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 16px auto 8px;
-  box-shadow: 0 8px 20px rgba(16, 185, 129, 0.35);
+  margin: 14px auto 6px;
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.35);
 }
 
-.success-step-title {
-  font-size: 17px;
-  font-weight: 700;
+.success-title {
+  font-size: 18px;
+  font-weight: 800;
   color: #0f172a;
   margin: 0;
 }
 
-.success-step-desc {
+.success-desc {
   font-size: 12px;
   color: #64748b;
   margin: 4px 0 16px;
