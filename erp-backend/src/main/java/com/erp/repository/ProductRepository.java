@@ -33,4 +33,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             @Param("stockStatus") String stockStatus,
             Pageable pageable
     );
+
+    @Query("SELECT p FROM Product p WHERE p.stock <= :threshold ORDER BY p.stock ASC")
+    java.util.List<Product> findTopLowStockProducts(@Param("threshold") int threshold, Pageable pageable);
 }

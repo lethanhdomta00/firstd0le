@@ -82,3 +82,20 @@ html, body {
 .el-color-dropdown {
   z-index: 12000 !important;
 }
+
+/* Quy chuẩn Tooltip Nền Trắng Rõ Ràng To Thoáng Toàn Dự Án */
+.el-popper.is-dark {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08) !important;
+  font-size: 13px !important;
+  padding: 8px 14px !important;
+  border-radius: 8px !important;
+  font-weight: 500 !important;
+}
+
+.el-popper.is-dark .el-popper__arrow::before {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}

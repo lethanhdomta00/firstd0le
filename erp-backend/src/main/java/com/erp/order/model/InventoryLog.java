@@ -7,7 +7,11 @@ import java.time.LocalDateTime;
 
 @Data
 @Entity
-@Table(name = "erp_inventory_logs")
+@Table(name = "erp_inventory_logs", indexes = {
+    @Index(name = "idx_inv_log_created_at", columnList = "created_at"),
+    @Index(name = "idx_inv_log_product_id", columnList = "product_id"),
+    @Index(name = "idx_inv_log_movement_type", columnList = "movement_type")
+})
 public class InventoryLog {
 
     @Id

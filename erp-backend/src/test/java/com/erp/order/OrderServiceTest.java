@@ -212,4 +212,25 @@ class OrderServiceTest {
         assertTrue(xml.contains("ORD-20261112-9999"));
         assertTrue(csv.contains("ORD-20261112-9999"));
     }
+
+    @Test
+    void getOrderStats_usesDbAggregateSafely() {
+        OrderStatsAggregate aggregate = new OrderStatsAggregate(
+                10L, 2L, 3L, 1L, 3L, 1L, 4L,
+                new BigDecimal("900000"),
+                new BigDecimal("300000"),
+                new BigDecimal("300000")
+        );
+        when(orderRepository.getOrderStatsAggregate(any())).thenReturn(aggregate);
+
+        OrderStatsDto stats = orderService.getOrderStats();
+
+        assertEquals(10L, stats.getTotalOrders());
+        assertEquals(3L, stats.getCompletedOrders());
+        assertEquals(5L, stats.getPendingFulfillmentCount()); // 2 pending + 3 confirmed
+        assertEquals(new BigDecimal("900000"), stats.getActiveRevenue());
+        assertEquals(30.0, stats.getCompletionRate());
+        verify(orderRepository, times(1)).getOrderStatsAggregate(any());
+        verify(orderRepository, never()).findAll();
+    }
 }

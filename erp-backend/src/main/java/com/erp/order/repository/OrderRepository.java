@@ -1,5 +1,6 @@
 package com.erp.order.repository;
 
+import com.erp.order.dto.OrderStatsAggregate;
 import com.erp.order.model.Order;
 import com.erp.order.model.OrderStatus;
 import com.erp.order.model.PaymentStatus;
@@ -18,6 +19,20 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     boolean existsByOrderCode(String orderCode);
 
     Optional<Order> findByOrderCode(String orderCode);
+
+    @Query("SELECT new com.erp.order.dto.OrderStatsAggregate(" +
+           " COUNT(o.id), " +
+           " SUM(CASE WHEN o.status = com.erp.order.model.OrderStatus.PENDING THEN 1L ELSE 0L END), " +
+           " SUM(CASE WHEN o.status = com.erp.order.model.OrderStatus.CONFIRMED THEN 1L ELSE 0L END), " +
+           " SUM(CASE WHEN o.status = com.erp.order.model.OrderStatus.SHIPPING THEN 1L ELSE 0L END), " +
+           " SUM(CASE WHEN o.status = com.erp.order.model.OrderStatus.COMPLETED THEN 1L ELSE 0L END), " +
+           " SUM(CASE WHEN o.status = com.erp.order.model.OrderStatus.CANCELLED THEN 1L ELSE 0L END), " +
+           " SUM(CASE WHEN o.createdAt >= :startOfToday THEN 1L ELSE 0L END), " +
+           " COALESCE(SUM(CASE WHEN o.status != com.erp.order.model.OrderStatus.CANCELLED THEN o.totalAmount ELSE 0 END), 0), " +
+           " COALESCE(SUM(CASE WHEN o.status = com.erp.order.model.OrderStatus.COMPLETED THEN o.totalAmount ELSE 0 END), 0), " +
+           " COALESCE(SUM(CASE WHEN o.paymentStatus = com.erp.order.model.PaymentStatus.PAID THEN o.totalAmount ELSE 0 END), 0) " +
+           ") FROM Order o")
+    OrderStatsAggregate getOrderStatsAggregate(@Param("startOfToday") LocalDateTime startOfToday);
 
     @Query("SELECT o FROM Order o WHERE " +
            "(:keyword IS NULL OR :keyword = '' OR " +

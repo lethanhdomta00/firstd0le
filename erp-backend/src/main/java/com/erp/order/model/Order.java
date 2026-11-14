@@ -16,7 +16,12 @@ import java.util.List;
 @ToString
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Entity
-@Table(name = "erp_orders")
+@Table(name = "erp_orders", indexes = {
+    @Index(name = "idx_orders_created_at", columnList = "created_at"),
+    @Index(name = "idx_orders_status", columnList = "status"),
+    @Index(name = "idx_orders_payment_status", columnList = "payment_status"),
+    @Index(name = "idx_orders_order_code", columnList = "order_code")
+})
 public class Order {
 
     @Id

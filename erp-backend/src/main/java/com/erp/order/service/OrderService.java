@@ -72,47 +72,21 @@ public class OrderService {
 
     @Transactional(readOnly = true)
     public OrderStatsDto getOrderStats() {
-        List<Order> allOrders = orderRepository.findAll();
-        LocalDate today = LocalDate.now();
+        LocalDateTime startOfToday = LocalDate.now().atStartOfDay();
+        com.erp.order.dto.OrderStatsAggregate agg = orderRepository.getOrderStatsAggregate(startOfToday);
 
-        long totalOrders = allOrders.size();
-        long pendingOrders = 0;
-        long confirmedOrders = 0;
-        long shippingOrders = 0;
-        long completedOrders = 0;
-        long cancelledOrders = 0;
-        long todayOrders = 0;
-        long activeCount = 0;
+        long totalOrders = agg.totalOrders();
+        long pendingOrders = agg.pendingOrders();
+        long confirmedOrders = agg.confirmedOrders();
+        long shippingOrders = agg.shippingOrders();
+        long completedOrders = agg.completedOrders();
+        long cancelledOrders = agg.cancelledOrders();
+        long todayOrders = agg.todayOrders();
+        long activeCount = totalOrders - cancelledOrders;
 
-        BigDecimal activeRevenue = BigDecimal.ZERO;
-        BigDecimal completedRevenue = BigDecimal.ZERO;
-        BigDecimal paidRevenue = BigDecimal.ZERO;
-
-        for (Order order : allOrders) {
-            if (order.getCreatedAt() != null && order.getCreatedAt().toLocalDate().equals(today)) {
-                todayOrders++;
-            }
-
-            switch (order.getStatus()) {
-                case PENDING -> pendingOrders++;
-                case CONFIRMED -> confirmedOrders++;
-                case SHIPPING -> shippingOrders++;
-                case COMPLETED -> completedOrders++;
-                case CANCELLED -> cancelledOrders++;
-            }
-
-            BigDecimal amount = order.getTotalAmount() != null ? order.getTotalAmount() : BigDecimal.ZERO;
-            if (order.getStatus() != OrderStatus.CANCELLED) {
-                activeRevenue = activeRevenue.add(amount);
-                activeCount++;
-            }
-            if (order.getStatus() == OrderStatus.COMPLETED) {
-                completedRevenue = completedRevenue.add(amount);
-            }
-            if (order.getPaymentStatus() == PaymentStatus.PAID && order.getStatus() != OrderStatus.CANCELLED) {
-                paidRevenue = paidRevenue.add(amount);
-            }
-        }
+        BigDecimal activeRevenue = agg.activeRevenue();
+        BigDecimal completedRevenue = agg.completedRevenue();
+        BigDecimal paidRevenue = agg.paidRevenue();
 
         BigDecimal avgOrderValue = activeCount > 0
                 ? activeRevenue.divide(BigDecimal.valueOf(activeCount), 0, RoundingMode.HALF_UP)

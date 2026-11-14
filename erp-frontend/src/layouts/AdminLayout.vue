@@ -117,7 +117,7 @@
           </template>
         </el-menu-item>
 
-        <el-menu-item index="/analytics" @click.prevent="notifyFeature('Báo cáo & Phân tích')">
+        <el-menu-item index="/analytics">
           <el-icon><DataAnalysis /></el-icon>
           <template #title>
             <span class="menu-title-text">Báo cáo & Phân tích</span>

@@ -603,8 +603,25 @@ function refreshData() {
   ElMessage.success('⚡ Đã đồng bộ dữ liệu thời gian thực từ Database!')
 }
 
-function exportExcel() {
-  ElMessage.success('📥 Đang kết xuất báo cáo doanh nghiệp ra tệp Excel (.xlsx)...')
+async function exportExcel() {
+  try {
+    ElMessage.info('📥 Đang kết xuất báo cáo BI đa sheet thời gian thực...')
+    const res = await api.get('/analytics/export-excel', {
+      responseType: 'blob'
+    })
+    const blob = new Blob([res.data], { type: 'application/vnd.ms-excel;charset=UTF-8' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `Bao_Cao_ERP_Dashboard_${new Date().toISOString().slice(0, 10)}.xls`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    window.URL.revokeObjectURL(url)
+    ElMessage.success('🎉 Đã tải xuống báo cáo phân tích kinh doanh thành công!')
+  } catch {
+    ElMessage.error('Không thể xuất báo cáo phân tích!')
+  }
 }
 
 function createPO(sku) {

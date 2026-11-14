@@ -13,7 +13,10 @@ import java.math.BigDecimal;
 @ToString
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Entity
-@Table(name = "erp_order_items")
+@Table(name = "erp_order_items", indexes = {
+    @Index(name = "idx_order_items_order_id", columnList = "order_id"),
+    @Index(name = "idx_order_items_product_id", columnList = "product_id")
+})
 public class OrderItem {
 
     @Id

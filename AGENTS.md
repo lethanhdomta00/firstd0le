@@ -39,6 +39,7 @@ Tệp quy tắc thường trực (`always_on`) dành cho trợ lý AI khi làm v
   - **Không lặp dữ liệu thừa (DRY UI)**: Thông tin đã hiển thị ở Header hoặc Bảng (người tạo, trạng thái, tổng số lượng) không lặp lại ở khối Metadata bên dưới.
   - **Bảng dữ liệu dễ quét (Scannable Tables)**: Mã chứng từ/tiền tệ giữ `white-space: nowrap`, tên dài cắt gọn `text-overflow: ellipsis`, gộp thuộc tính phụ (SKU dưới tên chính), gom action ít dùng (`Sửa`/`Xóa`) vào menu `⋯`, và gộp các nút xuất file phụ thành dropdown.
   - **Bố cục Hóa đơn & Modal Footer chuẩn**: Khối tổng tiền (`Tạm tính`, `VAT`, `Tổng cộng`) gom gọn `260px–300px` căn phải sát số tiền; Footer tách nút hủy nhẹ bên trái khỏi nút `Đóng` + CTA chính bên phải.
+  - **Quy chuẩn Tooltip Nền Trắng Rõ Nét (Zero Dark Cramped Tooltips)**: Mọi tooltip biểu đồ và chú thích hệ thống luôn dùng nền trắng (`background: #ffffff`), viền mảnh (`border: 1px solid #e2e8f0`), chữ tối tương phản cao (`color: #0f172a`), kích thước to thoáng (`padding: 10px 14px`, số liệu nổi bật `font-size: 14px–16px font-bold`), bóng đổ mềm mại (`box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1)`), tuyệt đối không dùng tooltip nền đen nhỏ xíu gây khó đọc.
 
 ## 5. Tiêu chuẩn Hiệu năng Hàng Triệu Dữ liệu (High-Scale Performance)
 - ⚡ **Zero `findAll()` OOM trong Service / BI**: Tuyệt đối không dùng `repository.findAll()` nạp toàn bộ bảng vào RAM JVM để đếm, tính tổng hay vẽ biểu đồ. Mọi thống kê (`stats`, `analytics`, báo cáo BI) bắt buộc dùng **SQL Aggregate (`COUNT`, `SUM`, `AVG`, `GROUP BY`)** hoặc projection DTO ngay tại tầng Database.
