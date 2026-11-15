@@ -15,6 +15,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
+import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -25,9 +26,18 @@ public class DataInitializer implements CommandLineRunner {
     private final AnnouncementRepository announcementRepository;
     private final ScheduledJobRepository scheduledJobRepository;
     private final PasswordEncoder passwordEncoder;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     @Override
     public void run(String... args) {
+        try {
+            // Tự động nâng cấp cột role từ enum cũ lên VARCHAR(30) để hỗ trợ đầy đủ các Roles RBAC mở rộng
+            jdbcTemplate.execute("ALTER TABLE users MODIFY COLUMN role VARCHAR(30) NOT NULL DEFAULT 'USER'");
+            log.info("Migrated users.role column to VARCHAR(30) for dynamic RBAC roles");
+        } catch (Exception e) {
+            log.warn("Notice on users.role schema alter: {}", e.getMessage());
+        }
+
         // 1. Đảm bảo tài khoản ADMIN
         Optional<User> adminOpt = userRepository.findByUsername("admin");
         if (adminOpt.isEmpty()) {
@@ -89,7 +99,24 @@ public class DataInitializer implements CommandLineRunner {
             log.info("Updated HIHI password to: password");
         }
 
-        // 4. Khởi tạo Thông báo / Sự kiện mẫu nếu bảng trống
+        // 4. Khởi tạo tài khoản Copilot AI Bot (Trợ lý điều hành ảo)
+        Optional<User> copilotOpt = userRepository.findByUsername("copilot");
+        if (copilotOpt.isEmpty()) {
+            User copilot = new User();
+            copilot.setUsername("copilot");
+            copilot.setFullName("🤖 ERP AI Copilot");
+            copilot.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
+            copilot.setRole(Role.ADMIN);
+            copilot.setStatus("ACTIVE");
+            copilot.setEmail("copilot@erp-internal.ai");
+            copilot.setPhone("1900-ERP-AI");
+            copilot.setBio("Trợ lý điều hành thông minh đa chiều của hệ thống ERP Cloud");
+            copilot.setAvatarUrl("https://api.dicebear.com/7.x/bottts/svg?seed=copilot");
+            userRepository.save(copilot);
+            log.info("Initialized default COPILOT AI Bot account: copilot");
+        }
+
+        // 5. Khởi tạo Thông báo / Sự kiện mẫu nếu bảng trống
         if (announcementRepository.count() == 0) {
             Announcement defaultAnnouncement = new Announcement();
             defaultAnnouncement.setTitle("Chào mừng hệ thống");

@@ -52,11 +52,14 @@ public class WebSocketEventListener {
     }
 
     public static Set<String> getOnlineUsernames() {
-        return Collections.unmodifiableSet(userSessionCount.keySet());
+        Set<String> set = new java.util.HashSet<>(userSessionCount.keySet());
+        set.add("copilot"); // Copilot AI Bot luôn online 24/7
+        return Collections.unmodifiableSet(set);
     }
 
     private void broadcastOnlineUsers() {
-        Set<String> onlineList = userSessionCount.keySet();
+        Set<String> onlineList = new java.util.HashSet<>(userSessionCount.keySet());
+        onlineList.add("copilot");
         try {
             messagingTemplate.convertAndSend("/topic/online-users", onlineList);
         } catch (Exception e) {

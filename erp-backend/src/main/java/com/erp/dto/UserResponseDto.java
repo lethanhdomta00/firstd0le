@@ -22,6 +22,7 @@ public class UserResponseDto {
     private String avatarUrl;
     private String bio;
     private Role role;
+    private String roleTitle;
     private String status;
     private String nickname;
     private String lastMessageContent;
@@ -43,6 +44,7 @@ public class UserResponseDto {
                 .avatarUrl(user.getAvatarUrl())
                 .bio(user.getBio())
                 .role(user.getRole())
+                .roleTitle(user.getRole() != null ? user.getRole().getTitle() : "")
                 .status(user.getStatus() != null ? user.getStatus() : "ACTIVE")
                 .createdAt(user.getCreatedAt())
                 .build();

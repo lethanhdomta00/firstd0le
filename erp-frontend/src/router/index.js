@@ -63,6 +63,11 @@ const routes = [
         meta: { role: 'ADMIN' }
       },
       {
+        path: 'settings',
+        name: 'Settings',
+        component: () => import('../views/Settings.vue')
+      },
+      {
         path: ':pathMatch(.*)*',
         name: 'NotFound',
         component: () => import('../views/NotFound.vue')

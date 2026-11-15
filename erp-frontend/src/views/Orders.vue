@@ -299,6 +299,16 @@
                   <td class="text-right">
                     <div class="row-actions-group">
                       <button
+                        v-if="order.paymentStatus !== 'PAID' && order.status !== 'CANCELLED'"
+                        type="button"
+                        class="btn-row-action vietqr-btn"
+                        title="Quét mã VietQR (NAPAS 24/7)"
+                        @click="openVietQrModal(order)"
+                      >
+                        ⚡ VietQR
+                      </button>
+
+                      <button
                         type="button"
                         class="btn-row-action primary"
                         title="Xem chi tiết &amp; chuyển trạng thái"
@@ -378,6 +388,14 @@
               </div>
 
               <div class="m-card-actions">
+                <button
+                  v-if="order.paymentStatus !== 'PAID' && order.status !== 'CANCELLED'"
+                  type="button"
+                  class="btn-row-action vietqr-btn"
+                  @click="openVietQrModal(order)"
+                >
+                  ⚡ VietQR
+                </button>
                 <button type="button" class="btn-row-action primary" @click="openDetailModal(order)">
                   Chi tiết / Xử lý
                 </button>
@@ -833,6 +851,14 @@
             </p>
           </div>
           <div class="modal-head-actions">
+            <button
+              v-if="activeOrder.paymentStatus !== 'PAID' && activeOrder.status !== 'CANCELLED'"
+              type="button"
+              class="btn-header-vietqr"
+              @click="openVietQrModal(activeOrder)"
+            >
+              ⚡ Quét mã VietQR
+            </button>
             <button type="button" class="btn-header-outline" @click="printOrderInvoice(activeOrder)">
               🖨️ Xuất Hóa đơn PDF (A4)
             </button>
@@ -1068,6 +1094,93 @@
         </div>
       </div>
     </div>
+
+    <!-- ========================================================== -->
+    <!-- MODAL 4: THANH TOÁN TỰ ĐỘNG VIETQR CHUẨN NAPAS 24/7        -->
+    <!-- ========================================================== -->
+    <div v-if="vietQrModalVisible" class="custom-modal-overlay" @click.self="vietQrModalVisible = false">
+      <div class="custom-modal-card vietqr-modal-card">
+        <div class="modal-head">
+          <div class="modal-title-row">
+            <span class="vietqr-napas-badge">⚡ VIETQR • NAPAS 24/7</span>
+            <h3>Thanh toán Đơn hàng {{ vietQrData?.orderCode }}</h3>
+          </div>
+          <button type="button" class="btn-modal-close" @click="vietQrModalVisible = false">✕</button>
+        </div>
+
+        <div v-loading="loadingVietQr" class="modal-body-scroll vietqr-body">
+          <div v-if="vietQrData" class="vietqr-grid">
+            <!-- Cột 1: Khung quét mã QR động -->
+            <div class="vietqr-qr-col">
+              <div class="qr-canvas-box">
+                <img :src="vietQrData.qrImageUrl" alt="Mã VietQR" class="vietqr-img" />
+                <div class="qr-laser-scanner"></div>
+              </div>
+              <p class="qr-note-txt">
+                Mở app Ngân hàng (MB, VCB, Techcombank, BIDV,...) hoặc Ví điện tử quét mã để thanh toán tức thời
+              </p>
+            </div>
+
+            <!-- Cột 2: Thông tin chuyển khoản chi tiết -->
+            <div class="vietqr-info-col">
+              <div class="vietqr-amount-card">
+                <span class="amount-tag">SỐ TIỀN CẦN THANH TOÁN</span>
+                <div class="amount-num">{{ formatCurrency(vietQrData.totalAmount) }}</div>
+                <div class="amount-words">({{ numberToVietnameseWords(vietQrData.totalAmount) }})</div>
+              </div>
+
+              <div class="vietqr-specs-box">
+                <div class="spec-line">
+                  <span class="s-label">Ngân hàng:</span>
+                  <span class="s-val font-semibold">{{ vietQrData.bankName }} ({{ vietQrData.bankId }})</span>
+                </div>
+                <div class="spec-line">
+                  <span class="s-label">Số tài khoản:</span>
+                  <div class="s-val-copy">
+                    <span class="s-code">{{ vietQrData.accountNo }}</span>
+                    <button type="button" class="btn-copy-mini" @click="copyText(vietQrData.accountNo, 'Số tài khoản')">Sao chép</button>
+                  </div>
+                </div>
+                <div class="spec-line">
+                  <span class="s-label">Chủ tài khoản:</span>
+                  <span class="s-val font-semibold">{{ vietQrData.accountName }}</span>
+                </div>
+                <div class="spec-line highlight">
+                  <span class="s-label">Nội dung CK:</span>
+                  <div class="s-val-copy">
+                    <span class="s-code s-indigo">{{ vietQrData.transferContent }}</span>
+                    <button type="button" class="btn-copy-mini" @click="copyText(vietQrData.transferContent, 'Nội dung CK')">Sao chép</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="vietqr-alert-note">
+                💡 <strong>Lưu ý:</strong> Vui lòng giữ nguyên nội dung chuyển khoản để hệ thống tự động ghi nhận thanh toán trong 3 giây.
+              </div>
+
+              <div class="vietqr-action-btn-wrap">
+                <button
+                  type="button"
+                  class="btn-mock-webhook"
+                  :disabled="payingMock || vietQrData.paid"
+                  @click="handlePayVietQrMock"
+                >
+                  <span v-if="vietQrData.paid">✅ ĐÃ HOÀN TẤT THANH TOÁN (PAID)</span>
+                  <span v-else>{{ payingMock ? 'Đang đối soát...' : '💳 Xác nhận đã chuyển khoản (Mô phỏng Webhook)' }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-foot">
+          <span></span>
+          <div class="foot-buttons">
+            <button type="button" class="btn-header-outline" @click="vietQrModalVisible = false">Đóng</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -1120,6 +1233,7 @@ function formatCompactRevenue(val) {
 
 function formatPaymentShort(method) {
   switch (method) {
+    case 'VIETQR': return 'VietQR'
     case 'BANK_TRANSFER': return 'Chuyển khoản'
     case 'CREDIT': return 'Công nợ'
     default: return 'Tiền mặt'
@@ -1351,6 +1465,12 @@ const orderForm = reactive({
 const detailModalVisible = ref(false)
 const activeOrder = ref(null)
 const updatingStatus = ref(false)
+
+// VietQR modal state
+const vietQrModalVisible = ref(false)
+const loadingVietQr = ref(false)
+const vietQrData = ref(null)
+const payingMock = ref(false)
 
 // Adjust stock modal state
 const adjustModalVisible = ref(false)
@@ -1760,6 +1880,65 @@ function confirmDeleteOrder(order) {
       ElMessage.error(err.response?.data?.message || 'Không thể xóa đơn hàng!')
     }
   }).catch(() => {})
+}
+
+// =========================================================================
+// VIETQR WORKFLOW (NAPAS 24/7 & MOCK WEBHOOK)
+// =========================================================================
+async function openVietQrModal(order) {
+  if (!order || !order.id) return
+  vietQrModalVisible.value = true
+  loadingVietQr.value = true
+  vietQrData.value = null
+  try {
+    const res = await api.get(`/orders/${order.id}/vietqr`)
+    vietQrData.value = res.data
+  } catch (err) {
+    ElMessage.error(err.response?.data?.message || 'Không thể tạo mã VietQR cho đơn hàng này!')
+    vietQrModalVisible.value = false
+  } finally {
+    loadingVietQr.value = false
+  }
+}
+
+async function handlePayVietQrMock() {
+  if (!vietQrData.value || !vietQrData.value.orderId) return
+  payingMock.value = true
+  try {
+    const res = await api.post(`/orders/${vietQrData.value.orderId}/pay-vietqr-mock`)
+    vietQrData.value = res.data
+    ElMessage.success(`Xác nhận thanh toán VietQR thành công cho đơn ${res.data.orderCode}!`)
+    if (activeOrder.value && activeOrder.value.id === res.data.orderId) {
+      activeOrder.value.paymentStatus = 'PAID'
+      activeOrder.value.paymentStatusLabel = 'Đã thanh toán'
+    }
+    await Promise.all([fetchOrders(), fetchOrderStats()])
+  } catch (err) {
+    ElMessage.error(err.response?.data?.message || 'Không thể mô phỏng xác nhận thanh toán!')
+  } finally {
+    payingMock.value = false
+  }
+}
+
+async function copyText(text, label) {
+  if (!text) return
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(String(text))
+    } else {
+      const textarea = document.createElement('textarea')
+      textarea.value = String(text)
+      textarea.style.position = 'fixed'
+      textarea.style.opacity = '0'
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+    }
+    ElMessage.success(`Đã sao chép ${label || 'nội dung'} vào bộ nhớ tạm!`)
+  } catch (e) {
+    ElMessage.info(`Nội dung: ${text}`)
+  }
 }
 
 // =========================================================================
@@ -3328,6 +3507,278 @@ onBeforeUnmount(() => {
 @media (max-width: 560px) {
   .orders-metrics-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ========================================================================= */
+/* VIETQR STYLES (BUTTONS, MODAL & LASER SCANNER)                            */
+/* ========================================================================= */
+.btn-row-action.vietqr-btn {
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+.btn-row-action.vietqr-btn:hover {
+  background: #2563eb;
+  color: #ffffff;
+  border-color: #2563eb;
+}
+
+.btn-header-vietqr {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+  transition: all 0.2s ease;
+}
+.btn-header-vietqr:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+}
+
+.vietqr-modal-card {
+  max-width: 820px;
+  width: 95%;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.vietqr-napas-badge {
+  display: inline-block;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  margin-bottom: 4px;
+}
+
+.vietqr-body {
+  padding: 24px;
+  background: #fafafa;
+}
+
+.vietqr-grid {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.vietqr-qr-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #ffffff;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.qr-canvas-box {
+  position: relative;
+  width: 280px;
+  height: 280px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vietqr-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.qr-laser-scanner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #2563eb, transparent);
+  box-shadow: 0 0 10px #2563eb;
+  animation: laserScan 2.5s ease-in-out infinite alternate;
+}
+
+@keyframes laserScan {
+  0% { top: 4%; opacity: 0.2; }
+  50% { opacity: 1; }
+  100% { top: 94%; opacity: 0.2; }
+}
+
+.qr-note-txt {
+  font-size: 12px;
+  color: #64748b;
+  text-align: center;
+  margin-top: 12px;
+  line-height: 1.4;
+}
+
+.vietqr-info-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.vietqr-amount-card {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  color: #ffffff;
+  padding: 16px 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
+}
+
+.amount-tag {
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.amount-num {
+  font-size: 26px;
+  font-weight: 800;
+  color: #38bdf8;
+  margin: 4px 0 2px 0;
+}
+
+.amount-words {
+  font-size: 12px;
+  color: #cbd5e1;
+  font-style: italic;
+}
+
+.vietqr-specs-box {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.spec-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  padding: 4px 0;
+  border-bottom: 1px dashed #f1f5f9;
+}
+.spec-line:last-child {
+  border-bottom: none;
+}
+.spec-line.highlight {
+  background: #f8fafc;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border-bottom: none;
+}
+
+.s-label {
+  color: #64748b;
+  font-weight: 500;
+}
+.s-val {
+  color: #1e293b;
+}
+.s-val-copy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.s-code {
+  font-family: 'Consolas', monospace;
+  font-weight: 700;
+  color: #0f172a;
+}
+.s-code.s-indigo {
+  color: #2563eb;
+  background: #eff6ff;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.btn-copy-mini {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-copy-mini:hover {
+  background: #2563eb;
+  color: #ffffff;
+  border-color: #2563eb;
+}
+
+.vietqr-alert-note {
+  font-size: 12px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #b45309;
+  padding: 10px 12px;
+  border-radius: 8px;
+  line-height: 1.4;
+}
+
+.vietqr-action-btn-wrap {
+  margin-top: 4px;
+}
+
+.btn-mock-webhook {
+  width: 100%;
+  padding: 12px 18px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.25);
+  transition: all 0.2s ease;
+}
+.btn-mock-webhook:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.35);
+}
+.btn-mock-webhook:disabled {
+  background: #94a3b8;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+@media (max-width: 768px) {
+  .vietqr-grid {
+    grid-template-columns: 1fr;
+  }
+  .qr-canvas-box {
+    width: 240px;
+    height: 240px;
   }
 }
 </style>

@@ -10,6 +10,11 @@ import com.erp.repository.AnnouncementRepository;
 import com.erp.repository.ChatMessageRepository;
 import com.erp.repository.ProductRepository;
 import com.erp.repository.UserRepository;
+import com.erp.order.dto.OrderStatsAggregate;
+import com.erp.order.model.Order;
+import com.erp.order.repository.OrderRepository;
+import com.erp.calendar.model.CalendarEvent;
+import com.erp.calendar.repository.CalendarEventRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -17,10 +22,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.text.Normalizer;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Optional;
 import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -35,6 +43,8 @@ public class ChatService {
     private final UserRepository userRepository;
     private final AnnouncementRepository announcementRepository;
     private final GeminiService geminiService;
+    private final OrderRepository orderRepository;
+    private final CalendarEventRepository calendarEventRepository;
 
     /**
      * Lấy toàn bộ lịch sử trò chuyện RIÊNG BIỆT của tài khoản đang đăng nhập
@@ -88,6 +98,27 @@ public class ChatService {
     }
 
     /**
+     * Tạo phản hồi trực tiếp của Trợ lý Copilot cho phòng chat thời gian thực hoặc tin nhắn riêng
+     */
+    public String generateBotReplyForPrompt(User user, String userContent) {
+        String prompt = userContent != null ? userContent.trim() : "";
+        List<ChatMessage> userHistory = (user != null && user.getId() != null)
+                ? chatMessageRepository.findByUserIdOrderByCreatedAtAsc(user.getId())
+                : List.of();
+
+        String botReply = null;
+        if (geminiService.isConfigured()) {
+            botReply = geminiService.generateReply(user, prompt, userHistory);
+        }
+
+        if (botReply == null || botReply.trim().isEmpty()) {
+            botReply = generateSmartReply(user, prompt);
+        }
+
+        return botReply;
+    }
+
+    /**
      * Xóa sạch lịch sử trò chuyện của tài khoản đang đăng nhập
      */
     @Transactional
@@ -116,7 +147,29 @@ public class ChatService {
             return mathResult;
         }
 
-        // 2. Hỏi THỜI GIAN, NGÀY THÁNG, GIỜ GIẤC HIỆN TẠI ("Mấy giờ rồi", "Hôm nay thứ mấy",...)
+        // 2. Tra cứu chi tiết một ĐƠN HÀNG cụ thể theo mã (VD: "ORD-20261114-1234")
+        Matcher orderMatcher = Pattern.compile("(?i)\\b(ORD-[0-9A-Za-z_-]+)\\b").matcher(prompt);
+        if (orderMatcher.find()) {
+            String code = orderMatcher.group(1).toUpperCase();
+            return buildOrderLookupResponse(code);
+        }
+
+        // 3. Báo cáo Doanh thu & Thống kê Tình hình Đơn hàng
+        if (isRevenueOrOrderQuery(unaccented)) {
+            return buildRevenueAndOrderStatsResponse();
+        }
+
+        // 4. Lịch biểu, Lịch họp & Công việc hôm nay
+        if (isCalendarOrTaskQuery(unaccented)) {
+            return buildTodayCalendarEventsResponse(user);
+        }
+
+        // 5. Hệ thống Phân quyền Doanh nghiệp (RBAC 6 roles)
+        if (isRbacQuery(unaccented)) {
+            return buildRbacRoleMatrixResponse();
+        }
+
+        // 6. Hỏi THỜI GIAN, NGÀY THÁNG, GIỜ GIẤC HIỆN TẠI ("Mấy giờ rồi", "Hôm nay thứ mấy",...)
         if (isTimeOrDateQuery(normalized, unaccented)) {
             return buildTimeAndDateResponse();
         }
@@ -471,8 +524,9 @@ public class ChatService {
      */
     private boolean isSystemInfoQuery(String unaccented) {
         if (unaccented == null) return false;
+        if (isRbacQuery(unaccented)) return false;
         return containsAny(unaccented,
-                "phien ban", "version", "he thong", "server", "may chu", "ha tang", 
+                "phien ban", "version", "server", "may chu", "ha tang", 
                 "sla", "cong nghe", "kien truc", "may chu o dau", "datacenter", "data center");
     }
 
@@ -713,5 +767,172 @@ public class ChatService {
         } catch (Exception e) {
             return "⚠️ Không thể tự động tạo sản phẩm vào Database: " + e.getMessage();
         }
+    }
+
+    /**
+     * Tra cứu chi tiết một đơn hàng theo mã cụ thể (ORD-...)
+     */
+    private String buildOrderLookupResponse(String code) {
+        Optional<Order> orderOpt = orderRepository.findByOrderCode(code);
+        if (orderOpt.isEmpty()) {
+            return String.format("❌ **Không tìm thấy đơn hàng `%s` trong hệ thống!**\n\n"
+                    + "Bạn vui lòng kiểm tra lại chính xác mã đơn hàng (ví dụ: `ORD-20261114-1001`) hoặc vào trang **Quản lý Đơn hàng** để tìm kiếm nhé.", code);
+        }
+
+        Order o = orderOpt.get();
+        String statusLabel = switch (o.getStatus()) {
+            case PENDING -> "⏳ Đang chờ duyệt (PENDING)";
+            case CONFIRMED -> "📋 Đã xác nhận (CONFIRMED)";
+            case SHIPPING -> "🚚 Đang vận chuyển (SHIPPING)";
+            case COMPLETED -> "✅ Đã hoàn tất (COMPLETED)";
+            case CANCELLED -> "❌ Đã hủy (CANCELLED)";
+        };
+
+        String paymentLabel = switch (o.getPaymentStatus()) {
+            case PAID -> "🟢 Đã thanh toán (PAID)";
+            case UNPAID -> "🔴 Chưa thanh toán (UNPAID)";
+            case REFUNDED -> "↩️ Đã hoàn tiền (REFUNDED)";
+        };
+
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("HH:mm:ss dd/MM/yyyy");
+        String createdAtStr = o.getCreatedAt() != null ? o.getCreatedAt().format(dtf) : "N/A";
+
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format("📦 **Thông tin Đơn hàng chi tiết `%s`:**\n\n", o.getOrderCode()));
+        sb.append(String.format("• **Khách hàng:** **%s**\n", o.getCustomerName()));
+        if (o.getCustomerPhone() != null && !o.getCustomerPhone().isEmpty()) {
+            sb.append(String.format("• **Số điện thoại:** `%s`\n", o.getCustomerPhone()));
+        }
+        sb.append(String.format("• **Tổng tiền:** **%,.0f đ**\n", o.getTotalAmount() != null ? o.getTotalAmount().doubleValue() : 0.0));
+        sb.append(String.format("• **Trạng thái đơn:** %s\n", statusLabel));
+        sb.append(String.format("• **Thanh toán:** %s (Phương thức: `%s`)\n", paymentLabel, o.getPaymentMethod()));
+        sb.append(String.format("• **Thời điểm tạo:** %s\n", createdAtStr));
+
+        if (o.getShippingAddress() != null && !o.getShippingAddress().isEmpty()) {
+            sb.append(String.format("• **Địa chỉ giao:** %s\n", o.getShippingAddress()));
+        }
+
+        if (o.getItems() != null && !o.getItems().isEmpty()) {
+            sb.append("\n**Danh sách sản phẩm trong đơn:**\n");
+            for (var item : o.getItems()) {
+                sb.append(String.format("  - %s (x%d) — %,.0f đ\n",
+                        item.getProductName(),
+                        item.getQuantity(),
+                        item.getLineTotal() != null ? item.getLineTotal().doubleValue() : 0.0));
+            }
+        }
+
+        return sb.toString();
+    }
+
+    private boolean isRevenueOrOrderQuery(String unaccented) {
+        if (unaccented == null) return false;
+        return containsAny(unaccented,
+                "doanh thu", "doanh so", "don hang", "tong thu", "tien thu",
+                "tinh hinh ban hang", "ban duoc bao nhieu", "don moi", "tien ban",
+                "bao cao don", "tinh hinh don", "don trong ngay");
+    }
+
+    private String buildRevenueAndOrderStatsResponse() {
+        LocalDateTime startOfToday = LocalDateTime.now(ZoneId.of("Asia/Ho_Chi_Minh")).toLocalDate().atStartOfDay();
+        OrderStatsAggregate stats = orderRepository.getOrderStatsAggregate(startOfToday);
+
+        double totalRev = stats.activeRevenue() != null ? stats.activeRevenue().doubleValue() : 0.0;
+        double paidRev = stats.paidRevenue() != null ? stats.paidRevenue().doubleValue() : 0.0;
+        double completedRev = stats.completedRevenue() != null ? stats.completedRevenue().doubleValue() : 0.0;
+
+        long totalOrders = stats.totalOrders() != null ? stats.totalOrders() : 0L;
+        long todayOrders = stats.todayOrders() != null ? stats.todayOrders() : 0L;
+        long pendingOrders = stats.pendingOrders() != null ? stats.pendingOrders() : 0L;
+        long shippingOrders = stats.shippingOrders() != null ? stats.shippingOrders() : 0L;
+        long completedOrders = stats.completedOrders() != null ? stats.completedOrders() : 0L;
+        long cancelledOrders = stats.cancelledOrders() != null ? stats.cancelledOrders() : 0L;
+
+        return String.format("📊 **Báo cáo Doanh thu & Tình hình Đơn hàng thời gian thực:**\n\n"
+                + "💰 **Số liệu Tài chính - Doanh thu:**\n"
+                + "• Tổng doanh thu hợp lệ: **%,.0f đ**\n"
+                + "• Doanh thu đã thu tiền: **%,.0f đ** 🟢\n"
+                + "• Doanh thu đơn đã hoàn tất: **%,.0f đ**\n\n"
+                + "📦 **Tình hình Lưu lượng Đơn hàng:**\n"
+                + "• Tổng số đơn hệ thống: **%d đơn**\n"
+                + "• Đơn phát sinh hôm nay: **%d đơn** ⚡\n"
+                + "• Đang chờ duyệt: **%d đơn** | Đang giao: **%d đơn**\n"
+                + "• Hoàn tất: **%d đơn** | Đã hủy: **%d đơn**\n\n"
+                + "💡 *Dữ liệu được tổng hợp trực tiếp từ ACID Database không có độ trễ.*",
+                totalRev, paidRev, completedRev, totalOrders, todayOrders, pendingOrders, shippingOrders, completedOrders, cancelledOrders);
+    }
+
+    private boolean isCalendarOrTaskQuery(String unaccented) {
+        if (unaccented == null) return false;
+        return containsAny(unaccented,
+                "lich hop", "lich lam viec", "lich bieu", "cong viec", "su kien",
+                "deadline", "lich hom nay", "hom nay lam gi", "co lich gi", "lich trinh");
+    }
+
+    private String buildTodayCalendarEventsResponse(User user) {
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh"));
+        LocalDateTime start = today.atStartOfDay();
+        LocalDateTime end = today.plusDays(1).atStartOfDay().minusNanos(1);
+
+        List<CalendarEvent> allEvents = calendarEventRepository.findEventsInRange(start, end);
+        String currentUsername = user != null ? user.getUsername() : "";
+
+        List<CalendarEvent> myEvents = allEvents.stream()
+                .filter(e -> (e.getAssigneeUsername() != null && e.getAssigneeUsername().equalsIgnoreCase(currentUsername))
+                        || (e.getCreatorUsername() != null && e.getCreatorUsername().equalsIgnoreCase(currentUsername))
+                        || Boolean.TRUE.equals(e.getIsPublic()))
+                .toList();
+
+        if (myEvents.isEmpty()) {
+            return String.format("📅 **Lịch biểu hôm nay (%s):**\n\n"
+                    + "✨ Hiện tại bạn **không có lịch họp hoặc nhiệm vụ nào** cần giải quyết trong hôm nay!\n"
+                    + "Chúc bạn một ngày làm việc thảnh thơi hoặc tập trung tối đa cho các kế hoạch phát triển mới nhé! 😊",
+                    today.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+        }
+
+        DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("HH:mm");
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format("📅 **Lịch biểu & Công việc hôm nay (%s):**\n\n", today.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))));
+        sb.append(String.format("Hôm nay bạn có **%d sự kiện / nhiệm vụ**:\n\n", myEvents.size()));
+
+        for (CalendarEvent e : myEvents) {
+            String startTimeStr = e.getStartTime() != null ? e.getStartTime().format(timeFmt) : "--:--";
+            String endTimeStr = e.getEndTime() != null ? e.getEndTime().format(timeFmt) : "--:--";
+            String priorityIcon = switch (e.getPriority() != null ? e.getPriority() : com.erp.calendar.model.EventPriority.MEDIUM) {
+                case URGENT -> "🔴 [KHẨN CẤP]";
+                case HIGH -> "🟠 [CAO]";
+                case MEDIUM -> "🟡 [VỪA]";
+                case LOW -> "⚪ [THẤP]";
+                default -> "🟡 [VỪA]";
+            };
+
+            sb.append(String.format("• **%s - %s**: **%s** %s\n", startTimeStr, endTimeStr, e.getTitle(), priorityIcon));
+            if (e.getLocation() != null && !e.getLocation().isEmpty()) {
+                sb.append(String.format("   📍 Địa điểm: %s\n", e.getLocation()));
+            }
+            if (e.getMeetingUrl() != null && !e.getMeetingUrl().isEmpty()) {
+                sb.append(String.format("   🔗 Link họp trực tuyến: `%s`\n", e.getMeetingUrl()));
+            }
+        }
+
+        sb.append("\n💡 *Bạn có thể bấm vào menu **Lịch biểu & Công việc** trên Sidebar để xem chi tiết hoặc thêm sự kiện mới nhé!*");
+        return sb.toString();
+    }
+
+    private boolean isRbacQuery(String unaccented) {
+        if (unaccented == null) return false;
+        return containsAny(unaccented, "vai tro", "phan quyen", "rbac", "quyen han", "chuc vu", "cac vai tro");
+    }
+
+    private String buildRbacRoleMatrixResponse() {
+        return "🛡️ **Ma trận Phân quyền Doanh nghiệp (Enterprise RBAC Matrix):**\n\n"
+                + "Hệ thống ERP Cloud áp dụng mô hình phân quyền ma trận 6 cấp độ với kiểm soát tường minh:\n\n"
+                + "1. 👑 **ADMIN (Quản trị viên tối cao):** Toàn quyền kiểm soát tài khoản, cấu hình hệ thống, kho hàng, đơn hàng và bảo mật.\n"
+                + "2. 💼 **MANAGER (Giám đốc / Quản lý):** Điều hành vận hành kinh doanh, phê duyệt đơn hàng, theo dõi báo cáo BI thời gian thực.\n"
+                + "3. 📊 **ACCOUNTANT (Kế toán tài chính):** Kiểm soát dòng tiền, đối soát doanh thu, xuất hóa đơn tài chính và kết xuất báo cáo Excel.\n"
+                + "4. 📦 **WAREHOUSE (Thủ kho vận hành):** Quản lý xuất/nhập/tồn kho, kiểm kê hàng hóa, điều chỉnh tồn kho định kỳ.\n"
+                + "5. 🎯 **SALES (Chuyên viên kinh doanh):** Tiếp nhận khách hàng, tạo và quản lý đơn hàng mới, tra cứu bảng giá sản phẩm.\n"
+                + "6. 👤 **USER (Nhân viên tác nghiệp):** Thao tác các tính năng cộng tác nội bộ, lịch biểu cá nhân và trò chuyện thời gian thực.\n\n"
+                + "💡 *Quản trị viên có thể xem ma trận chi tiết tại trang **Quản lý Tài khoản (tab Ma trận Phân quyền)**!*";
     }
 }

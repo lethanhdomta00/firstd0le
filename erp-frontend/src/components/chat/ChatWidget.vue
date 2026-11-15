@@ -318,10 +318,12 @@ const toggleTheme = () => {
 }
 
 const quickPrompts = [
+  '💰 Báo cáo doanh thu & đơn hàng',
   '📦 Kiểm tra tồn kho sản phẩm',
+  '📅 Lịch họp & công việc hôm nay',
+  '🛡️ Ma trận phân quyền 6 roles',
   '👥 Thống kê tài khoản người dùng',
-  '📢 Xem thông báo hệ thống',
-  '❓ Chào hỏi và trợ giúp'
+  '➕ Tạo sản phẩm mới tự động'
 ]
 
 const userDisplayName = computed(() => {

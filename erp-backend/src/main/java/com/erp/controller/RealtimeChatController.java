@@ -44,6 +44,7 @@ public class RealtimeChatController {
     private final UserRepository userRepository;
     private final ChatNicknameRepository nicknameRepository;
     private final ChatGroupMemberRepository memberRepository;
+    private final com.erp.service.ChatService chatService;
 
     // =========================================================================
     //                        WEBSOCKET STOMP HANDLERS
@@ -87,6 +88,9 @@ public class RealtimeChatController {
         // Broadcast tin nhắn tới tất cả mọi người đang theo dõi phòng này
         messagingTemplate.convertAndSend("/topic/room." + roomId, responseDto);
         log.info("WebSocket Public: [{}] gửi vào phòng [{}]: {}", senderUsername, roomId, messageDto.getContent());
+
+        // Kiểm tra Mention @copilot / @ai / @bot để Trợ lý ảo nhảy vào hỗ trợ ngay lập tức
+        triggerCopilotReplyIfMentioned(roomId, messageDto.getContent(), senderOpt.orElse(null), saved);
     }
 
     /**
@@ -137,14 +141,19 @@ public class RealtimeChatController {
         RealtimeMessage saved = messageRepository.save(entity);
         RealtimeMessageDto responseDto = RealtimeMessageDto.fromEntity(saved);
 
-        // Gửi trực tiếp tới người nhận (Recipient) qua User Queue
-        messagingTemplate.convertAndSendToUser(recipientUsername, "/queue/messages", responseDto);
-
         // Gửi xác nhận lại cho người gửi (Sender) để cập nhật UI ngay lập tức
         messagingTemplate.convertAndSendToUser(senderUsername, "/queue/messages", responseDto);
 
         // Kênh bổ trợ phòng riêng: Đảm bảo cả hai bên nhận được ngay lập tức bất kể môi trường mạng
         messagingTemplate.convertAndSend("/topic/private." + privateRoomId, responseDto);
+
+        // NẾU NGƯỜI NHẬN LÀ COPILOT -> TỰ ĐỘNG PHẢN HỒI QUA WEBSOCKET STOMP
+        if ("copilot".equalsIgnoreCase(recipientUsername)) {
+            triggerCopilotPrivateReply(senderUsername, messageDto.getContent(), senderOpt.orElse(null), saved, privateRoomId);
+        } else {
+            // Gửi trực tiếp tới người nhận (Recipient) qua User Queue
+            messagingTemplate.convertAndSendToUser(recipientUsername, "/queue/messages", responseDto);
+        }
 
         log.info("WebSocket Private: [{}] -> [{}]: {}", senderUsername, recipientUsername, messageDto.getContent());
     }
@@ -903,6 +912,105 @@ public class RealtimeChatController {
             return u1 + "_" + u2;
         } else {
             return u2 + "_" + u1;
+        }
+    }
+
+    /**
+     * Tự động kích hoạt phản hồi của Copilot khi được @mention trong phòng chat chung hoặc nhóm
+     */
+    private void triggerCopilotReplyIfMentioned(String roomId, String content, User senderUser, RealtimeMessage triggerMsg) {
+        if (content == null) return;
+        String lower = content.toLowerCase();
+        if (lower.contains("@copilot") || lower.contains("@ai") || lower.contains("@bot") || lower.contains("@troly")) {
+            try {
+                // Xóa mention khỏi prompt
+                String prompt = content.replaceAll("(?i)@(copilot|ai|bot|troly)", "").trim();
+                if (prompt.isEmpty()) {
+                    prompt = "Xin chào Copilot";
+                }
+
+                // Phát tín hiệu typing của Copilot
+                RealtimeMessageDto typing = RealtimeMessageDto.builder()
+                        .roomId(roomId)
+                        .senderUsername("copilot")
+                        .senderFullName("🤖 ERP AI Copilot")
+                        .type(MessageType.TYPING)
+                        .build();
+                messagingTemplate.convertAndSend("/topic/room." + roomId + ".typing", typing);
+
+                // Sinh phản hồi từ ChatService
+                String botReply = chatService.generateBotReplyForPrompt(senderUser, prompt);
+
+                // Lưu tin nhắn bot vào DB
+                RealtimeMessage botMessage = RealtimeMessage.builder()
+                        .roomId(roomId)
+                        .senderUsername("copilot")
+                        .senderFullName("🤖 ERP AI Copilot")
+                        .senderAvatarUrl("https://api.dicebear.com/7.x/bottts/svg?seed=copilot")
+                        .recipientUsername(null)
+                        .content(botReply)
+                        .type(MessageType.CHAT)
+                        .status(MessageStatus.SENT)
+                        .replyToId(triggerMsg.getId())
+                        .replyToSender(triggerMsg.getSenderFullName())
+                        .replyToContent(triggerMsg.getContent())
+                        .build();
+
+                RealtimeMessage savedBot = messageRepository.save(botMessage);
+                RealtimeMessageDto botDto = RealtimeMessageDto.fromEntity(savedBot);
+
+                // Broadcast phản hồi của Copilot tới toàn phòng
+                messagingTemplate.convertAndSend("/topic/room." + roomId, botDto);
+                log.info("WebSocket Public: Copilot đã phản hồi vào phòng [{}]: {}", roomId, botReply);
+            } catch (Exception ex) {
+                log.error("Lỗi khi xử lý phản hồi tự động của Copilot trong phòng [{}]: {}", roomId, ex.getMessage(), ex);
+            }
+        }
+    }
+
+    /**
+     * Tự động phản hồi tin nhắn riêng 1-1 gửi tới Copilot qua WebSocket STOMP
+     */
+    private void triggerCopilotPrivateReply(String targetUsername, String content, User senderUser, RealtimeMessage triggerMsg, String privateRoomId) {
+        try {
+            // Phát tín hiệu typing
+            RealtimeMessageDto typing = RealtimeMessageDto.builder()
+                    .roomId(privateRoomId)
+                    .senderUsername("copilot")
+                    .recipientUsername(targetUsername)
+                    .senderFullName("🤖 ERP AI Copilot")
+                    .type(MessageType.TYPING)
+                    .build();
+            messagingTemplate.convertAndSendToUser(targetUsername, "/queue/typing", typing);
+            messagingTemplate.convertAndSend("/topic/private." + privateRoomId + ".typing", typing);
+
+            // Sinh phản hồi
+            String botReply = chatService.generateBotReplyForPrompt(senderUser, content);
+
+            // Lưu tin nhắn Copilot gửi cho user
+            RealtimeMessage botMessage = RealtimeMessage.builder()
+                    .roomId(privateRoomId)
+                    .senderUsername("copilot")
+                    .senderFullName("🤖 ERP AI Copilot")
+                    .senderAvatarUrl("https://api.dicebear.com/7.x/bottts/svg?seed=copilot")
+                    .recipientUsername(targetUsername)
+                    .content(botReply)
+                    .type(MessageType.CHAT)
+                    .status(MessageStatus.SENT)
+                    .replyToId(triggerMsg.getId())
+                    .replyToSender(triggerMsg.getSenderFullName())
+                    .replyToContent(triggerMsg.getContent())
+                    .build();
+
+            RealtimeMessage savedBot = messageRepository.save(botMessage);
+            RealtimeMessageDto botDto = RealtimeMessageDto.fromEntity(savedBot);
+
+            // Gửi trực tiếp cho user
+            messagingTemplate.convertAndSendToUser(targetUsername, "/queue/messages", botDto);
+            messagingTemplate.convertAndSend("/topic/private." + privateRoomId, botDto);
+            log.info("WebSocket Private: Copilot đã trả lời riêng cho [{}]: {}", targetUsername, botReply);
+        } catch (Exception ex) {
+            log.error("Lỗi khi Copilot trả lời riêng cho [{}]: {}", targetUsername, ex.getMessage(), ex);
         }
     }
 }

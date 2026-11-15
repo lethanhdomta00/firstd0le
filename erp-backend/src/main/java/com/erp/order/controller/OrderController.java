@@ -28,6 +28,7 @@ public class OrderController {
 
     private final OrderService orderService;
     private final OrderExportService orderExportService;
+    private final com.erp.order.service.VietQrService vietQrService;
 
     @GetMapping
     public ResponseEntity<Page<OrderDto>> getOrders(
@@ -150,6 +151,26 @@ public class OrderController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"erp-orders.csv\"")
                 .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
                 .body(content);
+    }
+
+    // =========================================================================
+    //                        CỔNG THANH TOÁN VIETQR & NAPAS 24/7
+    // =========================================================================
+
+    @GetMapping("/{id}/vietqr")
+    public ResponseEntity<VietQrPaymentDto> getVietQr(@PathVariable Long id) {
+        return ResponseEntity.ok(vietQrService.generateVietQrForOrder(id));
+    }
+
+    @PostMapping("/{id}/pay-vietqr-mock")
+    public ResponseEntity<OrderDto> payVietQrMock(@PathVariable Long id) {
+        vietQrService.processPaymentSuccess(id, "TXN-MOCK-" + System.currentTimeMillis(), "VIETQR_MOCK");
+        return ResponseEntity.ok(orderService.getOrderById(id));
+    }
+
+    @PostMapping("/payment-webhook")
+    public ResponseEntity<Map<String, Object>> handlePaymentWebhook(@RequestBody PaymentWebhookRequest request) {
+        return ResponseEntity.ok(vietQrService.handlePaymentWebhook(request));
     }
 
     @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})

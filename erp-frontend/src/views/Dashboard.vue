@@ -606,7 +606,7 @@ function refreshData() {
 async function exportExcel() {
   try {
     ElMessage.info('📥 Đang kết xuất báo cáo BI đa sheet thời gian thực...')
-    const res = await api.get('/analytics/export-excel', {
+    const res = await api.get('/orders/export-excel', {
       responseType: 'blob'
     })
     const blob = new Blob([res.data], { type: 'application/vnd.ms-excel;charset=UTF-8' })

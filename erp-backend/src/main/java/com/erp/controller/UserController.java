@@ -1,11 +1,13 @@
 package com.erp.controller;
 
+import com.erp.dto.RoleMatrixDto;
 import com.erp.dto.UserPasswordResetRequest;
 import com.erp.dto.UserResponseDto;
 import com.erp.dto.UserUpdateRequest;
 import com.erp.model.Role;
 import com.erp.model.User;
 import com.erp.repository.UserRepository;
+import com.erp.service.RolePermissionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -18,18 +20,77 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')") // Toàn bộ màn quản trị tài khoản chỉ dành cho ADMIN
+@PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')") // ADMIN & MANAGER có quyền xem danh sách và ma trận
 public class UserController {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final RolePermissionService rolePermissionService;
 
-    // GET /api/users -> Danh sách tài khoản có Phân trang, Tìm kiếm & Lọc
+    // GET /api/users/roles-matrix -> Danh mục Ma trận Phân quyền RBAC Động
+    @GetMapping("/roles-matrix")
+    public ResponseEntity<List<RoleMatrixDto>> getRolesMatrix() {
+        return ResponseEntity.ok(rolePermissionService.getRolesMatrix());
+    }
+
+    // GET /api/users/permissions -> Danh sách toàn bộ các quyền hạn có trong hệ thống
+    @GetMapping("/permissions")
+    public ResponseEntity<List<Map<String, String>>> getAllPermissions() {
+        return ResponseEntity.ok(rolePermissionService.getAllAvailablePermissions());
+    }
+
+    // PUT /api/users/roles-matrix -> Cập nhật Ma trận Phân quyền Động (Chỉ ADMIN)
+    @PutMapping("/roles-matrix")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<RoleMatrixDto>> updateRolesMatrix(@RequestBody Map<String, Set<String>> matrixUpdate) {
+        List<RoleMatrixDto> updated = rolePermissionService.updateRolesMatrix(matrixUpdate);
+        return ResponseEntity.ok(updated);
+    }
+
+    // POST /api/users/roles-matrix/reset -> Khôi phục Ma trận Phân quyền về mặc định (Chỉ ADMIN)
+    @PostMapping("/roles-matrix/reset")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<RoleMatrixDto>> resetRolesMatrix() {
+        List<RoleMatrixDto> reset = rolePermissionService.resetToDefault();
+        return ResponseEntity.ok(reset);
+    }
+
+    // PATCH /api/users/{id}/role -> Cập nhật nhanh vai trò cho tài khoản (1-Click Role Update)
+    @PatchMapping("/{id}/role")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> updateUserRoleQuick(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        String roleStr = body.get("role");
+        if (roleStr == null || roleStr.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Vui lòng chọn vai trò hợp lệ!"));
+        }
+
+        Role newRole;
+        try {
+            newRole = Role.valueOf(roleStr.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Vai trò không hợp lệ: " + roleStr));
+        }
+
+        return userRepository.findById(id)
+                .map(user -> {
+                    user.setRole(newRole);
+                    User updated = userRepository.save(user);
+                    return ResponseEntity.ok(Map.of(
+                            "message", "Đã cập nhật vai trò @" + user.getUsername() + " thành " + newRole.getTitle(),
+                            "user", UserResponseDto.fromEntity(updated)
+                    ));
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    // GET /api/users -> Danh sách tài khoản có Phân trang, Tìm kiếm & Lọc theo Role/Status
     @GetMapping
     public Page<UserResponseDto> getAllUsers(
             @RequestParam(defaultValue = "0") int page,
@@ -53,8 +114,9 @@ public class UserController {
         return usersPage.map(UserResponseDto::fromEntity);
     }
 
-    // POST /api/users -> Tạo tài khoản mới (Admin tạo)
+    // POST /api/users -> Tạo tài khoản mới (Chỉ dành cho ADMIN tối cao)
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> createUser(@RequestBody User user) {
         if (user.getUsername() == null || user.getUsername().trim().isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("message", "Tên đăng nhập không được để trống!"));
@@ -79,8 +141,9 @@ public class UserController {
         return ResponseEntity.ok(UserResponseDto.fromEntity(savedUser));
     }
 
-    // PUT /api/users/{id} -> Cập nhật thông tin tài khoản (Email, Role, Status)
+    // PUT /api/users/{id} -> Cập nhật thông tin tài khoản (Chỉ dành cho ADMIN)
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> updateUser(@PathVariable Long id, @RequestBody UserUpdateRequest request) {
         return userRepository.findById(id)
                 .map(user -> {
@@ -111,8 +174,9 @@ public class UserController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // PUT /api/users/{id}/toggle-status -> Bật/Tắt trạng thái Khóa tài khoản
+    // PUT /api/users/{id}/toggle-status -> Khóa / Mở khóa tài khoản (Chỉ dành cho ADMIN)
     @PutMapping("/{id}/toggle-status")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> toggleUserStatus(@PathVariable Long id) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         String currentUsername = auth != null ? auth.getName() : "";
@@ -133,8 +197,9 @@ public class UserController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // PUT /api/users/{id}/reset-password -> Đặt lại mật khẩu cho tài khoản
+    // PUT /api/users/{id}/reset-password -> Đặt lại mật khẩu tài khoản (Chỉ dành cho ADMIN)
     @PutMapping("/{id}/reset-password")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> resetPassword(@PathVariable Long id, @RequestBody UserPasswordResetRequest request) {
         if (request.getNewPassword() == null || request.getNewPassword().length() < 6) {
             return ResponseEntity.badRequest().body(Map.of("message", "Mật khẩu mới phải có tối thiểu 6 ký tự!"));
@@ -149,8 +214,9 @@ public class UserController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // DELETE /api/users/{id} -> Xóa tài khoản
+    // DELETE /api/users/{id} -> Xóa tài khoản (Chỉ dành cho ADMIN)
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> deleteUser(@PathVariable Long id) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         String currentUsername = auth != null ? auth.getName() : "";

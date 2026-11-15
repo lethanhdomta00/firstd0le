@@ -124,7 +124,7 @@
           </template>
         </el-menu-item>
 
-        <el-menu-item index="/settings" @click.prevent="profileDialogVisible = true">
+        <el-menu-item index="/settings">
           <el-icon><Setting /></el-icon>
           <template #title>
             <span class="menu-title-text">Cài đặt hệ thống</span>
@@ -550,6 +550,7 @@ const currentRouteTitle = computed(() => {
   if (route.path.startsWith('/users')) return 'Quản lý Tài khoản'
   if (route.path.startsWith('/announcements')) return 'Quản lý Thông báo'
   if (route.path.startsWith('/jobs')) return 'Tác vụ tự động & Cron Jobs'
+  if (route.path.startsWith('/settings')) return 'Cài đặt hệ thống'
   return 'Hệ thống ERP'
 })
 
@@ -559,6 +560,7 @@ const currentRouteBreadcrumb = computed(() => {
   if (route.path.startsWith('/users')) return 'Danh sách nhân sự'
   if (route.path.startsWith('/announcements')) return 'Cài đặt truyền thông'
   if (route.path.startsWith('/jobs')) return 'Lập lịch hệ thống'
+  if (route.path.startsWith('/settings')) return 'Trung tâm cấu hình & Phân quyền'
   return 'Trang chính'
 })
 

@@ -225,9 +225,10 @@
             <div class="item-info">
               <div class="item-top-row">
                 <span class="item-name">{{ getColleagueDisplayName(colleague) }}</span>
-                <span v-if="colleague.lastMessageTime" class="item-time">{{ formatSidebarTime(colleague.lastMessageTime) }}</span>
+                <span v-if="colleague.username === 'copilot'" class="role-badge role-ai">AI COPILOT</span>
+                <span v-else-if="colleague.lastMessageTime" class="item-time">{{ formatSidebarTime(colleague.lastMessageTime) }}</span>
                 <span v-else class="role-badge" :class="colleague.role === 'ADMIN' ? 'role-admin' : 'role-user'">
-                  {{ colleague.role === 'ADMIN' ? 'ADMIN' : 'STAFF' }}
+                  {{ colleague.role === 'ADMIN' ? 'ADMIN' : (colleague.roleTitle || 'STAFF') }}
                 </span>
               </div>
               <div class="item-preview-row">
@@ -2738,10 +2739,14 @@ const togglePinRoom = (id) => {
   ElMessage.success(idx === -1 ? 'Đã ghim cuộc trò chuyện lên đầu' : 'Đã bỏ ghim cuộc trò chuyện')
 }
 
-// Sắp xếp danh sách đồng nghiệp: Pinned lên đầu -> Tin chưa đọc -> Bình thường
+// Sắp xếp danh sách đồng nghiệp: Copilot AI lên đầu -> Pinned lên đầu -> Tin chưa đọc -> Bình thường
 const sortedFilteredColleagues = computed(() => {
   const list = [...filteredColleagues.value]
   return list.sort((a, b) => {
+    const isBotA = a.username === 'copilot' ? 1 : 0
+    const isBotB = b.username === 'copilot' ? 1 : 0
+    if (isBotA !== isBotB) return isBotB - isBotA
+
     const pA = isRoomPinned(a.username) ? 1 : 0
     const pB = isRoomPinned(b.username) ? 1 : 0
     if (pA !== pB) return pB - pA
@@ -4689,6 +4694,14 @@ onUnmounted(() => {
 .role-admin {
   background: #fee2e2;
   color: #b91c1c;
+}
+
+.role-badge.role-ai {
+  background: linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%);
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25);
+  letter-spacing: 0.5px;
 }
 
 .role-user {
