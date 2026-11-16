@@ -56,15 +56,16 @@ class RealtimeChatCopilotIntegrationTest {
     @Test
     @DisplayName("1. Mention @copilot trong phòng chat công khai kích hoạt phản hồi tự động của AI Bot")
     void testCopilotMentionInPublicChatCreatesBotReply() {
+        String testRoomId = "TEST_ROOM_" + System.currentTimeMillis();
         RealtimeMessageDto sendDto = RealtimeMessageDto.builder()
-                .roomId("GLOBAL")
+                .roomId(testRoomId)
                 .senderUsername(testUser.getUsername())
                 .content("Xin chào @copilot cho tôi xem tình hình doanh thu hôm nay")
                 .build();
 
         realtimeChatController.sendPublicMessage(sendDto, userPrincipal);
 
-        List<RealtimeMessage> messages = messageRepository.findByRoomIdOrderByCreatedAtAsc("GLOBAL");
+        List<RealtimeMessage> messages = messageRepository.findByRoomIdOrderByCreatedAtAsc(testRoomId);
         assertThat(messages).isNotEmpty();
 
         RealtimeMessage userMsg = messages.stream()

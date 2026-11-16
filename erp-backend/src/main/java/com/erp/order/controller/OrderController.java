@@ -31,6 +31,7 @@ public class OrderController {
     private final com.erp.order.service.VietQrService vietQrService;
 
     @GetMapping
+    @PreAuthorize("hasAnyAuthority('ORDER_VIEW', 'ROLE_ADMIN')")
     public ResponseEntity<Page<OrderDto>> getOrders(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -48,16 +49,19 @@ public class OrderController {
     }
 
     @GetMapping("/stats")
+    @PreAuthorize("hasAnyAuthority('ORDER_VIEW', 'ANALYTICS_VIEW', 'ROLE_ADMIN')")
     public ResponseEntity<OrderStatsDto> getStats() {
         return ResponseEntity.ok(orderService.getOrderStats());
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('ORDER_VIEW', 'ROLE_ADMIN')")
     public ResponseEntity<OrderDto> getOrderById(@PathVariable Long id) {
         return ResponseEntity.ok(orderService.getOrderById(id));
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyAuthority('ORDER_CREATE', 'ROLE_ADMIN')")
     public ResponseEntity<OrderDto> createOrder(
             @Valid @RequestBody CreateOrderRequest request,
             Authentication authentication
@@ -67,6 +71,7 @@ public class OrderController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('ORDER_CREATE', 'ROLE_ADMIN')")
     public ResponseEntity<OrderDto> updateOrder(
             @PathVariable Long id,
             @Valid @RequestBody CreateOrderRequest request,
@@ -77,6 +82,7 @@ public class OrderController {
     }
 
     @PatchMapping("/{id}/status")
+    @PreAuthorize("hasAnyAuthority('ORDER_STATUS', 'ROLE_ADMIN')")
     public ResponseEntity<OrderDto> updateOrderStatus(
             @PathVariable Long id,
             @Valid @RequestBody UpdateOrderStatusRequest request,
@@ -87,6 +93,7 @@ public class OrderController {
     }
 
     @PatchMapping("/{id}/payment")
+    @PreAuthorize("hasAnyAuthority('ORDER_PAY', 'ROLE_ADMIN')")
     public ResponseEntity<OrderDto> updatePaymentStatus(
             @PathVariable Long id,
             @Valid @RequestBody UpdatePaymentStatusRequest request
@@ -95,7 +102,7 @@ public class OrderController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ORDER_CANCEL', 'ROLE_ADMIN')")
     public ResponseEntity<Map<String, String>> deleteOrder(
             @PathVariable Long id,
             Authentication authentication
@@ -106,6 +113,7 @@ public class OrderController {
     }
 
     @GetMapping("/inventory-logs")
+    @PreAuthorize("hasAnyAuthority('PRODUCT_VIEW', 'ORDER_VIEW', 'ROLE_ADMIN')")
     public ResponseEntity<Page<InventoryLogDto>> getInventoryLogs(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "12") int size,
@@ -118,7 +126,7 @@ public class OrderController {
     }
 
     @PostMapping("/inventory-adjust")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyAuthority('INVENTORY_ADJUST', 'ROLE_ADMIN')")
     public ResponseEntity<InventoryLogDto> adjustInventory(
             @Valid @RequestBody StockAdjustRequest request,
             Authentication authentication
@@ -128,6 +136,7 @@ public class OrderController {
     }
 
     @GetMapping("/export-excel")
+    @PreAuthorize("hasAnyAuthority('ORDER_EXPORT', 'ROLE_ADMIN')")
     public ResponseEntity<byte[]> exportExcel(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) OrderStatus status,
@@ -141,6 +150,7 @@ public class OrderController {
     }
 
     @GetMapping("/export-csv")
+    @PreAuthorize("hasAnyAuthority('ORDER_EXPORT', 'ROLE_ADMIN')")
     public ResponseEntity<byte[]> exportCsv(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) OrderStatus status,
@@ -158,11 +168,13 @@ public class OrderController {
     // =========================================================================
 
     @GetMapping("/{id}/vietqr")
+    @PreAuthorize("hasAnyAuthority('ORDER_PAY', 'ORDER_VIEW', 'ROLE_ADMIN')")
     public ResponseEntity<VietQrPaymentDto> getVietQr(@PathVariable Long id) {
         return ResponseEntity.ok(vietQrService.generateVietQrForOrder(id));
     }
 
     @PostMapping("/{id}/pay-vietqr-mock")
+    @PreAuthorize("hasAnyAuthority('ORDER_PAY', 'ROLE_ADMIN')")
     public ResponseEntity<OrderDto> payVietQrMock(@PathVariable Long id) {
         vietQrService.processPaymentSuccess(id, "TXN-MOCK-" + System.currentTimeMillis(), "VIETQR_MOCK");
         return ResponseEntity.ok(orderService.getOrderById(id));

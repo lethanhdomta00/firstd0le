@@ -22,23 +22,26 @@ const routes = [
       {
         path: 'products',
         name: 'Products',
-        component: () => import('../views/Products.vue')
+        component: () => import('../views/Products.vue'),
+        meta: { permission: 'PRODUCT_VIEW' }
       },
       {
         path: 'orders',
         name: 'Orders',
-        component: () => import('../views/Orders.vue')
+        component: () => import('../views/Orders.vue'),
+        meta: { permission: 'ORDER_VIEW' }
       },
       {
         path: 'analytics',
         name: 'Analytics',
-        component: () => import('../views/Analytics.vue')
+        component: () => import('../views/Analytics.vue'),
+        meta: { permission: 'ANALYTICS_VIEW' }
       },
       {
         path: 'users',
         name: 'Users',
         component: () => import('../views/Users.vue'),
-        meta: { role: 'ADMIN' } // Chỉ ADMIN mới được vào màn Quản lý Tài khoản
+        meta: { permission: 'USER_VIEW' }
       },
       {
         path: 'announcements',
@@ -49,7 +52,8 @@ const routes = [
       {
         path: 'chat',
         name: 'Chat',
-        component: () => import('../views/Chat.vue')
+        component: () => import('../views/Chat.vue'),
+        meta: { permission: 'CHAT_USE' }
       },
       {
         path: 'calendar',
@@ -60,12 +64,13 @@ const routes = [
         path: 'jobs',
         name: 'Jobs',
         component: () => import('../views/Jobs.vue'),
-        meta: { role: 'ADMIN' }
+        meta: { permission: 'JOB_VIEW' }
       },
       {
         path: 'settings',
         name: 'Settings',
-        component: () => import('../views/Settings.vue')
+        component: () => import('../views/Settings.vue'),
+        meta: { role: 'ADMIN' }
       },
       {
         path: ':pathMatch(.*)*',
@@ -96,13 +101,23 @@ router.beforeEach(async (to, from, next) => {
     return next({ name: 'Dashboard' })
   }
 
-  // Chặn người dùng không phải ADMIN truy cập vào các route yêu cầu quyền ADMIN
+  // Đảm bảo thông tin user và danh sách quyền hạn đã được nạp
+  if (authStore.isAuthenticated && !authStore.user) {
+    await authStore.fetchCurrentUser()
+  }
+
+  // Chặn người dùng theo vai trò tĩnh nếu route yêu cầu (ví dụ meta: { role: 'ADMIN' })
   if (to.meta.role && authStore.isAuthenticated) {
-    if (!authStore.user) {
-      await authStore.fetchCurrentUser()
-    }
     if (authStore.user?.role !== to.meta.role) {
-      ElMessage.warning('Bạn không có quyền truy cập vào trang này!')
+      ElMessage.warning('Bạn không có quyền truy cập vào phân hệ này!')
+      return next({ name: 'Dashboard' })
+    }
+  }
+
+  // Chặn người dùng theo quyền động (RBAC Permission Code)
+  if (to.meta.permission && authStore.isAuthenticated) {
+    if (!authStore.hasPermission(to.meta.permission)) {
+      ElMessage.warning(`Bạn chưa được cấp quyền [${to.meta.permission}] để truy cập phân hệ này!`)
       return next({ name: 'Dashboard' })
     }
   }

@@ -8,6 +8,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.Set;
 
 @Data
 @Builder
@@ -32,8 +33,13 @@ public class UserResponseDto {
     private Boolean isOnline;
     private Integer unreadCount;
     private LocalDateTime createdAt;
+    private Set<String> permissions;
 
     public static UserResponseDto fromEntity(User user) {
+        return fromEntity(user, null);
+    }
+
+    public static UserResponseDto fromEntity(User user, Set<String> permissions) {
         if (user == null) return null;
         return UserResponseDto.builder()
                 .id(user.getId())
@@ -46,6 +52,7 @@ public class UserResponseDto {
                 .role(user.getRole())
                 .roleTitle(user.getRole() != null ? user.getRole().getTitle() : "")
                 .status(user.getStatus() != null ? user.getStatus() : "ACTIVE")
+                .permissions(permissions)
                 .createdAt(user.getCreatedAt())
                 .build();
     }

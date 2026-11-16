@@ -11,11 +11,11 @@
         </div>
         <div>
           <div class="header-title-row">
-            <h1 class="header-title">Cài đặt Hệ thống &amp; Phân quyền</h1>
-            <span class="settings-badge">ERP Enterprise Suite</span>
+            <h1 class="header-title">Cài đặt Hệ thống &amp; Hồ sơ Quản trị</h1>
+            <span class="settings-badge">ERP Enterprise v4.2</span>
           </div>
           <p class="header-subtitle">
-            Trung tâm quản trị cấu hình, thiết lập hồ sơ người dùng và ma trận phân quyền vai trò (RBAC)
+            Trung tâm thiết lập cấu hình dịch vụ ngoài, quản lý bảo mật cá nhân và tham chiếu ma trận phân quyền vai trò (RBAC)
           </p>
         </div>
       </div>
@@ -28,7 +28,7 @@
             <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
             <path d="M16 3.13a4 4 0 0 1 0 7.75" />
           </svg>
-          <span>Quản lý Tài khoản &amp; Gán vai trò</span>
+          <span>Quản lý Tài khoản &amp; Ma trận RBAC</span>
         </router-link>
       </div>
     </div>
@@ -37,23 +37,22 @@
     <div class="settings-content-card">
       <el-tabs v-model="activeTab" class="settings-tabs">
         <!-- TAB 1: MA TRẬN PHÂN QUYỀN (RBAC MATRIX) -->
-        <el-tab-pane label="🛡️ Ma trận Phân quyền (RBAC)" name="rbac">
+        <el-tab-pane label="🛡️ Tổng quan Phân quyền (RBAC)" name="rbac">
           <div class="tab-pane-content">
             <div class="rbac-intro-box">
               <div class="intro-left">
-                <h3>Hệ thống Phân quyền Động 6 Vai trò (Dynamic Role Matrix)</h3>
+                <h3>Kiến trúc Phân quyền Động 6 Vai trò (Dynamic RBAC Engine)</h3>
                 <p>
-                  Hệ thống phân quyền ERP Cloud phân định trách nhiệm rõ ràng giữa các phòng ban. 
-                  Để đổi vai trò hoặc cấp quyền cho một nhân viên cụ thể, bạn chỉ cần vào mục 
-                  <router-link to="/users" class="text-link-bold">Quản lý Tài khoản (/users)</router-link>.
+                  Hệ thống áp dụng mô hình phân tách đặc quyền tối thiểu (Least Privilege). 
+                  Mọi thao tác thêm/bớt quyền trực tiếp trên từng vai trò đều có hiệu lực thời gian thực ngay lập tức.
                 </p>
               </div>
               <router-link to="/users" class="btn-action-primary">
-                Đến bảng Quản lý Tài khoản →
+                Tùy biến Ma trận Phân quyền →
               </router-link>
             </div>
 
-            <!-- GRID 6 VAI TRÒ CHÍNH -->
+            <!-- GRID 6 VAI TRÒ CHUẨN ENUM -->
             <div class="roles-cards-grid">
               <div class="role-card admin">
                 <div class="rc-header">
@@ -63,27 +62,11 @@
                     <span class="rc-sub">Quản trị viên tối cao</span>
                   </div>
                 </div>
-                <p class="rc-desc">Toàn quyền kiểm soát hệ thống, phân quyền người dùng, cấu hình thông báo và lập lịch cron jobs.</p>
+                <p class="rc-desc">Toàn quyền kiểm soát hệ thống, quản lý tài khoản, cấu hình cron jobs và cấp phát ma trận phân quyền.</p>
                 <div class="rc-tags">
                   <span class="rc-tag">Toàn quyền</span>
-                  <span class="rc-tag">Quản lý User</span>
-                  <span class="rc-tag">Cấu hình Cron</span>
-                </div>
-              </div>
-
-              <div class="role-card director">
-                <div class="rc-header">
-                  <span class="rc-icon">🎖️</span>
-                  <div>
-                    <h4 class="rc-title">DIRECTOR</h4>
-                    <span class="rc-sub">Giám đốc điều hành</span>
-                  </div>
-                </div>
-                <p class="rc-desc">Xem toàn bộ số liệu báo cáo BI thời gian thực, phê duyệt đơn hàng chiến lược, giám sát vận hành.</p>
-                <div class="rc-tags">
-                  <span class="rc-tag">Báo cáo BI</span>
-                  <span class="rc-tag">Duyệt đơn</span>
-                  <span class="rc-tag">Giám sát toàn diện</span>
+                  <span class="rc-tag">Quản lý Tài khoản</span>
+                  <span class="rc-tag">Cron Jobs</span>
                 </div>
               </div>
 
@@ -92,14 +75,14 @@
                   <span class="rc-icon">💼</span>
                   <div>
                     <h4 class="rc-title">MANAGER</h4>
-                    <span class="rc-sub">Trưởng phòng kinh doanh</span>
+                    <span class="rc-sub">Giám đốc / Quản lý</span>
                   </div>
                 </div>
-                <p class="rc-desc">Quản lý danh sách đơn hàng, phê duyệt chính sách chiết khấu, điều phối đội ngũ nhân viên kinh doanh.</p>
+                <p class="rc-desc">Điều hành vận hành kinh doanh, phê duyệt đơn hàng, theo dõi báo cáo phân tích BI thời gian thực.</p>
                 <div class="rc-tags">
-                  <span class="rc-tag">Quản lý Đơn</span>
-                  <span class="rc-tag">Duyệt chiết khấu</span>
-                  <span class="rc-tag">Điều phối sales</span>
+                  <span class="rc-tag">Báo cáo BI</span>
+                  <span class="rc-tag">Duyệt Đơn hàng</span>
+                  <span class="rc-tag">Xem Nhân sự</span>
                 </div>
               </div>
 
@@ -108,10 +91,10 @@
                   <span class="rc-icon">💰</span>
                   <div>
                     <h4 class="rc-title">ACCOUNTANT</h4>
-                    <span class="rc-sub">Kế toán trưởng</span>
+                    <span class="rc-sub">Kế toán tài chính</span>
                   </div>
                 </div>
-                <p class="rc-desc">Đối soát dòng tiền, xác nhận thanh toán VietQR / chuyển khoản ngân hàng, xuất hóa đơn tài chính PDF.</p>
+                <p class="rc-desc">Đối soát dòng tiền, xác nhận thanh toán VietQR / chuyển khoản ngân hàng, xuất hóa đơn tài chính PDF/Excel.</p>
                 <div class="rc-tags">
                   <span class="rc-tag">Xác nhận thanh toán</span>
                   <span class="rc-tag">Xuất hóa đơn</span>
@@ -124,14 +107,30 @@
                   <span class="rc-icon">📦</span>
                   <div>
                     <h4 class="rc-title">WAREHOUSE</h4>
-                    <span class="rc-sub">Quản lý kho vận</span>
+                    <span class="rc-sub">Thủ kho / Kho vận</span>
                   </div>
                 </div>
-                <p class="rc-desc">Kiểm kê hàng hóa tồn kho, điều chỉnh số lượng xuất/nhập thực tế, theo dõi lịch sử luân chuyển kho.</p>
+                <p class="rc-desc">Kiểm kê hàng hóa tồn kho, điều chỉnh số lượng xuất/nhập thực tế, tra cứu nhật ký luân chuyển kho.</p>
                 <div class="rc-tags">
                   <span class="rc-tag">Điều chỉnh tồn kho</span>
                   <span class="rc-tag">Kiểm kê SKU</span>
                   <span class="rc-tag">Nhật ký kho</span>
+                </div>
+              </div>
+
+              <div class="role-card sales">
+                <div class="rc-header">
+                  <span class="rc-icon">🏷️</span>
+                  <div>
+                    <h4 class="rc-title">SALES</h4>
+                    <span class="rc-sub">Kinh doanh / Bán lẻ</span>
+                  </div>
+                </div>
+                <p class="rc-desc">Tạo đơn hàng mới, tra cứu bảng giá sản phẩm, quản lý danh sách khách hàng và xuất báo cáo đơn hàng.</p>
+                <div class="rc-tags">
+                  <span class="rc-tag">Lên đơn hàng</span>
+                  <span class="rc-tag">Tra cứu giá</span>
+                  <span class="rc-tag">Xuất đơn</span>
                 </div>
               </div>
 
@@ -143,28 +142,28 @@
                     <span class="rc-sub">Nhân viên nghiệp vụ</span>
                   </div>
                 </div>
-                <p class="rc-desc">Tạo đơn hàng mới, tra cứu tình trạng kho, trò chuyện nội bộ và làm việc cùng trợ lý ảo AI Copilot.</p>
+                <p class="rc-desc">Lên đơn hàng cơ bản, tra cứu tình trạng kho, trò chuyện nội bộ và tương tác với trợ lý ảo AI Copilot.</p>
                 <div class="rc-tags">
                   <span class="rc-tag">Lên đơn hàng</span>
                   <span class="rc-tag">Tra cứu kho</span>
-                  <span class="rc-tag">Chat nội bộ</span>
+                  <span class="rc-tag">Chat &amp; AI</span>
                 </div>
               </div>
             </div>
 
-            <!-- BẢNG SO SÁNH MA TRẬN QUYỀN HẠN -->
+            <!-- BẢNG SO SÁNH MA TRẬN QUYỀN HẠN TỔNG QUÁT -->
             <div class="matrix-table-wrap">
-              <h4 class="matrix-table-title">📊 Bảng Ma trận Quyền hạn Phân hệ (Role Capability Matrix)</h4>
+              <h4 class="matrix-table-title">📊 Bảng Năng lực Phân hệ Mặc định (Baseline Permission Capabilities)</h4>
               <div class="table-responsive">
                 <table class="clean-matrix-table">
                   <thead>
                     <tr>
                       <th class="text-left">Phân hệ &amp; Tính năng</th>
                       <th class="text-center">ADMIN</th>
-                      <th class="text-center">DIRECTOR</th>
                       <th class="text-center">MANAGER</th>
                       <th class="text-center">ACCOUNTANT</th>
                       <th class="text-center">WAREHOUSE</th>
+                      <th class="text-center">SALES</th>
                       <th class="text-center">USER</th>
                     </tr>
                   </thead>
@@ -172,7 +171,7 @@
                     <tr>
                       <td class="font-medium">Quản lý Tài khoản &amp; Phân quyền (/users)</td>
                       <td class="text-center text-green">✓ Toàn quyền</td>
-                      <td class="text-center text-muted">—</td>
+                      <td class="text-center text-green">✓ Xem danh sách</td>
                       <td class="text-center text-muted">—</td>
                       <td class="text-center text-muted">—</td>
                       <td class="text-center text-muted">—</td>
@@ -182,8 +181,8 @@
                       <td class="font-medium">Báo cáo &amp; Phân tích BI (/analytics)</td>
                       <td class="text-center text-green">✓ Toàn quyền</td>
                       <td class="text-center text-green">✓ Xem &amp; Xuất</td>
-                      <td class="text-center text-green">✓ Xem doanh số</td>
                       <td class="text-center text-green">✓ Xem thu chi</td>
+                      <td class="text-center text-muted">—</td>
                       <td class="text-center text-muted">—</td>
                       <td class="text-center text-muted">—</td>
                     </tr>
@@ -191,8 +190,8 @@
                       <td class="font-medium">Xác nhận Thanh toán &amp; VietQR (/orders)</td>
                       <td class="text-center text-green">✓ Có</td>
                       <td class="text-center text-green">✓ Có</td>
-                      <td class="text-center text-green">✓ Có</td>
                       <td class="text-center text-green">✓ Chuyên trách</td>
+                      <td class="text-center text-muted">—</td>
                       <td class="text-center text-muted">—</td>
                       <td class="text-center text-muted">—</td>
                     </tr>
@@ -201,8 +200,8 @@
                       <td class="text-center text-green">✓ Có</td>
                       <td class="text-center text-muted">—</td>
                       <td class="text-center text-muted">—</td>
-                      <td class="text-center text-muted">—</td>
                       <td class="text-center text-green">✓ Chuyên trách</td>
+                      <td class="text-center text-muted">—</td>
                       <td class="text-center text-muted">—</td>
                     </tr>
                     <tr>
@@ -230,67 +229,135 @@
           </div>
         </el-tab-pane>
 
-        <!-- TAB 2: HỒ SƠ TÀI KHOẢN -->
+        <!-- TAB 2: HỒ SƠ TÀI KHOẢN & ĐỔI MẬT KHẨU -->
         <el-tab-pane label="👤 Hồ sơ &amp; Bảo mật" name="profile">
           <div class="tab-pane-content profile-pane">
-            <div class="profile-card">
-              <div class="profile-avatar-row">
-                <img
-                  :src="authStore.user?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'"
-                  alt="Avatar"
-                  class="profile-avatar-img"
-                />
-                <div class="profile-avatar-info">
-                  <h3>{{ authStore.user?.fullName || authStore.user?.username }}</h3>
-                  <div class="profile-meta-badges">
-                    <span class="badge-role">{{ authStore.user?.role }}</span>
-                    <span class="badge-status">Đang hoạt động</span>
+            <div class="profile-layout-grid">
+              <!-- KHỐI 1: THÔNG TIN HỒ SƠ -->
+              <div class="profile-card">
+                <div class="card-section-header">
+                  <h3 class="section-title">Thông tin Hồ sơ Cá nhân</h3>
+                  <span class="section-desc">Cập nhật thông tin hiển thị trên hệ thống và danh bạ nhân sự</span>
+                </div>
+
+                <div class="profile-avatar-row">
+                  <img
+                    :src="authStore.user?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'"
+                    alt="Avatar"
+                    class="profile-avatar-img"
+                  />
+                  <div class="profile-avatar-info">
+                    <h3>{{ authStore.user?.fullName || authStore.user?.username }}</h3>
+                    <div class="profile-meta-badges">
+                      <span class="badge-role">{{ authStore.user?.role }}</span>
+                      <span class="badge-status">Đang hoạt động</span>
+                    </div>
                   </div>
                 </div>
+
+                <form class="profile-edit-form" @submit.prevent="saveProfile">
+                  <div class="form-grid-2">
+                    <div class="form-group">
+                      <label>Tên đăng nhập</label>
+                      <input type="text" :value="authStore.user?.username" disabled class="form-input disabled" />
+                    </div>
+                    <div class="form-group">
+                      <label>Họ và tên</label>
+                      <input v-model="profileForm.fullName" type="text" class="form-input" placeholder="Nhập họ và tên..." />
+                    </div>
+                    <div class="form-group">
+                      <label>Email liên hệ</label>
+                      <input v-model="profileForm.email" type="email" class="form-input" placeholder="admin@enterprise.vn" />
+                    </div>
+                    <div class="form-group">
+                      <label>Số điện thoại</label>
+                      <input v-model="profileForm.phone" type="text" class="form-input" placeholder="0987654321" />
+                    </div>
+                  </div>
+
+                  <div class="form-group">
+                    <label>Link ảnh đại diện (Avatar URL)</label>
+                    <input v-model="profileForm.avatarUrl" type="text" class="form-input" placeholder="https://..." />
+                  </div>
+
+                  <div class="form-group">
+                    <label>Tiểu sử / Ghi chú chức danh</label>
+                    <textarea v-model="profileForm.bio" rows="3" class="form-textarea" placeholder="Mô tả chức danh, phòng ban làm việc..."></textarea>
+                  </div>
+
+                  <div class="form-actions-right">
+                    <button type="submit" class="btn-action-primary" :disabled="savingProfile">
+                      {{ savingProfile ? 'Đang lưu...' : 'Lưu thông tin hồ sơ' }}
+                    </button>
+                  </div>
+                </form>
               </div>
 
-              <form class="profile-edit-form" @submit.prevent="saveProfile">
-                <div class="form-grid-2">
-                  <div class="form-group">
-                    <label>Tên đăng nhập</label>
-                    <input type="text" :value="authStore.user?.username" disabled class="form-input disabled" />
-                  </div>
-                  <div class="form-group">
-                    <label>Họ và tên</label>
-                    <input v-model="profileForm.fullName" type="text" class="form-input" placeholder="Nhập họ và tên..." />
-                  </div>
-                  <div class="form-group">
-                    <label>Email liên hệ</label>
-                    <input v-model="profileForm.email" type="email" class="form-input" placeholder="admin@enterprise.vn" />
-                  </div>
-                  <div class="form-group">
-                    <label>Số điện thoại</label>
-                    <input v-model="profileForm.phone" type="text" class="form-input" placeholder="0987654321" />
-                  </div>
+              <!-- KHỐI 2: ĐỔI MẬT KHẨU TÀI KHOẢN -->
+              <div class="profile-card password-card">
+                <div class="card-section-header">
+                  <h3 class="section-title">Đổi Mật khẩu Tài khoản</h3>
+                  <span class="section-desc">Bảo vệ tài khoản bằng mật khẩu mạnh tối thiểu 6 ký tự</span>
                 </div>
 
-                <div class="form-group">
-                  <label>Tiểu sử / Ghi chú phòng ban</label>
-                  <textarea v-model="profileForm.bio" rows="3" class="form-textarea" placeholder="Mô tả chức danh, phòng ban làm việc..."></textarea>
-                </div>
+                <form class="password-edit-form" @submit.prevent="changePassword">
+                  <div class="form-group">
+                    <label>Mật khẩu hiện tại</label>
+                    <input 
+                      v-model="passwordForm.oldPassword" 
+                      type="password" 
+                      class="form-input" 
+                      placeholder="Nhập mật khẩu hiện tại..." 
+                      autocomplete="current-password"
+                    />
+                  </div>
 
-                <div class="form-actions-right">
-                  <button type="submit" class="btn-action-primary" :disabled="savingProfile">
-                    {{ savingProfile ? 'Đang lưu...' : 'Lưu thông tin hồ sơ' }}
-                  </button>
-                </div>
-              </form>
+                  <div class="form-group">
+                    <label>Mật khẩu mới</label>
+                    <input 
+                      v-model="passwordForm.newPassword" 
+                      type="password" 
+                      class="form-input" 
+                      placeholder="Tối thiểu 6 ký tự..." 
+                      autocomplete="new-password"
+                    />
+                  </div>
+
+                  <div class="form-group">
+                    <label>Xác nhận mật khẩu mới</label>
+                    <input 
+                      v-model="passwordForm.confirmPassword" 
+                      type="password" 
+                      class="form-input" 
+                      placeholder="Nhập lại mật khẩu mới..." 
+                      autocomplete="new-password"
+                    />
+                  </div>
+
+                  <div class="password-notice-box">
+                    <span class="notice-icon">🛡️</span>
+                    <span>Sau khi đổi mật khẩu thành công, phiên đăng nhập hiện tại vẫn được duy trì an toàn.</span>
+                  </div>
+
+                  <div class="form-actions-right">
+                    <button type="submit" class="btn-action-primary" :disabled="changingPassword">
+                      {{ changingPassword ? 'Đang xử lý...' : 'Cập nhật mật khẩu' }}
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
           </div>
         </el-tab-pane>
 
-        <!-- TAB 3: TÍCH HỢP HỆ THỐNG -->
+        <!-- TAB 3: TÍCH HỢP & DỊCH VỤ NGOÀI -->
         <el-tab-pane label="⚡ Tích hợp &amp; Dịch vụ ngoài" name="integrations">
           <div class="tab-pane-content integrations-pane">
             <div class="integrations-grid">
+              <!-- CARD 1: VIETQR NAPAS -->
               <div class="integration-card">
                 <div class="int-top">
-                  <span class="int-icon">⚡</span>
+                  <div class="int-icon-box vietqr-icon">💳</div>
                   <div>
                     <h4>Cổng VietQR Chuẩn NAPAS 24/7</h4>
                     <span class="int-status active">Đang kích hoạt</span>
@@ -300,27 +367,54 @@
                 <div class="int-specs">
                   <span>Ngân hàng thụ hưởng: <strong>MB Bank (Quân Đội)</strong></span>
                   <span>Số tài khoản: <strong>0987654321</strong></span>
+                  <span>Chủ tài khoản: <strong>CONG TY ERP CLOUD ENTERPRISE</strong></span>
+                  <span>Webhook URL: <code>/api/orders/payment-webhook</code></span>
+                </div>
+                <div class="card-footer-actions">
+                  <button type="button" class="btn-int-action" @click="showSampleQrModal = true">
+                    Xem mã QR Mẫu 🔍
+                  </button>
                 </div>
               </div>
 
+              <!-- CARD 2: TELEGRAM BOT -->
               <div class="integration-card">
                 <div class="int-top">
-                  <span class="int-icon">🤖</span>
+                  <div class="int-icon-box telegram-icon">✈️</div>
                   <div>
                     <h4>Telegram Bot Notification</h4>
                     <span class="int-status active">Đang kích hoạt</span>
                   </div>
                 </div>
-                <p>Tự động phát thông báo khi có đơn hàng mới, cảnh báo tồn kho an toàn và báo cáo tổng hợp cuối ngày.</p>
+                <p>Tự động phát thông báo khi có đơn hàng mới, cảnh báo tồn kho an toàn và mã xác thực OTP.</p>
                 <div class="int-specs">
-                  <span>Kênh tiếp nhận: <strong>ERP Management Channel</strong></span>
-                  <span>Tần suất: <strong>Thời gian thực</strong></span>
+                  <div class="telegram-input-group">
+                    <label>Chat ID kiểm thử:</label>
+                    <input 
+                      v-model="telegramChatId" 
+                      type="text" 
+                      class="form-input-sm" 
+                      placeholder="VD: 123456789" 
+                    />
+                  </div>
+                  <span>Trạng thái kết nối: <strong>Sẵn sàng gửi tin</strong></span>
+                </div>
+                <div class="card-footer-actions">
+                  <button 
+                    type="button" 
+                    class="btn-int-action primary" 
+                    :disabled="testingTelegram" 
+                    @click="handleTestTelegram"
+                  >
+                    {{ testingTelegram ? 'Đang gửi...' : 'Gửi tin nhắn test 🚀' }}
+                  </button>
                 </div>
               </div>
 
+              <!-- CARD 3: SPRING TASK SCHEDULER -->
               <div class="integration-card">
                 <div class="int-top">
-                  <span class="int-icon">⏱️</span>
+                  <div class="int-icon-box cron-icon">⏱️</div>
                   <div>
                     <h4>Spring TaskScheduler Engine</h4>
                     <span class="int-status active">Đang kích hoạt</span>
@@ -328,7 +422,14 @@
                 </div>
                 <p>Bộ điều phối tác vụ ngầm tự động trong bộ nhớ RAM, hỗ trợ cấu hình biểu thức Cron linh hoạt.</p>
                 <div class="int-specs">
-                  <router-link to="/jobs" class="text-link-bold">Truy cập Quản lý Tác vụ (/jobs) →</router-link>
+                  <span>Tác vụ kích hoạt: <strong>3 Cron Jobs</strong></span>
+                  <span>Nhật ký gần nhất: <strong>Thành công 100%</strong></span>
+                  <span>Độ trễ hệ thống: <strong>&lt; 5ms</strong></span>
+                </div>
+                <div class="card-footer-actions">
+                  <router-link to="/jobs" class="btn-int-action">
+                    Mở Quản lý Tác vụ (/jobs) →
+                  </router-link>
                 </div>
               </div>
             </div>
@@ -336,6 +437,35 @@
         </el-tab-pane>
       </el-tabs>
     </div>
+
+    <!-- MODAL PREVIEW MÃ VIETQR MẪU -->
+    <el-dialog
+      v-model="showSampleQrModal"
+      title="Mã VietQR Demo (NAPAS 24/7)"
+      width="420px"
+      center
+      append-to-body
+    >
+      <div class="qr-sample-dialog-content">
+        <div class="qr-image-wrapper">
+          <img 
+            src="https://img.vietqr.io/image/MB-0987654321-compact2.png?amount=500000&addInfo=DEMO_TEST&accountName=CONG%20TY%20ERP%20CLOUD%20ENTERPRISE" 
+            alt="VietQR Sample"
+            class="sample-qr-img" 
+          />
+        </div>
+        <div class="qr-info-note">
+          <p><strong>MB Bank</strong> • 0987654321</p>
+          <p class="account-name">CONG TY ERP CLOUD ENTERPRISE</p>
+          <p class="qr-tip">Khách hàng quét mã qua ứng dụng ngân hàng bất kỳ để hoàn tất thanh toán.</p>
+        </div>
+      </div>
+      <template #footer>
+        <button type="button" class="btn-action-primary" @click="showSampleQrModal = false">
+          Đóng cửa sổ
+        </button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -347,8 +477,9 @@ import api from '../api'
 
 const authStore = useAuthStore()
 const activeTab = ref('rbac')
-const savingProfile = ref(false)
 
+// Profile State
+const savingProfile = ref(false)
 const profileForm = reactive({
   fullName: '',
   email: '',
@@ -356,6 +487,19 @@ const profileForm = reactive({
   bio: '',
   avatarUrl: ''
 })
+
+// Password State
+const changingPassword = ref(false)
+const passwordForm = reactive({
+  oldPassword: '',
+  newPassword: '',
+  confirmPassword: ''
+})
+
+// Integrations State
+const showSampleQrModal = ref(false)
+const testingTelegram = ref(false)
+const telegramChatId = ref(localStorage.getItem('erp_telegram_test_chat_id') || '')
 
 onMounted(() => {
   if (authStore.user) {
@@ -367,17 +511,70 @@ onMounted(() => {
   }
 })
 
+// Lưu cập nhật hồ sơ
 async function saveProfile() {
   savingProfile.value = true
   try {
-    const res = await api.put('/users/profile', profileForm)
-    authStore.user = { ...authStore.user, ...res.data }
-    localStorage.setItem('user', JSON.stringify(authStore.user))
-    ElMessage.success('Cập nhật hồ sơ tài khoản thành công!')
+    const res = await authStore.updateProfile(profileForm)
+    if (res.success) {
+      ElMessage.success('Cập nhật hồ sơ tài khoản thành công!')
+    } else {
+      ElMessage.error(res.message || 'Không thể cập nhật hồ sơ!')
+    }
   } catch (err) {
     ElMessage.error(err.response?.data?.message || 'Không thể cập nhật hồ sơ!')
   } finally {
     savingProfile.value = false
+  }
+}
+
+// Đổi mật khẩu tài khoản
+async function changePassword() {
+  if (!passwordForm.oldPassword) {
+    ElMessage.warning('Vui lòng nhập mật khẩu hiện tại!')
+    return
+  }
+  if (!passwordForm.newPassword || passwordForm.newPassword.length < 6) {
+    ElMessage.warning('Mật khẩu mới phải có tối thiểu 6 ký tự!')
+    return
+  }
+  if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+    ElMessage.warning('Mật khẩu xác nhận không khớp!')
+    return
+  }
+
+  changingPassword.value = true
+  try {
+    const res = await api.put('/auth/change-password', {
+      oldPassword: passwordForm.oldPassword,
+      newPassword: passwordForm.newPassword
+    })
+    ElMessage.success(res.data?.message || 'Đổi mật khẩu tài khoản thành công!')
+    passwordForm.oldPassword = ''
+    passwordForm.newPassword = ''
+    passwordForm.confirmPassword = ''
+  } catch (err) {
+    ElMessage.error(err.response?.data?.message || 'Đổi mật khẩu thất bại!')
+  } finally {
+    changingPassword.value = false
+  }
+}
+
+// Gửi tin nhắn test Telegram
+async function handleTestTelegram() {
+  testingTelegram.value = true
+  if (telegramChatId.value) {
+    localStorage.setItem('erp_telegram_test_chat_id', telegramChatId.value.trim())
+  }
+  try {
+    const res = await api.post('/auth/test-telegram', {
+      chatId: telegramChatId.value.trim()
+    })
+    ElMessage.success(res.data?.message || 'Đã gửi tin nhắn test tới Telegram thành công!')
+  } catch (err) {
+    ElMessage.error(err.response?.data?.message || 'Lỗi khi gửi tin nhắn Telegram!')
+  } finally {
+    testingTelegram.value = false
   }
 }
 </script>
@@ -493,8 +690,8 @@ async function saveProfile() {
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
-  background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
-  border: 1px solid #bbf7d0;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   padding: 16px 20px;
   border-radius: 10px;
 }
@@ -502,20 +699,14 @@ async function saveProfile() {
 .intro-left h3 {
   font-size: 15px;
   font-weight: 700;
-  color: #166534;
+  color: #0f172a;
   margin: 0 0 6px 0;
 }
 .intro-left p {
   font-size: 13px;
-  color: #15803d;
+  color: #475569;
   margin: 0;
   line-height: 1.5;
-}
-
-.text-link-bold {
-  color: #2563eb;
-  font-weight: 600;
-  text-decoration: underline;
 }
 
 .btn-action-primary {
@@ -560,10 +751,10 @@ async function saveProfile() {
 }
 
 .role-card.admin { border-top: 3px solid #ef4444; }
-.role-card.director { border-top: 3px solid #3b82f6; }
-.role-card.manager { border-top: 3px solid #8b5cf6; }
+.role-card.manager { border-top: 3px solid #3b82f6; }
 .role-card.accountant { border-top: 3px solid #0d9488; }
 .role-card.warehouse { border-top: 3px solid #f59e0b; }
+.role-card.sales { border-top: 3px solid #ec4899; }
 .role-card.user { border-top: 3px solid #64748b; }
 
 .rc-header {
@@ -639,33 +830,54 @@ async function saveProfile() {
 .text-green { color: #16a34a; font-weight: 600; }
 .text-muted { color: #94a3b8; }
 
-/* PROFILE PANE */
+/* PROFILE LAYOUT GRID */
+.profile-layout-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 20px;
+}
+
 .profile-card {
-  max-width: 680px;
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
-  padding: 24px;
+  padding: 20px;
+}
+
+.card-section-header {
+  margin-bottom: 18px;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 10px;
+}
+.section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 4px 0;
+}
+.section-desc {
+  font-size: 12px;
+  color: #64748b;
 }
 
 .profile-avatar-row {
   display: flex;
   align-items: center;
   gap: 16px;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 .profile-avatar-img {
-  width: 64px;
-  height: 64px;
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid #e2e8f0;
 }
 .profile-avatar-info h3 {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 700;
   color: #0f172a;
-  margin: 0 0 6px 0;
+  margin: 0 0 4px 0;
 }
 .profile-meta-badges {
   display: flex;
@@ -691,14 +903,13 @@ async function saveProfile() {
 .form-grid-2 {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: 14px;
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
   margin-bottom: 14px;
 }
 .form-group label {
@@ -707,7 +918,7 @@ async function saveProfile() {
   color: #475569;
 }
 .form-input, .form-textarea {
-  padding: 9px 12px;
+  padding: 8px 12px;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
   font-size: 13px;
@@ -724,10 +935,37 @@ async function saveProfile() {
   cursor: not-allowed;
 }
 
+.form-input-sm {
+  padding: 6px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #0f172a;
+  outline: none;
+  width: 100%;
+}
+.form-input-sm:focus {
+  border-color: #2563eb;
+}
+
+.password-notice-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: #475569;
+  line-height: 1.4;
+  margin-bottom: 14px;
+}
+
 .form-actions-right {
   display: flex;
   justify-content: flex-end;
-  margin-top: 10px;
+  margin-top: 6px;
 }
 
 /* INTEGRATIONS */
@@ -750,7 +988,19 @@ async function saveProfile() {
   align-items: center;
   gap: 12px;
 }
-.int-icon { font-size: 24px; }
+.int-icon-box {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}
+.vietqr-icon { background: #eff6ff; }
+.telegram-icon { background: #f0fdf4; }
+.cron-icon { background: #fef3c7; }
+
 .int-top h4 {
   font-size: 14px;
   font-weight: 700;
@@ -772,23 +1022,110 @@ async function saveProfile() {
 .int-specs {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   font-size: 11px;
   color: #64748b;
   border-top: 1px dashed #e2e8f0;
   padding-top: 10px;
 }
+.int-specs code {
+  background: #f1f5f9;
+  padding: 2px 5px;
+  border-radius: 4px;
+  color: #0f172a;
+  font-size: 10px;
+}
+.telegram-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.telegram-input-group label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.card-footer-actions {
+  margin-top: 6px;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 10px;
+}
+.btn-int-action {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+.btn-int-action:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+.btn-int-action.primary {
+  background: #eff6ff;
+  color: #2563eb;
+  border-color: #bfdbfe;
+}
+.btn-int-action.primary:hover:not(:disabled) {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+/* SAMPLE QR DIALOG */
+.qr-sample-dialog-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+}
+.qr-image-wrapper {
+  background: #f8fafc;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+.sample-qr-img {
+  width: 220px;
+  height: auto;
+  border-radius: 8px;
+}
+.qr-info-note p {
+  margin: 3px 0;
+  font-size: 13px;
+  color: #0f172a;
+}
+.qr-info-note .account-name {
+  font-weight: 700;
+  color: #2563eb;
+  font-size: 12px;
+}
+.qr-tip {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 6px !important;
+}
 
 @media (max-width: 992px) {
   .roles-cards-grid,
-  .integrations-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .integrations-grid,
+  .profile-layout-grid {
+    grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 640px) {
-  .roles-cards-grid,
-  .integrations-grid,
   .form-grid-2 {
     grid-template-columns: 1fr;
   }

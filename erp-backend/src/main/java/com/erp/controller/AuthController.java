@@ -11,6 +11,7 @@ import com.erp.model.User;
 import com.erp.repository.UserRepository;
 import com.erp.security.JwtTokenProvider;
 import com.erp.service.EmailService;
+import com.erp.service.RolePermissionService;
 import com.erp.service.TelegramService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,8 +26,11 @@ import org.springframework.web.bind.annotation.*;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -40,6 +44,7 @@ public class AuthController {
     private final JwtTokenProvider tokenProvider;
     private final EmailService emailService;
     private final TelegramService telegramService;
+    private final RolePermissionService rolePermissionService;
     private final SecureRandom secureRandom = new SecureRandom();
 
     @GetMapping("/version")
@@ -71,7 +76,11 @@ public class AuthController {
             String jwt = tokenProvider.generateToken(authentication);
 
             User user = userOpt.orElseGet(() -> userRepository.findByUsername(loginRequest.getUsername()).orElse(null));
-            return ResponseEntity.ok(new JwtAuthenticationResponse(jwt, UserResponseDto.fromEntity(user)));
+            Set<String> permissions = Collections.emptySet();
+            if (user != null && user.getRole() != null) {
+                permissions = rolePermissionService.getPermissionsForRole(user.getRole().name());
+            }
+            return ResponseEntity.ok(new JwtAuthenticationResponse(jwt, UserResponseDto.fromEntity(user, permissions)));
         } catch (AuthenticationException e) {
             return ResponseEntity.status(401).body(Map.of("message", "Tên đăng nhập hoặc mật khẩu không chính xác!"));
         }
@@ -88,7 +97,12 @@ public class AuthController {
         if (userOpt.isEmpty()) {
             return ResponseEntity.status(404).body(Map.of("message", "Không tìm thấy thông tin tài khoản!"));
         }
-        return ResponseEntity.ok(UserResponseDto.fromEntity(userOpt.get()));
+        User user = userOpt.get();
+        Set<String> permissions = Collections.emptySet();
+        if (user.getRole() != null) {
+            permissions = rolePermissionService.getPermissionsForRole(user.getRole().name());
+        }
+        return ResponseEntity.ok(UserResponseDto.fromEntity(user, permissions));
     }
 
     @PutMapping("/profile")
@@ -111,7 +125,11 @@ public class AuthController {
         if (request.getBio() != null) user.setBio(request.getBio().trim());
 
         User updated = userRepository.save(user);
-        return ResponseEntity.ok(UserResponseDto.fromEntity(updated));
+        Set<String> permissions = Collections.emptySet();
+        if (updated.getRole() != null) {
+            permissions = rolePermissionService.getPermissionsForRole(updated.getRole().name());
+        }
+        return ResponseEntity.ok(UserResponseDto.fromEntity(updated, permissions));
     }
 
     @PostMapping("/register")
@@ -267,6 +285,55 @@ public class AuthController {
                 "status", "SUCCESS",
                 "message", "Đặt lại mật khẩu thành công! Bạn có thể đăng nhập ngay với mật khẩu mới."
         ));
+    }
+
+    @PutMapping("/change-password")
+    public ResponseEntity<?> changePassword(@RequestBody Map<String, String> request) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
+            return ResponseEntity.status(401).body(Map.of("message", "Chưa đăng nhập!"));
+        }
+
+        String oldPassword = request.get("oldPassword");
+        String newPassword = request.get("newPassword");
+
+        if (oldPassword == null || oldPassword.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Vui lòng nhập mật khẩu hiện tại!"));
+        }
+        if (newPassword == null || newPassword.trim().length() < 6) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Mật khẩu mới phải có tối thiểu 6 ký tự!"));
+        }
+
+        String username = authentication.getName();
+        Optional<User> userOpt = userRepository.findByUsername(username);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.status(404).body(Map.of("message", "Không tìm thấy thông tin tài khoản!"));
+        }
+
+        User user = userOpt.get();
+        if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Mật khẩu hiện tại không chính xác!"));
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword.trim()));
+        userRepository.save(user);
+
+        return ResponseEntity.ok(Map.of("message", "Đổi mật khẩu tài khoản thành công!"));
+    }
+
+    @PostMapping("/test-telegram")
+    public ResponseEntity<?> testTelegram(@RequestBody Map<String, String> request) {
+        String chatId = request.get("chatId");
+        String testMsg = "🌿 <b>[ERP Cloud Enterprise]</b>\n"
+                + "Kết nối thành công tới Telegram Bot!\n"
+                + "Thời gian: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss dd/MM/yyyy")) + "\n"
+                + "Kênh thông báo tự động đã sẵn sàng tiếp nhận sự kiện.";
+        boolean sent = telegramService.sendMessage(chatId, testMsg);
+        if (sent) {
+            return ResponseEntity.ok(Map.of("success", true, "message", "Đã gửi tin nhắn test tới Telegram thành công!"));
+        } else {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Không thể gửi tin nhắn Telegram. Vui lòng kiểm tra lại Bot Token hoặc Chat ID!"));
+        }
     }
 
     private String maskEmail(String email) {

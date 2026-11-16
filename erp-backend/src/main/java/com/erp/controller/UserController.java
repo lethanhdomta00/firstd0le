@@ -27,7 +27,7 @@ import java.util.Set;
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')") // ADMIN & MANAGER có quyền xem danh sách và ma trận
+@PreAuthorize("hasAnyAuthority('USER_VIEW', 'ROLE_ADMIN')") // Cần quyền USER_VIEW hoặc ADMIN để truy cập phân hệ
 public class UserController {
 
     private final UserRepository userRepository;
@@ -36,27 +36,29 @@ public class UserController {
 
     // GET /api/users/roles-matrix -> Danh mục Ma trận Phân quyền RBAC Động
     @GetMapping("/roles-matrix")
+    @PreAuthorize("hasAnyAuthority('USER_ROLE', 'ROLE_ADMIN')")
     public ResponseEntity<List<RoleMatrixDto>> getRolesMatrix() {
         return ResponseEntity.ok(rolePermissionService.getRolesMatrix());
     }
 
     // GET /api/users/permissions -> Danh sách toàn bộ các quyền hạn có trong hệ thống
     @GetMapping("/permissions")
+    @PreAuthorize("hasAnyAuthority('USER_ROLE', 'ROLE_ADMIN')")
     public ResponseEntity<List<Map<String, String>>> getAllPermissions() {
         return ResponseEntity.ok(rolePermissionService.getAllAvailablePermissions());
     }
 
-    // PUT /api/users/roles-matrix -> Cập nhật Ma trận Phân quyền Động (Chỉ ADMIN)
+    // PUT /api/users/roles-matrix -> Cập nhật Ma trận Phân quyền Động
     @PutMapping("/roles-matrix")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyAuthority('USER_ROLE', 'ROLE_ADMIN')")
     public ResponseEntity<List<RoleMatrixDto>> updateRolesMatrix(@RequestBody Map<String, Set<String>> matrixUpdate) {
         List<RoleMatrixDto> updated = rolePermissionService.updateRolesMatrix(matrixUpdate);
         return ResponseEntity.ok(updated);
     }
 
-    // POST /api/users/roles-matrix/reset -> Khôi phục Ma trận Phân quyền về mặc định (Chỉ ADMIN)
+    // POST /api/users/roles-matrix/reset -> Khôi phục Ma trận Phân quyền về mặc định
     @PostMapping("/roles-matrix/reset")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyAuthority('USER_ROLE', 'ROLE_ADMIN')")
     public ResponseEntity<List<RoleMatrixDto>> resetRolesMatrix() {
         List<RoleMatrixDto> reset = rolePermissionService.resetToDefault();
         return ResponseEntity.ok(reset);
@@ -64,7 +66,7 @@ public class UserController {
 
     // PATCH /api/users/{id}/role -> Cập nhật nhanh vai trò cho tài khoản (1-Click Role Update)
     @PatchMapping("/{id}/role")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyAuthority('USER_ROLE', 'ROLE_ADMIN')")
     public ResponseEntity<?> updateUserRoleQuick(@PathVariable Long id, @RequestBody Map<String, String> body) {
         String roleStr = body.get("role");
         if (roleStr == null || roleStr.trim().isEmpty()) {
@@ -114,9 +116,9 @@ public class UserController {
         return usersPage.map(UserResponseDto::fromEntity);
     }
 
-    // POST /api/users -> Tạo tài khoản mới (Chỉ dành cho ADMIN tối cao)
+    // POST /api/users -> Tạo tài khoản mới
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyAuthority('USER_CREATE', 'ROLE_ADMIN')")
     public ResponseEntity<?> createUser(@RequestBody User user) {
         if (user.getUsername() == null || user.getUsername().trim().isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("message", "Tên đăng nhập không được để trống!"));
@@ -141,9 +143,9 @@ public class UserController {
         return ResponseEntity.ok(UserResponseDto.fromEntity(savedUser));
     }
 
-    // PUT /api/users/{id} -> Cập nhật thông tin tài khoản (Chỉ dành cho ADMIN)
+    // PUT /api/users/{id} -> Cập nhật thông tin tài khoản
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyAuthority('USER_EDIT', 'ROLE_ADMIN')")
     public ResponseEntity<?> updateUser(@PathVariable Long id, @RequestBody UserUpdateRequest request) {
         return userRepository.findById(id)
                 .map(user -> {
@@ -174,9 +176,9 @@ public class UserController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // PUT /api/users/{id}/toggle-status -> Khóa / Mở khóa tài khoản (Chỉ dành cho ADMIN)
+    // PUT /api/users/{id}/toggle-status -> Khóa / Mở khóa tài khoản
     @PutMapping("/{id}/toggle-status")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyAuthority('USER_STATUS', 'ROLE_ADMIN')")
     public ResponseEntity<?> toggleUserStatus(@PathVariable Long id) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         String currentUsername = auth != null ? auth.getName() : "";

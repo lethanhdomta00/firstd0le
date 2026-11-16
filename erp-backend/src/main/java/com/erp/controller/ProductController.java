@@ -25,6 +25,7 @@ public class ProductController {
 
     // GET /api/products -> Danh sách sản phẩm có Phân trang, Tìm kiếm & Lọc nâng cao
     @GetMapping
+    @PreAuthorize("hasAnyAuthority('PRODUCT_VIEW', 'ROLE_ADMIN')")
     public Page<Product> getAllProducts(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -49,15 +50,16 @@ public class ProductController {
 
     // GET /api/products/{id} -> Chi tiết sản phẩm
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('PRODUCT_VIEW', 'ROLE_ADMIN')")
     public ResponseEntity<Product> getProductById(@PathVariable Long id) {
         return productRepository.findById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // POST /api/products -> Tạo sản phẩm mới (Chỉ ADMIN)
+    // POST /api/products -> Tạo sản phẩm mới
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyAuthority('PRODUCT_CREATE', 'ROLE_ADMIN')")
     public ResponseEntity<?> createProduct(@RequestBody Product product) {
         if (product.getName() == null || product.getName().trim().isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("message", "Tên sản phẩm không được để trống!"));
@@ -68,9 +70,9 @@ public class ProductController {
         return ResponseEntity.ok(productRepository.save(product));
     }
 
-    // PUT /api/products/{id} -> Cập nhật sản phẩm (Chỉ ADMIN)
+    // PUT /api/products/{id} -> Cập nhật sản phẩm
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyAuthority('PRODUCT_EDIT', 'ROLE_ADMIN')")
     public ResponseEntity<?> updateProduct(@PathVariable Long id, @RequestBody Product productDetails) {
         return productRepository.findById(id)
                 .map(product -> {
@@ -85,9 +87,9 @@ public class ProductController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // DELETE /api/products/{id} -> Xóa 1 sản phẩm (Chỉ ADMIN)
+    // DELETE /api/products/{id} -> Xóa 1 sản phẩm
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyAuthority('PRODUCT_DELETE', 'ROLE_ADMIN')")
     public ResponseEntity<?> deleteProduct(@PathVariable Long id) {
         return productRepository.findById(id)
                 .map(product -> {
@@ -97,9 +99,9 @@ public class ProductController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // POST /api/products/batch-delete -> Xóa hàng loạt nhiều sản phẩm (Chỉ ADMIN)
+    // POST /api/products/batch-delete -> Xóa hàng loạt nhiều sản phẩm
     @PostMapping("/batch-delete")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyAuthority('PRODUCT_DELETE', 'ROLE_ADMIN')")
     public ResponseEntity<?> batchDeleteProducts(@RequestBody ProductBatchDeleteRequest request) {
         if (request.getIds() == null || request.getIds().isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("message", "Danh sách ID sản phẩm cần xóa không hợp lệ!"));

@@ -151,6 +151,35 @@ public class RolePermissionService {
         return ALL_SYSTEM_PERMISSIONS;
     }
 
+    /**
+     * Lấy danh sách mã quyền hạn động của một vai trò cụ thể từ cơ sở dữ liệu
+     */
+    public Set<String> getPermissionsForRole(String roleName) {
+        if (roleName == null) return Collections.emptySet();
+
+        // ADMIN luôn có toàn quyền bảo vệ hệ thống
+        if ("ADMIN".equalsIgnoreCase(roleName)) {
+            return ALL_SYSTEM_PERMISSIONS.stream()
+                    .map(p -> p.get("code"))
+                    .collect(Collectors.toSet());
+        }
+
+        List<RolePermission> perms = rolePermissionRepository.findByRoleName(roleName.toUpperCase());
+        if (perms != null && !perms.isEmpty()) {
+            return perms.stream()
+                    .map(RolePermission::getPermissionCode)
+                    .collect(Collectors.toSet());
+        }
+
+        // Fallback về quyền mặc định của vai trò
+        try {
+            Role role = Role.valueOf(roleName.toUpperCase());
+            return getDefaultPermissionsForRole(role);
+        } catch (IllegalArgumentException e) {
+            return Collections.emptySet();
+        }
+    }
+
     private Set<String> getDefaultPermissionsForRole(Role role) {
         Set<String> set = new HashSet<>();
         switch (role) {

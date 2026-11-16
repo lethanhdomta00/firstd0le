@@ -60,28 +60,28 @@
           </template>
         </el-menu-item>
 
-        <el-menu-item index="/products">
+        <el-menu-item v-if="authStore.hasPermission('PRODUCT_VIEW')" index="/products">
           <el-icon><Goods /></el-icon>
           <template #title>
             <span class="menu-title-text">Quản lý Sản phẩm</span>
           </template>
         </el-menu-item>
 
-        <el-menu-item index="/orders">
+        <el-menu-item v-if="authStore.hasPermission('ORDER_VIEW')" index="/orders">
           <el-icon><Tickets /></el-icon>
           <template #title>
             <span class="menu-title-text">Quản lý Đơn hàng</span>
           </template>
         </el-menu-item>
 
-        <el-menu-item v-if="authStore.isAdmin" index="/users">
+        <el-menu-item v-if="authStore.hasPermission('USER_VIEW')" index="/users">
           <el-icon><User /></el-icon>
           <template #title>
             <span class="menu-title-text">Quản lý Tài khoản</span>
           </template>
         </el-menu-item>
 
-        <el-menu-item index="/chat">
+        <el-menu-item v-if="authStore.hasPermission('CHAT_USE')" index="/chat">
           <el-icon><ChatDotRound /></el-icon>
           <template #title>
             <div class="menu-item-with-badge">
@@ -100,7 +100,7 @@
           </template>
         </el-menu-item>
 
-        <el-menu-item index="/ai-copilot" @click.prevent="openChatWidget">
+        <el-menu-item v-if="authStore.hasPermission('AI_COPILOT')" index="/ai-copilot" @click.prevent="openChatWidget">
           <el-icon class="ai-sparkle-icon"><Cpu /></el-icon>
           <template #title>
             <div class="ai-menu-item-row">
@@ -117,14 +117,14 @@
           </template>
         </el-menu-item>
 
-        <el-menu-item index="/analytics">
+        <el-menu-item v-if="authStore.hasPermission('ANALYTICS_VIEW')" index="/analytics">
           <el-icon><DataAnalysis /></el-icon>
           <template #title>
             <span class="menu-title-text">Báo cáo & Phân tích</span>
           </template>
         </el-menu-item>
 
-        <el-menu-item index="/settings">
+        <el-menu-item v-if="authStore.isAdmin" index="/settings">
           <el-icon><Setting /></el-icon>
           <template #title>
             <span class="menu-title-text">Cài đặt hệ thống</span>
@@ -179,19 +179,19 @@
           <el-icon><Monitor /></el-icon>
           <template #title>Dashboard</template>
         </el-menu-item>
-        <el-menu-item index="/products">
+        <el-menu-item v-if="authStore.hasPermission('PRODUCT_VIEW')" index="/products">
           <el-icon><Goods /></el-icon>
           <template #title>Quản lý Sản phẩm</template>
         </el-menu-item>
-        <el-menu-item index="/orders">
+        <el-menu-item v-if="authStore.hasPermission('ORDER_VIEW')" index="/orders">
           <el-icon><Tickets /></el-icon>
           <template #title>Quản lý Đơn hàng</template>
         </el-menu-item>
-        <el-menu-item v-if="authStore.isAdmin" index="/users">
+        <el-menu-item v-if="authStore.hasPermission('USER_VIEW')" index="/users">
           <el-icon><User /></el-icon>
           <template #title>Quản lý Tài khoản</template>
         </el-menu-item>
-        <el-menu-item index="/chat">
+        <el-menu-item v-if="authStore.hasPermission('CHAT_USE')" index="/chat">
           <el-icon><ChatDotRound /></el-icon>
           <template #title>
             <div class="menu-item-with-badge">
@@ -209,9 +209,26 @@
             <span class="menu-title-text">Lịch biểu & Công việc</span>
           </template>
         </el-menu-item>
+        <el-menu-item v-if="authStore.hasPermission('AI_COPILOT')" index="/ai-copilot" @click.prevent="openChatWidget">
+          <el-icon class="ai-sparkle-icon"><Cpu /></el-icon>
+          <template #title>
+            <div class="ai-menu-item-row">
+              <span class="menu-title-text">Trợ lý AI Copilot</span>
+              <span class="ai-pill-tag">LIVE</span>
+            </div>
+          </template>
+        </el-menu-item>
         <el-menu-item v-if="authStore.isAdmin" index="/announcements">
           <el-icon><BellFilled /></el-icon>
           <template #title>Quản lý Thông báo</template>
+        </el-menu-item>
+        <el-menu-item v-if="authStore.hasPermission('ANALYTICS_VIEW')" index="/analytics">
+          <el-icon><DataAnalysis /></el-icon>
+          <template #title>Báo cáo & Phân tích</template>
+        </el-menu-item>
+        <el-menu-item v-if="authStore.isAdmin" index="/settings">
+          <el-icon><Setting /></el-icon>
+          <template #title>Cài đặt hệ thống</template>
         </el-menu-item>
       </el-menu>
     </el-drawer>

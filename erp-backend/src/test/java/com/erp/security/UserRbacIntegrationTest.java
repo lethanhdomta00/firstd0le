@@ -66,7 +66,7 @@ class UserRbacIntegrationTest {
 
         assertThat(details.getAuthorities())
                 .extracting("authority")
-                .contains("ROLE_ACCOUNTANT", "ORDER_READ", "ORDER_EXPORT", "ANALYTICS_ALL");
+                .contains("ROLE_ACCOUNTANT", "ORDER_VIEW", "ORDER_PAY", "ORDER_EXPORT", "ANALYTICS_VIEW");
     }
 
     @Test

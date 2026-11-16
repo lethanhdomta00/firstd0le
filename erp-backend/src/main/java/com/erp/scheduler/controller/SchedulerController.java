@@ -34,6 +34,7 @@ public class SchedulerController {
      * 1. Lấy danh sách toàn bộ các tác vụ tự động
      */
     @GetMapping("/jobs")
+    @PreAuthorize("hasAnyAuthority('JOB_VIEW', 'ROLE_ADMIN')")
     public ResponseEntity<List<ScheduledJobDto>> getAllJobs() {
         return ResponseEntity.ok(schedulerService.getAllJobs());
     }
@@ -42,6 +43,7 @@ public class SchedulerController {
      * 2. Lấy chi tiết một tác vụ
      */
     @GetMapping("/jobs/{id}")
+    @PreAuthorize("hasAnyAuthority('JOB_VIEW', 'ROLE_ADMIN')")
     public ResponseEntity<ScheduledJobDto> getJobById(@PathVariable Long id) {
         return ResponseEntity.ok(schedulerService.getJobById(id));
     }
@@ -50,6 +52,7 @@ public class SchedulerController {
      * 3. Tạo tác vụ tự động mới
      */
     @PostMapping("/jobs")
+    @PreAuthorize("hasAnyAuthority('JOB_CONFIG', 'ROLE_ADMIN')")
     public ResponseEntity<?> createJob(@Valid @RequestBody CreateJobRequest request) {
         try {
             ScheduledJobDto created = schedulerService.createJob(request);
@@ -63,6 +66,7 @@ public class SchedulerController {
      * 4. Cập nhật tác vụ / Đổi lịch Cron
      */
     @PutMapping("/jobs/{id}")
+    @PreAuthorize("hasAnyAuthority('JOB_CONFIG', 'ROLE_ADMIN')")
     public ResponseEntity<?> updateJob(@PathVariable Long id, @RequestBody UpdateJobRequest request) {
         try {
             ScheduledJobDto updated = schedulerService.updateJob(id, request);
@@ -76,6 +80,7 @@ public class SchedulerController {
      * 5. Tạm dừng tác vụ (PAUSE)
      */
     @PostMapping("/jobs/{id}/pause")
+    @PreAuthorize("hasAnyAuthority('JOB_CONFIG', 'ROLE_ADMIN')")
     public ResponseEntity<?> pauseJob(@PathVariable Long id) {
         try {
             return ResponseEntity.ok(schedulerService.pauseJob(id));
@@ -88,6 +93,7 @@ public class SchedulerController {
      * 6. Kích hoạt lại tác vụ (RESUME)
      */
     @PostMapping("/jobs/{id}/resume")
+    @PreAuthorize("hasAnyAuthority('JOB_CONFIG', 'ROLE_ADMIN')")
     public ResponseEntity<?> resumeJob(@PathVariable Long id) {
         try {
             return ResponseEntity.ok(schedulerService.resumeJob(id));
@@ -100,6 +106,7 @@ public class SchedulerController {
      * 7. Chạy ngay lập tức (TRIGGER NOW)
      */
     @PostMapping("/jobs/{id}/trigger")
+    @PreAuthorize("hasAnyAuthority('JOB_TRIGGER', 'ROLE_ADMIN')")
     public ResponseEntity<?> triggerNow(@PathVariable Long id, Authentication authentication) {
         try {
             String triggeredBy = authentication != null ? authentication.getName() : "ADMIN_MANUAL";
@@ -114,6 +121,7 @@ public class SchedulerController {
      * 8. Xóa vĩnh viễn một tác vụ
      */
     @DeleteMapping("/jobs/{id}")
+    @PreAuthorize("hasAnyAuthority('JOB_CONFIG', 'ROLE_ADMIN')")
     public ResponseEntity<?> deleteJob(@PathVariable Long id) {
         try {
             schedulerService.deleteJob(id);
@@ -127,6 +135,7 @@ public class SchedulerController {
      * 9. Lấy danh sách các loại Task Handler có sẵn trong hệ thống
      */
     @GetMapping("/job-types")
+    @PreAuthorize("hasAnyAuthority('JOB_VIEW', 'ROLE_ADMIN')")
     public ResponseEntity<List<Map<String, String>>> getAvailableJobTypes() {
         return ResponseEntity.ok(schedulerService.getAvailableJobTypes());
     }
@@ -135,6 +144,7 @@ public class SchedulerController {
      * 10. Lấy danh sách nhật ký thực thi (Execution Logs) phân trang
      */
     @GetMapping("/logs")
+    @PreAuthorize("hasAnyAuthority('JOB_VIEW', 'ROLE_ADMIN')")
     public ResponseEntity<?> getExecutionLogs(
             @RequestParam(required = false) String jobCode,
             @RequestParam(defaultValue = "0") int page,

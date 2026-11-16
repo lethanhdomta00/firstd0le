@@ -19,7 +19,20 @@ export const useAuthStore = defineStore('auth', {
   getters: {
     isAuthenticated: (state) => !!state.token,
     isAdmin: (state) => state.user?.role === 'ADMIN',
-    currentUser: (state) => state.user
+    currentUser: (state) => state.user,
+    permissions: (state) => state.user?.permissions || [],
+    hasPermission: (state) => (perm) => {
+      if (!state.user) return false
+      if (state.user.role === 'ADMIN') return true
+      const perms = state.user.permissions || []
+      return perms.includes(perm)
+    },
+    hasAnyPermission: (state) => (permList) => {
+      if (!state.user) return false
+      if (state.user.role === 'ADMIN') return true
+      const perms = state.user.permissions || []
+      return permList.some(p => perms.includes(p))
+    }
   },
 
   actions: {
