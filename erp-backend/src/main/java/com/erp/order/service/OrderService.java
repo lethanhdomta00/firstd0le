@@ -1,12 +1,15 @@
 package com.erp.order.service;
 
+import com.erp.model.Customer;
 import com.erp.model.Product;
 import com.erp.order.dto.*;
 import com.erp.order.model.*;
 import com.erp.order.repository.InventoryLogRepository;
 import com.erp.order.repository.OrderRepository;
+import com.erp.repository.CustomerRepository;
 import com.erp.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -24,11 +27,13 @@ import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class OrderService {
 
     private final OrderRepository orderRepository;
     private final InventoryLogRepository inventoryLogRepository;
     private final ProductRepository productRepository;
+    private final CustomerRepository customerRepository;
 
     private static final DateTimeFormatter DATE_CODE_FMT = DateTimeFormatter.ofPattern("yyyyMMdd");
 
@@ -113,6 +118,12 @@ public class OrderService {
                 .build();
     }
 
+    /**
+     * 1. Tạo đơn hàng mới:
+     * - Áp dụng Atomic Stock Reservation (chống bán lố Race Condition)
+     * - Đóng băng giá vốn snapshot_cost_price từ moving_avg_cost
+     * - Kiểm soát hạn mức công nợ Credit Gatekeeper
+     */
     @Transactional
     public OrderDto createOrder(CreateOrderRequest request, String username) {
         Map<Long, Integer> mergedQuantities = mergeItemQuantities(request.getItems());
@@ -124,7 +135,11 @@ public class OrderService {
         order.setStockDeducted(true);
         order.setCreatedByUsername(username);
 
-        applyItemsAndDeductStock(order, mergedQuantities, username, "Tạo đơn hàng mới");
+        // Áp dụng sản phẩm, tính toán giá vốn & giữ chỗ tồn kho nguyên tử
+        applyItemsAndReserveStock(order, mergedQuantities, username, "Tạo đơn hàng mới (Giữ chỗ)");
+
+        // Kiểm tra Hạn mức nợ của Khách hàng (Credit Gatekeeper)
+        checkAndApplyCustomerCreditLimit(order);
 
         Order saved = orderRepository.save(order);
         return toOrderDto(saved);
@@ -139,8 +154,9 @@ public class OrderService {
             throw new IllegalStateException("Chỉ được phép chỉnh sửa thông tin & sản phẩm khi đơn hàng ở trạng thái Chờ xác nhận!");
         }
 
+        // Giải phóng giữ chỗ cũ trước khi áp dụng mới
         if (order.isStockDeducted()) {
-            restoreOrderStock(order, username, "Hoàn kho tạm do cập nhật lại đơn hàng " + order.getOrderCode());
+            releaseOrderReservation(order, username, "Hoàn giữ chỗ tạm do cập nhật lại đơn hàng " + order.getOrderCode());
         }
 
         order.clearItems();
@@ -150,12 +166,19 @@ public class OrderService {
         order.setStockDeducted(true);
 
         Map<Long, Integer> mergedQuantities = mergeItemQuantities(request.getItems());
-        applyItemsAndDeductStock(order, mergedQuantities, username, "Cập nhật đơn hàng");
+        applyItemsAndReserveStock(order, mergedQuantities, username, "Cập nhật đơn hàng (Giữ chỗ mới)");
+        checkAndApplyCustomerCreditLimit(order);
 
         Order saved = orderRepository.save(order);
         return toOrderDto(saved);
     }
 
+    /**
+     * Cập nhật trạng thái đơn hàng (State Machine):
+     * - PENDING -> CONFIRMED/SHIPPING: Xuất kho thực tế (trừ physicalStock và reservedStock, ghi thẻ kho EXPORT_ORDER)
+     * - PENDING -> CANCELLED: Giải phóng giữ chỗ (trừ reservedStock, trả lại availableStock)
+     * - Đã xuất kho -> CANCELLED: Hoàn kho vật lý (cộng lại physicalStock, ghi thẻ kho IMPORT_CANCEL)
+     */
     @Transactional
     public OrderDto updateOrderStatus(Long id, OrderStatus newStatus, String note, String username) {
         Order order = orderRepository.findById(id)
@@ -179,13 +202,21 @@ public class OrderService {
             throw new IllegalStateException("Đơn hàng đang giao, không thể lùi về trạng thái Đã xác nhận!");
         }
 
+        // Kiểm tra chặn xuất kho nếu đang bị treo duyệt công nợ
+        if ((newStatus == OrderStatus.CONFIRMED || newStatus == OrderStatus.SHIPPING)
+                && order.isCreditExceeded() && "PENDING".equalsIgnoreCase(order.getCreditApprovalStatus())) {
+            throw new IllegalStateException("Đơn hàng đang vượt hạn mức công nợ đại lý! Cần được Giám đốc/Kế toán duyệt công nợ trước khi xuất kho.");
+        }
+
         LocalDateTime now = LocalDateTime.now();
         order.setStatus(newStatus);
 
-        if (newStatus == OrderStatus.CONFIRMED && order.getConfirmedAt() == null) {
-            order.setConfirmedAt(now);
-        } else if (newStatus == OrderStatus.SHIPPING && order.getConfirmedAt() == null) {
-            order.setConfirmedAt(now);
+        if (newStatus == OrderStatus.CONFIRMED || newStatus == OrderStatus.SHIPPING) {
+            if (order.getConfirmedAt() == null) {
+                order.setConfirmedAt(now);
+            }
+            // Xuất kho thực tế: chuyển từ Tồn giữ chỗ sang Xuất kho vật lý
+            deductPhysicalStockForOrder(order, username, "Xuất kho giao hàng theo đơn " + order.getOrderCode());
         } else if (newStatus == OrderStatus.COMPLETED) {
             if (order.getConfirmedAt() == null) {
                 order.setConfirmedAt(now);
@@ -193,13 +224,10 @@ public class OrderService {
             order.setCompletedAt(now);
         } else if (newStatus == OrderStatus.CANCELLED) {
             order.setCancelledAt(now);
-            if (order.isStockDeducted()) {
-                String cancelNote = (note != null && !note.trim().isEmpty())
-                        ? "Hủy đơn " + order.getOrderCode() + ": " + note.trim()
-                        : "Hoàn kho tự động do hủy đơn hàng " + order.getOrderCode();
-                restoreOrderStock(order, username, cancelNote);
-                order.setStockDeducted(false);
-            }
+            // Xử lý hoàn kho tùy thuộc vào trạng thái trước khi hủy
+            handleCancelOrderStock(order, currentStatus, username, note);
+            order.setStockDeducted(false);
+
             if (order.getPaymentStatus() == PaymentStatus.PAID) {
                 order.setPaymentStatus(PaymentStatus.REFUNDED);
             }
@@ -214,6 +242,25 @@ public class OrderService {
         return toOrderDto(orderRepository.save(order));
     }
 
+    /**
+     * Phê duyệt công nợ cho đơn hàng bị treo hạn mức
+     */
+    @Transactional
+    public OrderDto approveCredit(Long orderId, String username, boolean approved) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng #" + orderId));
+
+        if (!order.isCreditExceeded()) {
+            throw new IllegalStateException("Đơn hàng này không thuộc diện kiểm soát hạn mức nợ!");
+        }
+
+        order.setCreditApprovalStatus(approved ? "APPROVED" : "REJECTED");
+        String note = "[" + (approved ? "ĐÃ DUYỆT CÔNG NỢ" : "TỪ CHỐI CÔNG NỢ") + "] Người duyệt: " + username;
+        order.setNote(order.getNote() != null ? order.getNote() + "\n" + note : note);
+
+        return toOrderDto(orderRepository.save(order));
+    }
+
     @Transactional
     public OrderDto updatePaymentStatus(Long id, PaymentStatus paymentStatus) {
         Order order = orderRepository.findById(id)
@@ -223,7 +270,17 @@ public class OrderService {
             throw new IllegalStateException("Không thể đánh dấu Đã thanh toán cho đơn hàng đã hủy!");
         }
 
+        PaymentStatus oldPaymentStatus = order.getPaymentStatus();
         order.setPaymentStatus(paymentStatus);
+
+        // Nếu chuyển sang PAID: Gạch nợ khách hàng nếu có
+        if (oldPaymentStatus != PaymentStatus.PAID && paymentStatus == PaymentStatus.PAID) {
+            if (order.getCustomerPhone() != null) {
+                customerRepository.findByPhone(order.getCustomerPhone())
+                        .ifPresent(c -> customerRepository.decreaseDebt(c.getId(), order.getTotalAmount()));
+            }
+        }
+
         return toOrderDto(orderRepository.save(order));
     }
 
@@ -236,8 +293,8 @@ public class OrderService {
             throw new IllegalStateException("Chỉ có thể xóa đơn hàng ở trạng thái Chờ xác nhận hoặc Đã hủy!");
         }
 
-        if (order.isStockDeducted()) {
-            restoreOrderStock(order, username, "Hoàn kho do xóa đơn hàng " + order.getOrderCode());
+        if (order.isStockDeducted() && order.getStatus() == OrderStatus.PENDING) {
+            releaseOrderReservation(order, username, "Hủy giữ chỗ do xóa đơn hàng " + order.getOrderCode());
         }
 
         orderRepository.delete(order);
@@ -252,49 +309,69 @@ public class OrderService {
             int page,
             int size
     ) {
-        Pageable pageable = PageRequest.of(
-                Math.max(0, page),
-                Math.max(1, Math.min(size, 100)),
-                Sort.by("createdAt").descending().and(Sort.by("id").descending())
-        );
-        return inventoryLogRepository.searchLogs(trimOrNull(keyword), movementType, fromDate, toDate, pageable)
-                .map(this::toInventoryLogDto);
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.max(1, Math.min(size, 100)));
+        return inventoryLogRepository.searchLogs(
+                trimOrNull(keyword),
+                movementType,
+                fromDate,
+                toDate,
+                pageable
+        ).map(this::toInventoryLogDto);
     }
 
+    /**
+     * Điều chỉnh tồn kho thủ công & Tự động tính lại Giá vốn MAC nếu có nhập kho
+     */
     @Transactional
     public InventoryLogDto adjustStock(StockAdjustRequest request, String username) {
-        if (request.getQuantityDelta() == 0) {
-            throw new IllegalArgumentException("Số lượng điều chỉnh phải khác 0!");
+        Product product = productRepository.findById(request.getProductId())
+                .orElseThrow(() -> new IllegalArgumentException("Sản phẩm ID #" + request.getProductId() + " không tồn tại!"));
+
+        int delta = request.getQuantityDelta();
+        if (delta == 0) {
+            throw new IllegalArgumentException("Số lượng điều chỉnh kho phải khác 0!");
         }
 
-        Product product = productRepository.findByIdForUpdate(request.getProductId())
-                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy sản phẩm #" + request.getProductId()));
+        int physicalBefore = product.getPhysicalStock() != null ? product.getPhysicalStock() : (product.getStock() != null ? product.getStock() : 0);
+        int physicalAfter = physicalBefore + delta;
 
-        int stockBefore = product.getStock() != null ? product.getStock() : 0;
-        int stockAfter = stockBefore + request.getQuantityDelta();
-        if (stockAfter < 0) {
+        if (physicalAfter < 0) {
             throw new IllegalArgumentException(
-                    "Không thể trừ " + Math.abs(request.getQuantityDelta()) + " sản phẩm '" + product.getName()
-                    + "' vì tồn kho hiện chỉ còn " + stockBefore + "!"
+                    "Không thể điều chỉnh! Tồn kho thực tế hiện tại là " + physicalBefore
+                    + ", trừ " + Math.abs(delta) + " sẽ làm âm kho."
             );
         }
 
-        product.setStock(stockAfter);
+        // Thuật toán Moving Average Cost (MAC) khi nhập kho
+        if (delta > 0 && request.getInboundCostPrice() != null && request.getInboundCostPrice().compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal currentMac = product.getMovingAvgCost() != null ? product.getMovingAvgCost() : BigDecimal.ZERO;
+            BigDecimal inboundPrice = request.getInboundCostPrice();
+
+            BigDecimal totalOldValue = currentMac.multiply(BigDecimal.valueOf(physicalBefore));
+            BigDecimal totalNewInbound = inboundPrice.multiply(BigDecimal.valueOf(delta));
+            BigDecimal newTotalValue = totalOldValue.add(totalNewInbound);
+
+            BigDecimal newMac = newTotalValue.divide(BigDecimal.valueOf(physicalAfter), 2, RoundingMode.HALF_UP);
+            product.setMovingAvgCost(newMac);
+            log.info("Sản phẩm [{}] cập nhật Giá vốn MAC mới: {} đ (Cũ: {} đ, Nhập mới: {} đ)", product.getSku(), newMac, currentMac, inboundPrice);
+        }
+
+        product.setPhysicalStock(physicalAfter);
+        product.syncStockFields();
         productRepository.save(product);
 
-        String refCode = "ADJ-" + LocalDate.now().format(DATE_CODE_FMT) + "-" + ThreadLocalRandom.current().nextInt(100, 999);
-        String note = trimOrNull(request.getNote());
-        if (note == null) {
-            note = request.getQuantityDelta() > 0 ? "Nhập bổ sung tồn kho thủ công" : "Xuất/giảm trừ kiểm kê kho";
-        }
+        InventoryMovementType type = delta > 0 ? InventoryMovementType.MANUAL_ADJUST : InventoryMovementType.EXPORT_ORDER;
+        String note = (request.getNote() != null && !request.getNote().trim().isEmpty())
+                ? request.getNote().trim()
+                : "Điều chỉnh kho thủ công";
 
         InventoryLog savedLog = recordInventoryLog(
                 product,
-                InventoryMovementType.MANUAL_ADJUST,
-                request.getQuantityDelta(),
-                stockBefore,
-                stockAfter,
-                refCode,
+                type,
+                delta,
+                physicalBefore,
+                physicalAfter,
+                "ADJUST-" + System.currentTimeMillis() % 100000,
                 note,
                 username
         );
@@ -302,76 +379,56 @@ public class OrderService {
         return toInventoryLogDto(savedLog);
     }
 
-    private Map<Long, Integer> mergeItemQuantities(List<OrderItemRequest> items) {
-        // TreeMap keeps productIds sorted deterministically to prevent lock deadlocks
-        Map<Long, Integer> merged = new TreeMap<>();
-        for (OrderItemRequest req : items) {
-            if (req.getQuantity() == null || req.getQuantity() <= 0) {
-                throw new IllegalArgumentException("Số lượng sản phẩm phải lớn hơn 0!");
-            }
-            merged.merge(req.getProductId(), req.getQuantity(), Integer::sum);
-        }
-        return merged;
-    }
+    // =========================================================================
+    //                        CƠ CHẾ KHO & GIÁ VỐN NỘI BỘ
+    // =========================================================================
 
-    private void applyCustomerAndPaymentFields(Order order, CreateOrderRequest request) {
-        order.setCustomerName(request.getCustomerName().trim());
-        order.setCustomerPhone(trimOrNull(request.getCustomerPhone()));
-        order.setCustomerEmail(trimOrNull(request.getCustomerEmail()));
-        order.setShippingAddress(trimOrNull(request.getShippingAddress()));
-        order.setNote(trimOrNull(request.getNote()));
-        order.setPaymentMethod(request.getPaymentMethod() != null ? request.getPaymentMethod() : PaymentMethod.CASH);
-        order.setPaymentStatus(request.getPaymentStatus() != null ? request.getPaymentStatus() : PaymentStatus.UNPAID);
-        order.setDiscountAmount(sanitizeNonNegative(request.getDiscountAmount()));
-        order.setTaxRate(sanitizeTaxRate(request.getTaxRate()));
-    }
-
-    private void applyItemsAndDeductStock(Order order, Map<Long, Integer> qtyByProduct, String username, String logPrefix) {
+    /**
+     * Giữ chỗ tồn kho nguyên tử (Atomic Stock Reservation) & Đóng băng giá vốn MAC
+     */
+    private void applyItemsAndReserveStock(Order order, Map<Long, Integer> qtyByProduct, String username, String logPrefix) {
         BigDecimal subtotal = BigDecimal.ZERO;
+        BigDecimal totalCostAmount = BigDecimal.ZERO;
 
         for (Map.Entry<Long, Integer> entry : qtyByProduct.entrySet()) {
             Long productId = entry.getKey();
             int qty = entry.getValue();
 
-            Product product = productRepository.findByIdForUpdate(productId)
+            Product product = productRepository.findById(productId)
                     .orElseThrow(() -> new IllegalArgumentException("Sản phẩm ID #" + productId + " không tồn tại!"));
 
-            int stockBefore = product.getStock() != null ? product.getStock() : 0;
-            if (stockBefore < qty) {
+            // 1. Giữ chỗ tồn kho nguyên tử (Atomic Check & Update)
+            int updatedRows = productRepository.reserveStockAtomic(productId, qty);
+            if (updatedRows == 0) {
+                int available = product.getAvailableStock();
                 throw new IllegalArgumentException(
                         "Sản phẩm '" + product.getName() + "' (" + product.getSku() + ") chỉ còn "
-                        + stockBefore + " trong kho, không đủ cho số lượng đặt " + qty + "!"
+                        + available + " tồn khả dụng, không đủ để giữ chỗ số lượng " + qty + "!"
                 );
             }
-
-            int stockAfter = stockBefore - qty;
-            product.setStock(stockAfter);
-            productRepository.save(product);
 
             BigDecimal unitPrice = product.getPrice() != null ? product.getPrice() : BigDecimal.ZERO;
             BigDecimal lineTotal = unitPrice.multiply(BigDecimal.valueOf(qty)).setScale(2, RoundingMode.HALF_UP);
             subtotal = subtotal.add(lineTotal);
+
+            // 2. Đóng băng giá vốn Moving Average Cost
+            BigDecimal snapshotCost = product.getMovingAvgCost() != null ? product.getMovingAvgCost() : BigDecimal.ZERO;
+            BigDecimal lineCost = snapshotCost.multiply(BigDecimal.valueOf(qty)).setScale(2, RoundingMode.HALF_UP);
+            totalCostAmount = totalCostAmount.add(lineCost);
 
             OrderItem item = new OrderItem();
             item.setProductId(product.getId());
             item.setProductName(product.getName());
             item.setProductSku(product.getSku());
             item.setProductImageUrl(product.getImageUrl());
+            item.setUomName(product.getBaseUnit() != null ? product.getBaseUnit() : "Cái");
+            item.setUomConversionRate(BigDecimal.ONE);
             item.setUnitPrice(unitPrice);
             item.setQuantity(qty);
             item.setLineTotal(lineTotal);
+            item.setSnapshotCostPrice(snapshotCost);
+            item.calculateGrossProfit();
             order.addItem(item);
-
-            recordInventoryLog(
-                    product,
-                    InventoryMovementType.EXPORT_ORDER,
-                    -qty,
-                    stockBefore,
-                    stockAfter,
-                    order.getOrderCode(),
-                    logPrefix + " (" + order.getCustomerName() + ")",
-                    username
-            );
         }
 
         BigDecimal discount = order.getDiscountAmount();
@@ -389,36 +446,148 @@ public class OrderService {
         order.setSubtotal(subtotal.setScale(2, RoundingMode.HALF_UP));
         order.setTaxAmount(taxAmount);
         order.setTotalAmount(totalAmount);
+        order.setTotalCostAmount(totalCostAmount);
+        order.setGrossProfit(totalAmount.subtract(totalCostAmount).setScale(2, RoundingMode.HALF_UP));
     }
 
-    private void restoreOrderStock(Order order, String username, String reason) {
-        Map<Long, Integer> qtyByProduct = new TreeMap<>();
+    /**
+     * Xuất kho thực tế (trừ Physical Stock và Reserved Stock, ghi nhận Thẻ kho)
+     */
+    private void deductPhysicalStockForOrder(Order order, String username, String note) {
         for (OrderItem item : order.getItems()) {
-            qtyByProduct.merge(item.getProductId(), item.getQuantity(), Integer::sum);
-        }
+            productRepository.findById(item.getProductId()).ifPresent(product -> {
+                int physicalBefore = product.getPhysicalStock() != null ? product.getPhysicalStock() : 0;
+                int qty = item.getQuantity();
 
-        for (Map.Entry<Long, Integer> entry : qtyByProduct.entrySet()) {
-            Long productId = entry.getKey();
-            int qty = entry.getValue();
-
-            productRepository.findByIdForUpdate(productId).ifPresent(product -> {
-                int stockBefore = product.getStock() != null ? product.getStock() : 0;
-                int stockAfter = stockBefore + qty;
-                product.setStock(stockAfter);
-                productRepository.save(product);
+                productRepository.deductPhysicalStock(product.getId(), qty);
+                int physicalAfter = Math.max(0, physicalBefore - qty);
 
                 recordInventoryLog(
                         product,
-                        InventoryMovementType.IMPORT_CANCEL,
-                        qty,
-                        stockBefore,
-                        stockAfter,
+                        InventoryMovementType.EXPORT_ORDER,
+                        -qty,
+                        physicalBefore,
+                        physicalAfter,
                         order.getOrderCode(),
-                        reason,
+                        note,
                         username
                 );
             });
         }
+    }
+
+    /**
+     * Giải phóng giữ chỗ (Khi Hủy đơn ở trạng thái PENDING)
+     */
+    private void releaseOrderReservation(Order order, String username, String reason) {
+        for (OrderItem item : order.getItems()) {
+            productRepository.releaseReservedStock(item.getProductId(), item.getQuantity());
+        }
+    }
+
+    /**
+     * Xử lý hoàn kho khi Hủy đơn
+     */
+    private void handleCancelOrderStock(Order order, OrderStatus previousStatus, String username, String reason) {
+        String logNote = (reason != null && !reason.trim().isEmpty())
+                ? "Hủy đơn " + order.getOrderCode() + ": " + reason.trim()
+                : "Hủy đơn hàng " + order.getOrderCode();
+
+        if (previousStatus == OrderStatus.PENDING) {
+            // Mới chỉ giữ chỗ, chưa xuất kho -> Giải phóng giữ chỗ
+            releaseOrderReservation(order, username, logNote);
+        } else {
+            // Đã xuất kho vật lý -> Hoàn trả lại hàng vào kệ kho
+            for (OrderItem item : order.getItems()) {
+                productRepository.findById(item.getProductId()).ifPresent(product -> {
+                    int physicalBefore = product.getPhysicalStock() != null ? product.getPhysicalStock() : 0;
+                    int qty = item.getQuantity();
+
+                    productRepository.restorePhysicalStock(product.getId(), qty);
+                    int physicalAfter = physicalBefore + qty;
+
+                    recordInventoryLog(
+                            product,
+                            InventoryMovementType.IMPORT_CANCEL,
+                            qty,
+                            physicalBefore,
+                            physicalAfter,
+                            order.getOrderCode(),
+                            logNote,
+                            username
+                    );
+                });
+            }
+        }
+    }
+
+    /**
+     * Kiểm tra hạn mức nợ khách hàng (Credit Gatekeeper)
+     */
+    private void checkAndApplyCustomerCreditLimit(Order order) {
+        if (order.getCustomerPhone() == null || order.getCustomerPhone().trim().isEmpty()) {
+            return;
+        }
+
+        String phone = order.getCustomerPhone().trim();
+        Customer customer = customerRepository.findByPhone(phone).orElseGet(() -> {
+            Customer c = new Customer();
+            c.setName(order.getCustomerName());
+            c.setPhone(phone);
+            c.setEmail(order.getCustomerEmail());
+            c.setAddress(order.getShippingAddress());
+            c.setPriceTier("RETAIL");
+            c.setCreditLimit(new BigDecimal("50000000.00"));
+            c.setCurrentDebt(BigDecimal.ZERO);
+            return customerRepository.save(c);
+        });
+
+        order.setPriceTier(customer.getPriceTier());
+
+        // Kiểm tra vượt hạn mức nợ
+        if (customer.isExceedingCreditLimit(order.getTotalAmount())) {
+            order.setCreditExceeded(true);
+            order.setCreditApprovalStatus("PENDING");
+            log.warn("Đơn hàng [{}] của khách [{}] vượt hạn mức nợ! (Dư nợ: {} đ, Đơn mới: {} đ, Hạn mức: {} đ)",
+                    order.getOrderCode(), customer.getName(), customer.getCurrentDebt(), order.getTotalAmount(), customer.getCreditLimit());
+        } else {
+            order.setCreditExceeded(false);
+            order.setCreditApprovalStatus("NONE");
+            // Tăng dư nợ nếu đơn chưa thanh toán ngay
+            if (order.getPaymentStatus() != PaymentStatus.PAID) {
+                customerRepository.increaseDebt(customer.getId(), order.getTotalAmount());
+            }
+        }
+    }
+
+    private void applyCustomerAndPaymentFields(Order order, CreateOrderRequest request) {
+        order.setCustomerName(request.getCustomerName().trim());
+        order.setCustomerPhone(trimOrNull(request.getCustomerPhone()));
+        order.setCustomerEmail(trimOrNull(request.getCustomerEmail()));
+        order.setShippingAddress(trimOrNull(request.getShippingAddress()));
+        order.setNote(trimOrNull(request.getNote()));
+        order.setPaymentMethod(request.getPaymentMethod() != null ? request.getPaymentMethod() : PaymentMethod.CASH);
+        order.setPaymentStatus(request.getPaymentStatus() != null ? request.getPaymentStatus() : PaymentStatus.UNPAID);
+        order.setDiscountAmount(sanitizeNonNegative(request.getDiscountAmount()));
+        order.setTaxRate(sanitizeTaxRate(request.getTaxRate()));
+    }
+
+    private Map<Long, Integer> mergeItemQuantities(List<OrderItemRequest> itemRequests) {
+        if (itemRequests == null || itemRequests.isEmpty()) {
+            throw new IllegalArgumentException("Đơn hàng phải chứa ít nhất 1 sản phẩm!");
+        }
+
+        Map<Long, Integer> merged = new LinkedHashMap<>();
+        for (OrderItemRequest req : itemRequests) {
+            if (req.getProductId() == null) {
+                throw new IllegalArgumentException("Product ID không được để trống!");
+            }
+            if (req.getQuantity() == null || req.getQuantity() <= 0) {
+                throw new IllegalArgumentException("Số lượng sản phẩm phải lớn hơn 0!");
+            }
+            merged.merge(req.getProductId(), req.getQuantity(), Integer::sum);
+        }
+        return merged;
     }
 
     private InventoryLog recordInventoryLog(
@@ -488,9 +657,13 @@ public class OrderService {
                         .productName(item.getProductName())
                         .productSku(item.getProductSku())
                         .productImageUrl(item.getProductImageUrl())
+                        .uomName(item.getUomName())
+                        .uomConversionRate(item.getUomConversionRate())
                         .unitPrice(item.getUnitPrice())
                         .quantity(item.getQuantity())
                         .lineTotal(item.getLineTotal())
+                        .snapshotCostPrice(item.getSnapshotCostPrice())
+                        .grossProfit(item.getGrossProfit())
                         .build())
                 .toList();
 
@@ -512,11 +685,16 @@ public class OrderService {
                 .paymentStatusLabel(order.getPaymentStatus().getLabel())
                 .paymentMethod(order.getPaymentMethod())
                 .paymentMethodLabel(order.getPaymentMethod().getLabel())
+                .priceTier(order.getPriceTier())
                 .subtotal(order.getSubtotal())
                 .discountAmount(order.getDiscountAmount())
                 .taxRate(order.getTaxRate())
                 .taxAmount(order.getTaxAmount())
                 .totalAmount(order.getTotalAmount())
+                .totalCostAmount(order.getTotalCostAmount())
+                .grossProfit(order.getGrossProfit())
+                .creditExceeded(order.isCreditExceeded())
+                .creditApprovalStatus(order.getCreditApprovalStatus())
                 .stockDeducted(order.isStockDeducted())
                 .createdByUsername(order.getCreatedByUsername())
                 .confirmedAt(order.getConfirmedAt())

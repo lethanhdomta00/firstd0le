@@ -1,5 +1,6 @@
 package com.erp.order;
 
+import com.erp.model.Customer;
 import com.erp.model.Product;
 import com.erp.order.dto.*;
 import com.erp.order.model.*;
@@ -7,6 +8,7 @@ import com.erp.order.repository.InventoryLogRepository;
 import com.erp.order.repository.OrderRepository;
 import com.erp.order.service.OrderExportService;
 import com.erp.order.service.OrderService;
+import com.erp.repository.CustomerRepository;
 import com.erp.repository.ProductRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,6 +40,9 @@ class OrderServiceTest {
     @Mock
     private ProductRepository productRepository;
 
+    @Mock
+    private CustomerRepository customerRepository;
+
     @InjectMocks
     private OrderService orderService;
 
@@ -50,6 +55,9 @@ class OrderServiceTest {
         sampleProduct.setName("Doc Reader Pro Wireless");
         sampleProduct.setSku("SKU-9178");
         sampleProduct.setPrice(new BigDecimal("100000"));
+        sampleProduct.setMovingAvgCost(new BigDecimal("70000"));
+        sampleProduct.setPhysicalStock(8);
+        sampleProduct.setReservedStock(0);
         sampleProduct.setStock(8);
     }
 
@@ -73,9 +81,10 @@ class OrderServiceTest {
         request.setItems(List.of(item1, item2));
 
         when(orderRepository.existsByOrderCode(anyString())).thenReturn(false);
-        when(productRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(sampleProduct));
-        when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(inventoryLogRepository.save(any(InventoryLog.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(productRepository.findById(1L)).thenReturn(Optional.of(sampleProduct));
+        when(productRepository.reserveStockAtomic(1L, 3)).thenReturn(1);
+        when(customerRepository.findByPhone(anyString())).thenReturn(Optional.empty());
+        when(customerRepository.save(any(Customer.class))).thenAnswer(inv -> inv.getArgument(0));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> {
             Order o = inv.getArgument(0);
             o.setId(100L);
@@ -87,13 +96,12 @@ class OrderServiceTest {
         assertNotNull(result);
         assertEquals(100L, result.getId());
         assertEquals(OrderStatus.PENDING, result.getStatus());
-        assertEquals(5, sampleProduct.getStock()); // 8 - 3 = 5
         assertEquals(new BigDecimal("300000.00"), result.getSubtotal());
         assertEquals(new BigDecimal("24000.00"), result.getTaxAmount());
         assertEquals(new BigDecimal("324000.00"), result.getTotalAmount());
         assertEquals(3, result.getTotalQuantity());
         assertEquals(1, result.getItems().size());
-        verify(inventoryLogRepository, times(1)).save(any(InventoryLog.class));
+        verify(productRepository, times(1)).reserveStockAtomic(1L, 3);
     }
 
     @Test
@@ -106,7 +114,8 @@ class OrderServiceTest {
         request.setItems(List.of(item));
 
         when(orderRepository.existsByOrderCode(anyString())).thenReturn(false);
-        when(productRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(sampleProduct));
+        when(productRepository.findById(1L)).thenReturn(Optional.of(sampleProduct));
+        when(productRepository.reserveStockAtomic(1L, 99)).thenReturn(0);
 
         IllegalArgumentException ex = assertThrows(
                 IllegalArgumentException.class,
@@ -114,7 +123,6 @@ class OrderServiceTest {
         );
 
         assertTrue(ex.getMessage().contains("chỉ còn 8"));
-        assertEquals(8, sampleProduct.getStock());
         verify(orderRepository, never()).save(any());
     }
 
@@ -138,11 +146,12 @@ class OrderServiceTest {
         orderItem.setLineTotal(new BigDecimal("300000"));
         existing.addItem(orderItem);
 
+        sampleProduct.setPhysicalStock(5);
         sampleProduct.setStock(5);
 
         when(orderRepository.findById(5L)).thenReturn(Optional.of(existing));
-        when(productRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(sampleProduct));
-        when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(productRepository.findById(1L)).thenReturn(Optional.of(sampleProduct));
+        when(productRepository.restorePhysicalStock(1L, 3)).thenReturn(1);
         when(inventoryLogRepository.save(any(InventoryLog.class))).thenAnswer(inv -> inv.getArgument(0));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -151,7 +160,7 @@ class OrderServiceTest {
         assertEquals(OrderStatus.CANCELLED, cancelled.getStatus());
         assertEquals(PaymentStatus.REFUNDED, cancelled.getPaymentStatus());
         assertFalse(cancelled.isStockDeducted());
-        assertEquals(8, sampleProduct.getStock()); // 5 + 3 restored
+        verify(productRepository, times(1)).restorePhysicalStock(1L, 3);
         verify(inventoryLogRepository, times(1)).save(any(InventoryLog.class));
     }
 
@@ -173,7 +182,7 @@ class OrderServiceTest {
         StockAdjustRequest req = new StockAdjustRequest();
         req.setProductId(1L);
         req.setQuantityDelta(-15);
-        when(productRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(sampleProduct));
+        when(productRepository.findById(1L)).thenReturn(Optional.of(sampleProduct));
 
         assertThrows(
                 IllegalArgumentException.class,

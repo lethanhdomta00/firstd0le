@@ -67,7 +67,34 @@ public class ProductController {
         if (product.getSku() == null || product.getSku().trim().isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("message", "Mã SKU không được để trống!"));
         }
+        // Khởi tạo và đồng bộ tồn kho ban đầu
+        if (product.getPhysicalStock() == null && product.getStock() != null) {
+            product.setPhysicalStock(product.getStock());
+        } else if (product.getPhysicalStock() != null && product.getStock() == null) {
+            product.setStock(product.getPhysicalStock());
+        }
+        if (product.getReservedStock() == null) {
+            product.setReservedStock(0);
+        }
+        if (product.getIncomingStock() == null) {
+            product.setIncomingStock(0);
+        }
+        if (product.getBaseUnit() == null || product.getBaseUnit().trim().isEmpty()) {
+            product.setBaseUnit("Cái");
+        }
+        if (product.getMovingAvgCost() == null && product.getPrice() != null) {
+            product.setMovingAvgCost(product.getPrice());
+        }
         return ResponseEntity.ok(productRepository.save(product));
+    }
+
+    // GET /api/products/barcode/{barcode} -> Tra cứu nhanh sản phẩm qua máy quét mã vạch
+    @GetMapping("/barcode/{barcode}")
+    @PreAuthorize("hasAnyAuthority('PRODUCT_VIEW', 'ORDER_VIEW', 'ORDER_CREATE', 'ROLE_ADMIN')")
+    public ResponseEntity<Product> getProductByBarcode(@PathVariable String barcode) {
+        return productRepository.findByBarcode(barcode)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     // PUT /api/products/{id} -> Cập nhật sản phẩm
@@ -78,8 +105,23 @@ public class ProductController {
                 .map(product -> {
                     product.setName(productDetails.getName());
                     product.setSku(productDetails.getSku());
+                    product.setBarcode(productDetails.getBarcode());
+                    product.setBaseUnit(productDetails.getBaseUnit());
                     product.setPrice(productDetails.getPrice());
-                    product.setStock(productDetails.getStock());
+                    product.setWholesalePrice(productDetails.getWholesalePrice());
+                    product.setVipPrice(productDetails.getVipPrice());
+                    if (productDetails.getMovingAvgCost() != null) {
+                        product.setMovingAvgCost(productDetails.getMovingAvgCost());
+                    }
+                    if (productDetails.getPhysicalStock() != null) {
+                        product.setPhysicalStock(productDetails.getPhysicalStock());
+                        int res = product.getReservedStock() != null ? product.getReservedStock() : 0;
+                        product.setStock(Math.max(0, productDetails.getPhysicalStock() - res));
+                    } else if (productDetails.getStock() != null) {
+                        product.setStock(productDetails.getStock());
+                        product.setPhysicalStock(productDetails.getStock() + (product.getReservedStock() != null ? product.getReservedStock() : 0));
+                    }
+                    product.setMinStockAlert(productDetails.getMinStockAlert());
                     product.setImageUrl(productDetails.getImageUrl());
                     Product updatedProduct = productRepository.save(product);
                     return ResponseEntity.ok(updatedProduct);

@@ -13,7 +13,11 @@ public class OrderItemDto {
     private String productName;
     private String productSku;
     private String productImageUrl;
+    private String uomName;
+    private BigDecimal uomConversionRate;
     private BigDecimal unitPrice;
     private Integer quantity;
     private BigDecimal lineTotal;
+    private BigDecimal snapshotCostPrice;
+    private BigDecimal grossProfit;
 }

@@ -241,24 +241,46 @@
             </template>
           </el-table-column>
 
-          <el-table-column prop="sku" label="Mã SKU" width="135">
+          <el-table-column prop="sku" label="Mã SKU / Barcode" width="165">
             <template #default="{ row }">
-              <span class="sku-pill-badge">{{ row.sku }}</span>
+              <div class="sku-cell-block">
+                <span class="sku-pill-badge">{{ row.sku }}</span>
+                <div v-if="row.barcode" class="barcode-sub-txt" title="Mã vạch máy quét">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="display:inline; vertical-align:middle; margin-right:3px;">
+                    <path d="M3 5v14M7 5v14M11 5v14M15 5v14M19 5v14M21 5v14"/>
+                  </svg>
+                  <span>{{ row.barcode }}</span>
+                </div>
+              </div>
             </template>
           </el-table-column>
 
-          <el-table-column prop="price" label="Giá bán" width="145" align="right">
+          <el-table-column prop="price" label="Giá bán / Giá vốn" width="165" align="right">
             <template #default="{ row }">
-              <span class="price-tag">{{ formatCurrency(row.price) }}</span>
+              <div class="price-cell-block">
+                <span class="price-tag">{{ formatCurrency(row.price) }}</span>
+                <div class="sub-cost-txt" v-if="row.movingAvgCost != null" title="Giá vốn bình quân Moving Average Cost (MAC)">
+                  Vốn MAC: {{ formatCurrency(row.movingAvgCost) }}
+                </div>
+              </div>
             </template>
           </el-table-column>
 
-          <el-table-column prop="stock" label="Tồn kho" width="165" align="center">
+          <el-table-column prop="stock" label="Tồn kho 4 trạng thái" width="195" align="center">
             <template #default="{ row }">
-              <span class="stock-status-pill" :class="getStockClass(row.stock)">
-                <span class="stock-dot"></span>
-                <span>{{ getStockLabel(row.stock) }}</span>
-              </span>
+              <div class="stock-multi-cell">
+                <span class="stock-status-pill" :class="getStockClass(row.stock)">
+                  <span class="stock-dot"></span>
+                  <span>Khả dụng: <strong>{{ row.stock }}</strong> {{ row.baseUnit || 'Cái' }}</span>
+                </span>
+                <div class="sub-stock-breakdown">
+                  <span title="Hàng thực tế nằm trên kệ">Kệ: <strong>{{ row.physicalStock ?? row.stock }}</strong></span>
+                  <span class="dot-sep">•</span>
+                  <span :class="{'text-amber': (row.reservedStock ?? 0) > 0}" title="Hàng đang giữ chỗ trong đơn chờ xuất">
+                    Giữ: <strong>{{ row.reservedStock ?? 0 }}</strong>
+                  </span>
+                </div>
+              </div>
             </template>
           </el-table-column>
 
@@ -465,10 +487,36 @@
                 </div>
               </div>
 
-              <!-- Row 2: Đơn giá (VNĐ) & Số lượng tồn kho -->
+              <!-- Row 1.5: Mã vạch Barcode & Đơn vị tính (UoM) -->
               <div class="pm-grid-2col">
                 <div class="pm-field-block">
-                  <label class="pm-label">Đơn giá (VNĐ) <span class="req-star">*</span></label>
+                  <label class="pm-label">Mã vạch Barcode (Máy quét)</label>
+                  <input
+                    v-model="form.barcode"
+                    type="text"
+                    placeholder="VD: 8938500123456"
+                    class="pm-text-input"
+                  />
+                  <span class="pm-helper-text">Hỗ trợ quét trực tiếp qua máy bắn barcode USB/Bluetooth</span>
+                </div>
+
+                <div class="pm-field-block">
+                  <label class="pm-label">Đơn vị tính cơ sở (UoM)</label>
+                  <el-select v-model="form.baseUnit" placeholder="Chọn đơn vị tính" style="width: 100%">
+                    <el-option label="Cái (Mặc định)" value="Cái" />
+                    <el-option label="Chiếc" value="Chiếc" />
+                    <el-option label="Hộp" value="Hộp" />
+                    <el-option label="Thùng" value="Thùng" />
+                    <el-option label="Gói / Bịch" value="Gói" />
+                    <el-option label="Bộ / Set" value="Bộ" />
+                  </el-select>
+                </div>
+              </div>
+
+              <!-- Row 2: Đơn giá bán lẻ & Số lượng tồn kho thực tế -->
+              <div class="pm-grid-2col">
+                <div class="pm-field-block">
+                  <label class="pm-label">Đơn giá bán lẻ (VNĐ) <span class="req-star">*</span></label>
                   <div class="pm-stepper-box">
                     <button type="button" class="pm-step-btn" @click="adjustPrice(-10000)">−</button>
                     <input
@@ -487,7 +535,7 @@
                 </div>
 
                 <div class="pm-field-block">
-                  <label class="pm-label">Số lượng tồn kho <span class="req-star">*</span></label>
+                  <label class="pm-label">Tồn kho thực tế trên kệ <span class="req-star">*</span></label>
                   <div class="pm-stepper-box">
                     <button type="button" class="pm-step-btn" @click="adjustStock(-1)">−</button>
                     <input
@@ -502,6 +550,63 @@
                   <span class="pm-helper-text" :class="stockSafeHintClass">
                     {{ stockSafeHintText }}
                   </span>
+                </div>
+              </div>
+
+              <!-- Row 3: Bảng giá đa tầng (Giá Sỉ & Giá VIP) -->
+              <div class="pm-grid-2col">
+                <div class="pm-field-block">
+                  <label class="pm-label">Giá bán Sỉ (Đại lý)</label>
+                  <input
+                    v-model.number="form.wholesalePrice"
+                    type="number"
+                    min="0"
+                    step="1000"
+                    placeholder="VD: 90000"
+                    class="pm-text-input"
+                  />
+                  <span class="pm-helper-text">Áp dụng cho Đại lý cấp 1 và khách mua sỉ</span>
+                </div>
+
+                <div class="pm-field-block">
+                  <label class="pm-label">Giá Khách VIP / Thân thiết</label>
+                  <input
+                    v-model.number="form.vipPrice"
+                    type="number"
+                    min="0"
+                    step="1000"
+                    placeholder="VD: 85000"
+                    class="pm-text-input"
+                  />
+                  <span class="pm-helper-text">Áp dụng riêng cho khách hàng đạt hạng thẻ VIP</span>
+                </div>
+              </div>
+
+              <!-- Row 4: Giá vốn ban đầu & Ngưỡng cảnh báo an toàn -->
+              <div class="pm-grid-2col">
+                <div class="pm-field-block">
+                  <label class="pm-label">Giá vốn ban đầu (MAC)</label>
+                  <input
+                    v-model.number="form.movingAvgCost"
+                    type="number"
+                    min="0"
+                    step="1000"
+                    placeholder="VD: 70000"
+                    class="pm-text-input"
+                  />
+                  <span class="pm-helper-text">Khởi tạo giá vốn ban đầu (tự động cập nhật Moving Average khi nhập hàng)</span>
+                </div>
+
+                <div class="pm-field-block">
+                  <label class="pm-label">Ngưỡng cảnh báo tồn an toàn</label>
+                  <input
+                    v-model.number="form.minStockAlert"
+                    type="number"
+                    min="0"
+                    placeholder="Mặc định: 10"
+                    class="pm-text-input"
+                  />
+                  <span class="pm-helper-text">Hệ thống sẽ báo động đỏ khi tồn khả dụng dưới ngưỡng này</span>
                 </div>
               </div>
 
@@ -657,8 +762,14 @@ const form = ref({
   id: null,
   name: '',
   sku: '',
+  barcode: '',
+  baseUnit: 'Cái',
   price: 100000,
+  wholesalePrice: null,
+  vipPrice: null,
+  movingAvgCost: 70000,
   stock: 10,
+  minStockAlert: 10,
   imageUrl: ''
 })
 
@@ -833,8 +944,14 @@ const openDialog = (row = null) => {
       id: row.id,
       name: row.name || '',
       sku: row.sku || '',
+      barcode: row.barcode || '',
+      baseUnit: row.baseUnit || 'Cái',
       price: row.price ?? 0,
-      stock: row.stock ?? 0,
+      wholesalePrice: row.wholesalePrice ?? null,
+      vipPrice: row.vipPrice ?? null,
+      movingAvgCost: row.movingAvgCost ?? null,
+      stock: row.physicalStock ?? row.stock ?? 0,
+      minStockAlert: row.minStockAlert ?? 10,
       imageUrl: row.imageUrl || ''
     }
   } else {
@@ -842,8 +959,14 @@ const openDialog = (row = null) => {
       id: null,
       name: '',
       sku: 'SKU-' + Math.floor(1000 + Math.random() * 9000),
+      barcode: '',
+      baseUnit: 'Cái',
       price: 100000,
+      wholesalePrice: null,
+      vipPrice: null,
+      movingAvgCost: 70000,
       stock: 10,
+      minStockAlert: 10,
       imageUrl: ''
     }
   }
@@ -2065,5 +2188,63 @@ onBeforeUnmount(() => {
   .products-metrics-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* =========================================================================
+   STYLE BỔ SUNG GIAI ĐOẠN 1: TỒN 4 TRẠNG THÁI & GIÁ VỐN MAC
+   ========================================================================= */
+.sku-cell-block {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.barcode-sub-txt {
+  font-size: 11px;
+  color: #64748b;
+  font-family: monospace;
+  display: flex;
+  align-items: center;
+}
+
+.price-cell-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.sub-cost-txt {
+  font-size: 11px;
+  color: #64748b;
+  font-style: italic;
+}
+
+.stock-multi-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.sub-stock-breakdown {
+  font-size: 11px;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sub-stock-breakdown strong {
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.dot-sep {
+  color: #cbd5e1;
+}
+
+.text-amber {
+  color: #d97706 !important;
 }
 </style>

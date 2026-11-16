@@ -268,6 +268,15 @@
                   <td>
                     <div class="customer-name-cell" :title="order.customerName">{{ order.customerName }}</div>
                     <div class="sub-muted-line">{{ order.customerPhone || 'Chưa có SĐT' }}</div>
+                    <div v-if="order.creditExceeded" class="credit-badge-wrap" style="margin-top: 3px;">
+                      <span
+                        class="badge-credit-warn"
+                        :class="order.creditApprovalStatus === 'APPROVED' ? 'approved' : 'pending'"
+                        :title="order.creditApprovalStatus === 'APPROVED' ? 'Đã được duyệt công nợ cho xuất kho' : 'Đơn hàng vượt hạn mức nợ, cần Giám đốc/Kế toán duyệt'"
+                      >
+                        {{ order.creditApprovalStatus === 'APPROVED' ? '✓ Đã duyệt nợ' : '⚠️ Vượt nợ chờ duyệt' }}
+                      </span>
+                    </div>
                   </td>
 
                   <td class="text-center">
@@ -276,7 +285,10 @@
 
                   <td class="text-right">
                     <div class="price-cell">{{ formatCurrency(order.totalAmount) }}</div>
-                    <div class="sub-muted-line">{{ formatPaymentShort(order.paymentMethod) }}</div>
+                    <div class="sub-profit-line" v-if="order.grossProfit != null">
+                      Lãi gộp: <span class="profit-val">{{ formatCurrency(order.grossProfit) }}</span>
+                    </div>
+                    <div class="sub-muted-line" v-else>{{ formatPaymentShort(order.paymentMethod) }}</div>
                   </td>
 
                   <td class="text-center">
@@ -298,6 +310,16 @@
 
                   <td class="text-right">
                     <div class="row-actions-group">
+                      <button
+                        v-if="order.creditExceeded && order.creditApprovalStatus === 'PENDING'"
+                        type="button"
+                        class="btn-row-action credit-approve-btn"
+                        title="Duyệt cho phép xuất kho đơn vượt hạn mức nợ"
+                        @click="handleApproveCredit(order, true)"
+                      >
+                        🛡️ Duyệt Nợ
+                      </button>
+
                       <button
                         v-if="order.paymentStatus !== 'PAID' && order.status !== 'CANCELLED'"
                         type="button"
@@ -886,6 +908,39 @@
             Đơn hàng đã hủy lúc {{ formatDateTime(activeOrder.cancelledAt) }} — Tồn kho đã được hoàn lại tự động.
           </div>
 
+          <!-- 1.5. BANNER CẢNH BÁO CÔNG NỢ & CREDIT GATEKEEPER -->
+          <div v-if="activeOrder.creditExceeded" class="credit-gatekeeper-banner" :class="activeOrder.creditApprovalStatus === 'APPROVED' ? 'approved' : 'pending'">
+            <div class="banner-left">
+              <span class="banner-icon">{{ activeOrder.creditApprovalStatus === 'APPROVED' ? '🛡️' : '⚠️' }}</span>
+              <div>
+                <div class="banner-title">
+                  {{ activeOrder.creditApprovalStatus === 'APPROVED' ? 'Đơn hàng vượt hạn mức nợ — Đã được phê duyệt xuất kho' : 'Cảnh báo: Đơn hàng vượt hạn mức công nợ Đại lý!' }}
+                </div>
+                <div class="banner-sub">
+                  {{ activeOrder.creditApprovalStatus === 'APPROVED' ? 'Kế toán/Quản lý đã duyệt bảo lãnh, hệ thống cho phép đóng gói xuất kho bình thường.' : 'Khách hàng có dư nợ vượt hạn mức tín dụng cho phép. Đơn hàng bị chặn xuất kho cho tới khi được phê duyệt.' }}
+                </div>
+              </div>
+            </div>
+            <div class="banner-actions" v-if="activeOrder.creditApprovalStatus === 'PENDING' && (authStore.isAdmin || authStore.isManager || authStore.isAccountant)">
+              <button
+                type="button"
+                class="btn-approve-credit"
+                :disabled="approvingCredit"
+                @click="handleApproveCredit(activeOrder, true)"
+              >
+                ✓ Duyệt cho xuất kho
+              </button>
+              <button
+                type="button"
+                class="btn-reject-credit"
+                :disabled="approvingCredit"
+                @click="handleApproveCredit(activeOrder, false)"
+              >
+                ✕ Từ chối
+              </button>
+            </div>
+          </div>
+
           <!-- 2. THÔNG TIN KHÁCH & THANH TOÁN (PHẲNG, TINH GỌN, KHÔNG LẶP DỮ LIỆU) -->
           <div class="clean-meta-grid">
             <div class="clean-meta-col">
@@ -1064,6 +1119,21 @@
               type="number"
               class="erp-input"
               placeholder="VD: 20 hoặc -5"
+            />
+          </div>
+
+          <div class="field-group" v-if="adjustForm.quantityDelta > 0" style="margin-top: 14px;">
+            <label class="field-label">
+              Giá nhập lô hàng mới (VNĐ)
+              <small>(Tự động tính lại Giá vốn MAC Moving Average Cost)</small>
+            </label>
+            <input
+              v-model.number="adjustForm.inboundCostPrice"
+              type="number"
+              min="0"
+              step="1000"
+              class="erp-input"
+              placeholder="VD: 85000 (Để trống nếu giữ giá vốn cũ)"
             />
           </div>
 
@@ -1465,6 +1535,7 @@ const orderForm = reactive({
 const detailModalVisible = ref(false)
 const activeOrder = ref(null)
 const updatingStatus = ref(false)
+const approvingCredit = ref(false)
 
 // VietQR modal state
 const vietQrModalVisible = ref(false)
@@ -1478,6 +1549,7 @@ const savingAdjust = ref(false)
 const adjustForm = reactive({
   productId: null,
   quantityDelta: 10,
+  inboundCostPrice: null,
   note: ''
 })
 
@@ -1942,12 +2014,44 @@ async function copyText(text, label) {
 }
 
 // =========================================================================
+// CREDIT GATEKEEPER APPROVAL
+// =========================================================================
+async function handleApproveCredit(order, approved) {
+  try {
+    const actionTxt = approved ? 'phê duyệt công nợ' : 'từ chối duyệt nợ'
+    await ElMessageBox.confirm(
+      `Bạn có chắc chắn muốn ${actionTxt} cho đơn hàng #${order.orderCode}?`,
+      'Xác nhận duyệt hạn mức nợ',
+      {
+        confirmButtonText: approved ? 'Phê duyệt xuất kho' : 'Từ chối',
+        cancelButtonText: 'Quay lại',
+        type: approved ? 'success' : 'warning'
+      }
+    )
+    approvingCredit.value = true
+    const res = await api.patch(`/orders/${order.id}/approve-credit?approved=${approved}`)
+    ElMessage.success(approved ? 'Đã phê duyệt công nợ thành công! Đơn hàng sẵn sàng xuất kho.' : 'Đã từ chối cấp nợ đơn hàng.')
+    if (activeOrder.value && activeOrder.value.id === order.id) {
+      activeOrder.value = res.data
+    }
+    await Promise.all([fetchOrders(), fetchOrderStats()])
+  } catch (e) {
+    if (e !== 'cancel') {
+      ElMessage.error(e.response?.data?.message || 'Lỗi khi xử lý phê duyệt nợ!')
+    }
+  } finally {
+    approvingCredit.value = false
+  }
+}
+
+// =========================================================================
 // MANUAL STOCK ADJUSTMENT
 // =========================================================================
 async function openStockAdjustModal() {
   await fetchProductsCatalog()
   adjustForm.productId = availableProducts.value[0]?.id || null
   adjustForm.quantityDelta = 10
+  adjustForm.inboundCostPrice = null
   adjustForm.note = ''
   adjustModalVisible.value = true
 }
@@ -1966,6 +2070,7 @@ async function submitStockAdjust() {
     await api.post('/orders/inventory-adjust', {
       productId: adjustForm.productId,
       quantityDelta: Number(adjustForm.quantityDelta),
+      inboundCostPrice: adjustForm.quantityDelta > 0 && adjustForm.inboundCostPrice ? Number(adjustForm.inboundCostPrice) : null,
       note: adjustForm.note?.trim() || null
     })
     ElMessage.success('Đã cập nhật tồn kho & ghi nhận nhật ký kho!')
@@ -3780,5 +3885,133 @@ onBeforeUnmount(() => {
     width: 240px;
     height: 240px;
   }
+}
+
+/* =========================================================================
+   CREDIT GATEKEEPER & GROSS PROFIT STYLES
+   ========================================================================= */
+.badge-credit-warn {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  letter-spacing: 0.02em;
+}
+.badge-credit-warn.pending {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+.badge-credit-warn.approved {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+.sub-profit-line {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 2px;
+}
+.sub-profit-line .profit-val {
+  color: #059669;
+  font-weight: 700;
+}
+
+.btn-row-action.credit-approve-btn {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+  font-weight: 700;
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-row-action.credit-approve-btn:hover {
+  background: #fde68a;
+  color: #92400e;
+}
+
+.credit-gatekeeper-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.credit-gatekeeper-banner.pending {
+  background: #fffbeb;
+  border: 1px solid #fef3c7;
+  border-left: 4px solid #f59e0b;
+}
+.credit-gatekeeper-banner.approved {
+  background: #f0fdf4;
+  border: 1px solid #dcfce7;
+  border-left: 4px solid #10b981;
+}
+.banner-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1 1 300px;
+}
+.banner-icon {
+  font-size: 24px;
+}
+.banner-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
+}
+.credit-gatekeeper-banner.pending .banner-title {
+  color: #92400e;
+}
+.credit-gatekeeper-banner.approved .banner-title {
+  color: #065f46;
+}
+.banner-sub {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 2px;
+}
+.banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.btn-approve-credit {
+  padding: 7px 14px;
+  background: #10b981;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.btn-approve-credit:hover:not(:disabled) {
+  background: #059669;
+}
+.btn-reject-credit {
+  padding: 7px 14px;
+  background: #ffffff;
+  color: #ef4444;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-reject-credit:hover:not(:disabled) {
+  background: #fef2f2;
 }
 </style>

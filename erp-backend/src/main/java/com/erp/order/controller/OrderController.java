@@ -101,6 +101,17 @@ public class OrderController {
         return ResponseEntity.ok(orderService.updatePaymentStatus(id, request.getPaymentStatus()));
     }
 
+    @PatchMapping("/{id}/approve-credit")
+    @PreAuthorize("hasAnyAuthority('ORDER_STATUS', 'ORDER_PAY', 'ROLE_ADMIN')")
+    public ResponseEntity<OrderDto> approveCredit(
+            @PathVariable Long id,
+            @RequestParam boolean approved,
+            Authentication authentication
+    ) {
+        String username = authentication != null ? authentication.getName() : "system";
+        return ResponseEntity.ok(orderService.approveCredit(id, username, approved));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyAuthority('ORDER_CANCEL', 'ROLE_ADMIN')")
     public ResponseEntity<Map<String, String>> deleteOrder(

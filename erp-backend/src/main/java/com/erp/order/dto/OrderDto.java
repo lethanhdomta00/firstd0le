@@ -26,11 +26,16 @@ public class OrderDto {
     private String paymentStatusLabel;
     private PaymentMethod paymentMethod;
     private String paymentMethodLabel;
+    private String priceTier;
     private BigDecimal subtotal;
     private BigDecimal discountAmount;
     private BigDecimal taxRate;
     private BigDecimal taxAmount;
     private BigDecimal totalAmount;
+    private BigDecimal totalCostAmount;
+    private BigDecimal grossProfit;
+    private boolean creditExceeded;
+    private String creditApprovalStatus;
     private boolean stockDeducted;
     private String createdByUsername;
     private LocalDateTime confirmedAt;
