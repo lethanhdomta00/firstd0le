@@ -274,7 +274,7 @@
                         :class="order.creditApprovalStatus === 'APPROVED' ? 'approved' : 'pending'"
                         :title="order.creditApprovalStatus === 'APPROVED' ? 'Đã được duyệt công nợ cho xuất kho' : 'Đơn hàng vượt hạn mức nợ, cần Giám đốc/Kế toán duyệt'"
                       >
-                        {{ order.creditApprovalStatus === 'APPROVED' ? '✓ Đã duyệt nợ' : '⚠️ Vượt nợ chờ duyệt' }}
+                        {{ order.creditApprovalStatus === 'APPROVED' ? 'Đã duyệt nợ' : 'Chờ duyệt nợ' }}
                       </span>
                     </div>
                   </td>
@@ -317,7 +317,7 @@
                         title="Duyệt cho phép xuất kho đơn vượt hạn mức nợ"
                         @click="handleApproveCredit(order, true)"
                       >
-                        🛡️ Duyệt Nợ
+                        Duyệt nợ
                       </button>
 
                       <button
@@ -327,7 +327,7 @@
                         title="Quét mã VietQR (NAPAS 24/7)"
                         @click="openVietQrModal(order)"
                       >
-                        ⚡ VietQR
+                        VietQR
                       </button>
 
                       <button
@@ -416,7 +416,7 @@
                   class="btn-row-action vietqr-btn"
                   @click="openVietQrModal(order)"
                 >
-                  ⚡ VietQR
+                  VietQR
                 </button>
                 <button type="button" class="btn-row-action primary" @click="openDetailModal(order)">
                   Chi tiết / Xử lý
@@ -520,7 +520,13 @@
         </div>
 
         <div v-else-if="inventoryLogs.length === 0" class="empty-state-box">
-          <div class="empty-icon-circle">📦</div>
+          <div class="empty-icon-circle">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#94a3b8" stroke-width="1.6">
+              <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/>
+              <path d="m3.3 7 8.7 5 8.7-5"/>
+              <path d="M12 22V12"/>
+            </svg>
+          </div>
           <h4>Chưa có biến động xuất/nhập kho</h4>
           <p>Mỗi khi bạn tạo đơn, hủy đơn hoặc kiểm kê kho, hệ thống tự động ghi vết audit tại đây.</p>
         </div>
@@ -642,7 +648,7 @@
               class="btn-quick-fill"
               @click="fillSampleOrder"
             >
-              ⚡ Điền mẫu nhanh
+              Điền mẫu nhanh
             </button>
             <button type="button" class="btn-modal-close" @click="closeOrderModal">✕</button>
           </div>
@@ -879,10 +885,10 @@
               class="btn-header-vietqr"
               @click="openVietQrModal(activeOrder)"
             >
-              ⚡ Quét mã VietQR
+              Quét mã VietQR
             </button>
             <button type="button" class="btn-header-outline" @click="printOrderInvoice(activeOrder)">
-              🖨️ Xuất Hóa đơn PDF (A4)
+              Xuất Hóa đơn PDF (A4)
             </button>
             <button type="button" class="btn-modal-close" @click="detailModalVisible = false">✕</button>
           </div>
@@ -911,10 +917,12 @@
           <!-- 1.5. BANNER CẢNH BÁO CÔNG NỢ & CREDIT GATEKEEPER -->
           <div v-if="activeOrder.creditExceeded" class="credit-gatekeeper-banner" :class="activeOrder.creditApprovalStatus === 'APPROVED' ? 'approved' : 'pending'">
             <div class="banner-left">
-              <span class="banner-icon">{{ activeOrder.creditApprovalStatus === 'APPROVED' ? '🛡️' : '⚠️' }}</span>
+              <span class="banner-tag" :class="activeOrder.creditApprovalStatus === 'APPROVED' ? 'approved' : 'pending'">
+                {{ activeOrder.creditApprovalStatus === 'APPROVED' ? 'BẢO LÃNH' : 'CẢNH BÁO NỢ' }}
+              </span>
               <div>
                 <div class="banner-title">
-                  {{ activeOrder.creditApprovalStatus === 'APPROVED' ? 'Đơn hàng vượt hạn mức nợ — Đã được phê duyệt xuất kho' : 'Cảnh báo: Đơn hàng vượt hạn mức công nợ Đại lý!' }}
+                  {{ activeOrder.creditApprovalStatus === 'APPROVED' ? 'Đơn hàng vượt hạn mức nợ — Đã được phê duyệt xuất kho' : 'Đơn hàng vượt hạn mức công nợ Đại lý' }}
                 </div>
                 <div class="banner-sub">
                   {{ activeOrder.creditApprovalStatus === 'APPROVED' ? 'Kế toán/Quản lý đã duyệt bảo lãnh, hệ thống cho phép đóng gói xuất kho bình thường.' : 'Khách hàng có dư nợ vượt hạn mức tín dụng cho phép. Đơn hàng bị chặn xuất kho cho tới khi được phê duyệt.' }}
@@ -928,7 +936,7 @@
                 :disabled="approvingCredit"
                 @click="handleApproveCredit(activeOrder, true)"
               >
-                ✓ Duyệt cho xuất kho
+                Duyệt xuất kho
               </button>
               <button
                 type="button"
@@ -936,7 +944,7 @@
                 :disabled="approvingCredit"
                 @click="handleApproveCredit(activeOrder, false)"
               >
-                ✕ Từ chối
+                Từ chối
               </button>
             </div>
           </div>
@@ -1172,7 +1180,7 @@
       <div class="custom-modal-card vietqr-modal-card">
         <div class="modal-head">
           <div class="modal-title-row">
-            <span class="vietqr-napas-badge">⚡ VIETQR • NAPAS 24/7</span>
+            <span class="vietqr-napas-badge">VIETQR • NAPAS 24/7</span>
             <h3>Thanh toán Đơn hàng {{ vietQrData?.orderCode }}</h3>
           </div>
           <button type="button" class="btn-modal-close" @click="vietQrModalVisible = false">✕</button>
@@ -3948,13 +3956,11 @@ onBeforeUnmount(() => {
 }
 .credit-gatekeeper-banner.pending {
   background: #fffbeb;
-  border: 1px solid #fef3c7;
-  border-left: 4px solid #f59e0b;
+  border: 1px solid #fde68a;
 }
 .credit-gatekeeper-banner.approved {
   background: #f0fdf4;
-  border: 1px solid #dcfce7;
-  border-left: 4px solid #10b981;
+  border: 1px solid #bbf7d0;
 }
 .banner-left {
   display: flex;
@@ -3962,8 +3968,22 @@ onBeforeUnmount(() => {
   gap: 12px;
   flex: 1 1 300px;
 }
-.banner-icon {
-  font-size: 24px;
+.banner-tag {
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+.banner-tag.pending {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+.banner-tag.approved {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
 }
 .banner-title {
   font-size: 13px;

@@ -37,7 +37,7 @@
     <div class="settings-content-card">
       <el-tabs v-model="activeTab" class="settings-tabs">
         <!-- TAB 1: MA TRẬN PHÂN QUYỀN (RBAC MATRIX) -->
-        <el-tab-pane label="🛡️ Tổng quan Phân quyền (RBAC)" name="rbac">
+        <el-tab-pane label="Tổng quan Phân quyền (RBAC)" name="rbac">
           <div class="tab-pane-content">
             <div class="rbac-intro-box">
               <div class="intro-left">
@@ -56,7 +56,6 @@
             <div class="roles-cards-grid">
               <div class="role-card admin">
                 <div class="rc-header">
-                  <span class="rc-icon">👑</span>
                   <div>
                     <h4 class="rc-title">ADMIN</h4>
                     <span class="rc-sub">Quản trị viên tối cao</span>
@@ -72,7 +71,6 @@
 
               <div class="role-card manager">
                 <div class="rc-header">
-                  <span class="rc-icon">💼</span>
                   <div>
                     <h4 class="rc-title">MANAGER</h4>
                     <span class="rc-sub">Giám đốc / Quản lý</span>
@@ -88,7 +86,6 @@
 
               <div class="role-card accountant">
                 <div class="rc-header">
-                  <span class="rc-icon">💰</span>
                   <div>
                     <h4 class="rc-title">ACCOUNTANT</h4>
                     <span class="rc-sub">Kế toán tài chính</span>
@@ -104,7 +101,6 @@
 
               <div class="role-card warehouse">
                 <div class="rc-header">
-                  <span class="rc-icon">📦</span>
                   <div>
                     <h4 class="rc-title">WAREHOUSE</h4>
                     <span class="rc-sub">Thủ kho / Kho vận</span>
@@ -120,7 +116,6 @@
 
               <div class="role-card sales">
                 <div class="rc-header">
-                  <span class="rc-icon">🏷️</span>
                   <div>
                     <h4 class="rc-title">SALES</h4>
                     <span class="rc-sub">Kinh doanh / Bán lẻ</span>
@@ -136,7 +131,6 @@
 
               <div class="role-card user">
                 <div class="rc-header">
-                  <span class="rc-icon">👤</span>
                   <div>
                     <h4 class="rc-title">USER</h4>
                     <span class="rc-sub">Nhân viên nghiệp vụ</span>
@@ -153,7 +147,7 @@
 
             <!-- BẢNG SO SÁNH MA TRẬN QUYỀN HẠN TỔNG QUÁT -->
             <div class="matrix-table-wrap">
-              <h4 class="matrix-table-title">📊 Bảng Năng lực Phân hệ Mặc định (Baseline Permission Capabilities)</h4>
+              <h4 class="matrix-table-title">Bảng Năng lực Phân hệ Mặc định (Baseline Permission Capabilities)</h4>
               <div class="table-responsive">
                 <table class="clean-matrix-table">
                   <thead>
@@ -230,7 +224,7 @@
         </el-tab-pane>
 
         <!-- TAB 2: HỒ SƠ TÀI KHOẢN & ĐỔI MẬT KHẨU -->
-        <el-tab-pane label="👤 Hồ sơ &amp; Bảo mật" name="profile">
+        <el-tab-pane label="Hồ sơ &amp; Bảo mật" name="profile">
           <div class="tab-pane-content profile-pane">
             <div class="profile-layout-grid">
               <!-- KHỐI 1: THÔNG TIN HỒ SƠ -->
@@ -335,7 +329,6 @@
                   </div>
 
                   <div class="password-notice-box">
-                    <span class="notice-icon">🛡️</span>
                     <span>Sau khi đổi mật khẩu thành công, phiên đăng nhập hiện tại vẫn được duy trì an toàn.</span>
                   </div>
 
@@ -351,13 +344,13 @@
         </el-tab-pane>
 
         <!-- TAB 3: TÍCH HỢP & DỊCH VỤ NGOÀI -->
-        <el-tab-pane label="⚡ Tích hợp &amp; Dịch vụ ngoài" name="integrations">
+        <el-tab-pane label="Tích hợp &amp; Dịch vụ ngoài" name="integrations">
           <div class="tab-pane-content integrations-pane">
             <div class="integrations-grid">
               <!-- CARD 1: VIETQR NAPAS -->
               <div class="integration-card">
                 <div class="int-top">
-                  <div class="int-icon-box vietqr-icon">💳</div>
+                  <div class="int-tag-pill">NAPAS 24/7</div>
                   <div>
                     <h4>Cổng VietQR Chuẩn NAPAS 24/7</h4>
                     <span class="int-status active">Đang kích hoạt</span>
@@ -372,7 +365,7 @@
                 </div>
                 <div class="card-footer-actions">
                   <button type="button" class="btn-int-action" @click="showSampleQrModal = true">
-                    Xem mã QR Mẫu 🔍
+                    Xem mã QR mẫu
                   </button>
                 </div>
               </div>
@@ -380,7 +373,7 @@
               <!-- CARD 2: TELEGRAM BOT -->
               <div class="integration-card">
                 <div class="int-top">
-                  <div class="int-icon-box telegram-icon">✈️</div>
+                  <div class="int-tag-pill">TELEGRAM</div>
                   <div>
                     <h4>Telegram Bot Notification</h4>
                     <span class="int-status active">Đang kích hoạt</span>
@@ -406,7 +399,7 @@
                     :disabled="testingTelegram" 
                     @click="handleTestTelegram"
                   >
-                    {{ testingTelegram ? 'Đang gửi...' : 'Gửi tin nhắn test 🚀' }}
+                    {{ testingTelegram ? 'Đang gửi...' : 'Gửi tin nhắn test' }}
                   </button>
                 </div>
               </div>
@@ -414,7 +407,7 @@
               <!-- CARD 3: SPRING TASK SCHEDULER -->
               <div class="integration-card">
                 <div class="int-top">
-                  <div class="int-icon-box cron-icon">⏱️</div>
+                  <div class="int-tag-pill">CRON ENGINE</div>
                   <div>
                     <h4>Spring TaskScheduler Engine</h4>
                     <span class="int-status active">Đang kích hoạt</span>
@@ -750,20 +743,10 @@ async function handleTestTelegram() {
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
 }
 
-.role-card.admin { border-top: 3px solid #ef4444; }
-.role-card.manager { border-top: 3px solid #3b82f6; }
-.role-card.accountant { border-top: 3px solid #0d9488; }
-.role-card.warehouse { border-top: 3px solid #f59e0b; }
-.role-card.sales { border-top: 3px solid #ec4899; }
-.role-card.user { border-top: 3px solid #64748b; }
-
 .rc-header {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-.rc-icon {
-  font-size: 22px;
 }
 .rc-title {
   font-size: 14px;
@@ -988,18 +971,16 @@ async function handleTestTelegram() {
   align-items: center;
   gap: 12px;
 }
-.int-icon-box {
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
+.int-tag-pill {
+  padding: 4px 8px;
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
 }
-.vietqr-icon { background: #eff6ff; }
-.telegram-icon { background: #f0fdf4; }
-.cron-icon { background: #fef3c7; }
 
 .int-top h4 {
   font-size: 14px;

@@ -100,7 +100,7 @@
         <div class="kpi-title">Tổng Tài khoản</div>
         <div class="kpi-value-row">
           <span class="kpi-number">{{ stats.users }}</span>
-          <span class="trend-badge neutral">🛡️ RBAC Active</span>
+          <span class="trend-badge neutral">RBAC Active</span>
         </div>
         <div class="kpi-footer">
           <span class="footer-sub">3 Quản trị | 9 Vận hành viên</span>
@@ -356,7 +356,7 @@
 
           <!-- Item 4 -->
           <div class="activity-item">
-            <div class="user-avatar-tag slate">🛡️</div>
+            <div class="user-avatar-tag slate">SEC</div>
             <div class="activity-content">
               <div class="activity-actor-row">
                 <span class="actor-name">Hệ thống Giám sát RBAC</span>
@@ -384,7 +384,6 @@
         <div class="panel-header">
           <div class="warning-title-group">
             <div class="warning-title-row">
-              <span class="warning-triangle-icon">⚠️</span>
               <h2 class="panel-main-title">Cảnh báo tồn kho an toàn</h2>
             </div>
             <p class="panel-sub-title">3 mặt hàng đang dưới ngưỡng dự trữ viện kiểm định mức</p>

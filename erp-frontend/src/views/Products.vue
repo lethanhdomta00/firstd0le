@@ -85,7 +85,7 @@
           <span class="kpi-stat-label">Cảnh báo sắp hết</span>
           <span class="kpi-stat-value">{{ lowOrOutStockCount }}</span>
           <span class="kpi-stat-sub" :class="lowOrOutStockCount > 0 ? 'text-red' : 'text-muted'">
-            {{ lowOrOutStockCount > 0 ? '⚠️ Dưới ngưỡng an toàn' : '✓ Mức tồn kho ổn định' }}
+            {{ lowOrOutStockCount > 0 ? 'Dưới ngưỡng an toàn' : 'Mức tồn kho ổn định' }}
           </span>
         </div>
         <div class="kpi-stat-icon icon-red">
@@ -296,7 +296,11 @@
 
           <template #empty>
             <div class="empty-state-box">
-              <span class="empty-emoji">📦</span>
+              <svg class="empty-svg" viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="#94a3b8" stroke-width="1.5">
+                <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/>
+                <path d="m3.3 7 8.7 5 8.7-5"/>
+                <path d="M12 22V12"/>
+              </svg>
               <p>Không tìm thấy sản phẩm nào khớp với điều kiện tìm kiếm</p>
             </div>
           </template>
@@ -306,7 +310,11 @@
       <!-- DANH SÁCH THẺ MOBILE (<= 768px) -> KHÔNG BỊ TRÀN NGANG TRÊN MÀN HÌNH NHỎ -->
       <div class="mobile-cards-wrapper">
         <div v-if="products.length === 0 && !loading" class="empty-state-box">
-          <span class="empty-emoji">📦</span>
+          <svg class="empty-svg" viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="#94a3b8" stroke-width="1.5">
+            <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/>
+            <path d="m3.3 7 8.7 5 8.7-5"/>
+            <path d="M12 22V12"/>
+          </svg>
           <p>Không tìm thấy sản phẩm nào</p>
         </div>
 
@@ -613,7 +621,6 @@
               <!-- Box đồng bộ hệ thống -->
               <div class="pm-sync-banner">
                 <div class="pm-sync-left">
-                  <span class="pm-shield-badge">🛡️</span>
                   <div>
                     <div class="pm-sync-title">Tự động đồng bộ Realtime</div>
                     <div class="pm-sync-sub">Dữ liệu sẽ cập nhật ngay vào phân hệ Kho và Hệ thống ERP</div>
@@ -811,8 +818,8 @@ const stockSafeHintClass = computed(() => {
 
 const stockSafeHintText = computed(() => {
   const s = Number(form.value.stock) ?? 0
-  if (s === 0) return '⚠️ Cảnh báo: Sản phẩm đang hết hàng (0)'
-  if (s <= 5) return '⚠️ Sắp chạm ngưỡng an toàn (<= 5 sản phẩm)'
+  if (s === 0) return 'Cảnh báo: Sản phẩm đang hết hàng (0)'
+  if (s <= 5) return 'Sắp chạm ngưỡng an toàn (<= 5 sản phẩm)'
   return 'Định mức an toàn: > 5 sản phẩm'
 })
 
