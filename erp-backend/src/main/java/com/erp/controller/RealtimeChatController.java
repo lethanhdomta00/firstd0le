@@ -933,7 +933,7 @@ public class RealtimeChatController {
                 RealtimeMessageDto typing = RealtimeMessageDto.builder()
                         .roomId(roomId)
                         .senderUsername("copilot")
-                        .senderFullName("🤖 ERP AI Copilot")
+                        .senderFullName("ERP Copilot")
                         .type(MessageType.TYPING)
                         .build();
                 messagingTemplate.convertAndSend("/topic/room." + roomId + ".typing", typing);
@@ -945,7 +945,7 @@ public class RealtimeChatController {
                 RealtimeMessage botMessage = RealtimeMessage.builder()
                         .roomId(roomId)
                         .senderUsername("copilot")
-                        .senderFullName("🤖 ERP AI Copilot")
+                        .senderFullName("ERP Copilot")
                         .senderAvatarUrl("https://api.dicebear.com/7.x/bottts/svg?seed=copilot")
                         .recipientUsername(null)
                         .content(botReply)
@@ -978,7 +978,7 @@ public class RealtimeChatController {
                     .roomId(privateRoomId)
                     .senderUsername("copilot")
                     .recipientUsername(targetUsername)
-                    .senderFullName("🤖 ERP AI Copilot")
+                    .senderFullName("ERP Copilot")
                     .type(MessageType.TYPING)
                     .build();
             messagingTemplate.convertAndSendToUser(targetUsername, "/queue/typing", typing);
@@ -991,7 +991,7 @@ public class RealtimeChatController {
             RealtimeMessage botMessage = RealtimeMessage.builder()
                     .roomId(privateRoomId)
                     .senderUsername("copilot")
-                    .senderFullName("🤖 ERP AI Copilot")
+                    .senderFullName("ERP Copilot")
                     .senderAvatarUrl("https://api.dicebear.com/7.x/bottts/svg?seed=copilot")
                     .recipientUsername(targetUsername)
                     .content(botReply)

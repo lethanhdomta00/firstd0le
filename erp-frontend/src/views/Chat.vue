@@ -206,8 +206,17 @@
             @click="selectPrivatePartner(colleague)"
           >
             <div class="item-avatar-wrapper">
+              <div v-if="colleague.username === 'copilot'" class="item-avatar copilot-pro-avatar" title="Trợ lý ERP Copilot">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#38bdf8" stroke-width="2">
+                  <rect x="3" y="11" width="18" height="10" rx="3" />
+                  <circle cx="12" cy="5" r="2" />
+                  <path d="M12 7v4" />
+                  <line x1="8" y1="16" x2="8.01" y2="16" stroke-width="3" stroke-linecap="round" />
+                  <line x1="16" y1="16" x2="16.01" y2="16" stroke-width="3" stroke-linecap="round" />
+                </svg>
+              </div>
               <img 
-                v-if="colleague.avatarUrl" 
+                v-else-if="colleague.avatarUrl" 
                 :src="colleague.avatarUrl" 
                 class="item-avatar" 
                 alt="avatar" 
@@ -224,9 +233,11 @@
 
             <div class="item-info">
               <div class="item-top-row">
-                <span class="item-name">{{ getColleagueDisplayName(colleague) }}</span>
-                <span v-if="colleague.username === 'copilot'" class="role-badge role-ai">AI COPILOT</span>
-                <span v-else-if="colleague.lastMessageTime" class="item-time">{{ formatSidebarTime(colleague.lastMessageTime) }}</span>
+                <div class="name-cluster-box">
+                  <span class="item-name">{{ getColleagueDisplayName(colleague) }}</span>
+                  <span v-if="colleague.username === 'copilot'" class="ai-badge-pill">AI</span>
+                </div>
+                <span v-if="colleague.lastMessageTime" class="item-time">{{ formatSidebarTime(colleague.lastMessageTime) }}</span>
                 <span v-else class="role-badge" :class="colleague.role === 'ADMIN' ? 'role-admin' : 'role-user'">
                   {{ colleague.role === 'ADMIN' ? 'ADMIN' : (colleague.roleTitle || 'STAFF') }}
                 </span>
@@ -316,8 +327,17 @@
               </svg>
             </div>
             <div v-else class="header-room-avatar-wrapper">
+              <div v-if="chatStore.activePartner?.username === 'copilot'" class="header-room-avatar copilot-pro-avatar" title="Trợ lý ERP Copilot">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#38bdf8" stroke-width="2">
+                  <rect x="3" y="11" width="18" height="10" rx="3" />
+                  <circle cx="12" cy="5" r="2" />
+                  <path d="M12 7v4" />
+                  <line x1="8" y1="16" x2="8.01" y2="16" stroke-width="3" stroke-linecap="round" />
+                  <line x1="16" y1="16" x2="16.01" y2="16" stroke-width="3" stroke-linecap="round" />
+                </svg>
+              </div>
               <img 
-                v-if="chatStore.activePartner?.avatarUrl" 
+                v-else-if="chatStore.activePartner?.avatarUrl" 
                 :src="chatStore.activePartner.avatarUrl" 
                 class="header-room-avatar" 
               />
@@ -691,8 +711,17 @@
           >
             <!-- Avatar người gửi (chỉ hiển thị với tin nhắn nhận được) -->
             <div v-if="!isMyMessage(msg)" class="sender-avatar-col">
+              <div v-if="msg.senderUsername === 'copilot'" class="bubble-avatar copilot-pro-avatar" title="ERP Copilot">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#38bdf8" stroke-width="2">
+                  <rect x="3" y="11" width="18" height="10" rx="3" />
+                  <circle cx="12" cy="5" r="2" />
+                  <path d="M12 7v4" />
+                  <line x1="8" y1="16" x2="8.01" y2="16" stroke-width="3" stroke-linecap="round" />
+                  <line x1="16" y1="16" x2="16.01" y2="16" stroke-width="3" stroke-linecap="round" />
+                </svg>
+              </div>
               <img 
-                v-if="msg.senderAvatarUrl" 
+                v-else-if="msg.senderAvatarUrl" 
                 :src="msg.senderAvatarUrl" 
                 class="bubble-avatar" 
                 alt="avatar" 
@@ -1054,7 +1083,7 @@
           <!-- Chỉ báo đang nhập tin nhắn (Typing Indicator) -->
           <div v-if="chatStore.currentTypingUsers.length > 0" class="typing-indicator-row">
             <div class="typing-bubble">
-              <span class="typing-names">{{ chatStore.currentTypingUsers.join(', ') }} đang nhập</span>
+              <span class="typing-names">{{ formatTypingUsers(chatStore.currentTypingUsers) }} đang nhập</span>
               <span class="bouncing-dots">
                 <span class="dot"></span>
                 <span class="dot"></span>
@@ -2584,6 +2613,7 @@ const getVotePercent = (poll, opt) => {
 // Helper lấy tên hiển thị của đồng nghiệp theo biệt danh phòng riêng
 const getColleagueDisplayName = (colleague) => {
   if (!colleague) return ''
+  if (colleague.username === 'copilot') return 'ERP Copilot'
   const myUsername = authStore.user?.username
   const privateRoomId = chatStore.getPrivateRoomId(myUsername, colleague.username)
   return chatStore.roomNicknames[privateRoomId]?.[colleague.username] 
@@ -2640,9 +2670,19 @@ const activeTitle = computed(() => {
     return chatStore.activeGroup?.name || 'Nhóm chat'
   }
   const partnerUsername = chatStore.activePartner?.username
+  if (partnerUsername === 'copilot') return 'ERP Copilot'
   const defaultName = chatStore.activePartner?.fullName || partnerUsername || 'Đồng nghiệp'
   return chatStore.getNickname(partnerUsername, defaultName)
 })
+
+// Chuẩn hóa danh sách người đang gõ phím (chống lỗi hiển thị [object Object])
+const formatTypingUsers = (users) => {
+  if (!users || !Array.isArray(users) || users.length === 0) return ''
+  return users
+    .map(u => (typeof u === 'string' ? u : (u.name || u.username || 'Ai đó')))
+    .filter(Boolean)
+    .join(', ')
+}
 
 // Kiểm tra trạng thái Typing hiển thị ngoài Sidebar
 const isColleagueTyping = (username) => {
@@ -2659,9 +2699,10 @@ const isGroupTyping = (groupId) => {
 
 const getGroupTypingNames = (groupId) => {
   const typingList = chatStore.typingUsers[`GROUP_${groupId}`] || []
-  if (typingList.length === 1) return typingList[0]
-  if (typingList.length > 1) return `${typingList[0]} và ${typingList.length - 1} người khác`
-  return ''
+  if (typingList.length === 0) return ''
+  const first = typeof typingList[0] === 'string' ? typingList[0] : (typingList[0].name || typingList[0].username || 'Ai đó')
+  if (typingList.length === 1) return first
+  return `${first} và ${typingList.length - 1} người khác`
 }
 
 const isPublicTyping = computed(() => {
@@ -2677,19 +2718,22 @@ const currentRoomIsTyping = computed(() => {
 const activeSubtitle = computed(() => {
   if (chatStore.activeChatType === 'PUBLIC') {
     const typing = chatStore.typingUsers['GLOBAL'] || []
-    if (typing.length > 0) return `${typing.join(', ')} đang nhập tin nhắn...`
+    if (typing.length > 0) return `${formatTypingUsers(typing)} đang nhập tin nhắn...`
     return 'Kênh chung • Thảo luận công việc & thông báo nhanh'
   }
   if (chatStore.activeChatType === 'GROUP') {
     const typing = chatStore.typingUsers[`GROUP_${chatStore.activeGroup?.id}`] || []
-    if (typing.length > 0) return `${typing.join(', ')} đang nhập...`
+    if (typing.length > 0) return `${formatTypingUsers(typing)} đang nhập...`
     return `${chatStore.activeGroup?.memberCount || 0} thành viên • Trưởng nhóm: ${chatStore.activeGroup?.creatorFullName || chatStore.activeGroup?.creatorUsername}`
   }
   // Chat riêng 1-1
   const partnerUsername = chatStore.activePartner?.username
   const typing = chatStore.typingUsers[chatStore.activeRoomId] || []
   if (typing.length > 0) {
-    return 'đang nhập tin nhắn...'
+    return `${formatTypingUsers(typing)} đang nhập tin nhắn...`
+  }
+  if (partnerUsername === 'copilot') {
+    return 'Trợ lý số ERP • Luôn sẵn sàng hỗ trợ nghiệp vụ'
   }
   const fullName = chatStore.activePartner?.fullName
   const hasNickname = chatStore.roomNicknames[chatStore.activeRoomId]?.[partnerUsername]
@@ -3421,13 +3465,23 @@ const escapeHtml = (unsafe) => {
 const formatMessageWithMentions = (content) => {
   if (!content) return ''
   let text = escapeHtml(content)
-  // Xuống dòng
+
+  // 1. Parse Markdown in đậm: **text**
+  text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+
+  // 2. Parse Markdown in nghiêng: *text* (tránh trùng với tag html)
+  text = text.replace(/(?<!\*)\*(?!\*)([^\*]+)(?<!\*)\*(?!\*)/g, '<em>$1</em>')
+
+  // 3. Parse Markdown inline code: `code`
+  text = text.replace(/`([^`]+)`/g, '<code class="chat-inline-code">$1</code>')
+
+  // 4. Xuống dòng
   text = text.replace(/\n/g, '<br>')
 
-  // Chuyển link HTTP/HTTPS thành clickable
+  // 5. Chuyển link HTTP/HTTPS thành clickable
   text = text.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer" class="chat-inline-link">$1</a>')
 
-  // Định dạng Mention @username
+  // 6. Định dạng Mention @username
   const myUsername = authStore.user?.username?.toLowerCase()
   text = text.replace(/@([a-zA-Z0-9_\u00C0-\u024F\u1E00-\u1EFF]+)/g, (match, uname) => {
     const isMe = myUsername && uname.toLowerCase() === myUsername
@@ -9337,5 +9391,49 @@ onUnmounted(() => {
   text-align: right;
 }
 
+/* ========================================================================= */
+/* COPILOT ENTERPRISE AI PRO AVATAR & SIDEBAR BADGE                          */
+/* ========================================================================= */
+.copilot-pro-avatar {
+  background: #0f172a !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: 1px solid #334155 !important;
+  border-radius: 50% !important;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.15) !important;
+  color: #38bdf8 !important;
+}
+
+.name-cluster-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.ai-badge-pill {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+  line-height: 1.2;
+  flex-shrink: 0;
+  letter-spacing: 0.5px;
+}
+
+.chat-inline-code {
+  background: #f1f5f9;
+  color: #0f172a;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  border: 1px solid #e2e8f0;
+}
 </style>
 

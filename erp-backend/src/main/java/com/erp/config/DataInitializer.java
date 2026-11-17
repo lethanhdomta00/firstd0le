@@ -104,7 +104,7 @@ public class DataInitializer implements CommandLineRunner {
         if (copilotOpt.isEmpty()) {
             User copilot = new User();
             copilot.setUsername("copilot");
-            copilot.setFullName("🤖 ERP AI Copilot");
+            copilot.setFullName("ERP Copilot");
             copilot.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
             copilot.setRole(Role.ADMIN);
             copilot.setStatus("ACTIVE");

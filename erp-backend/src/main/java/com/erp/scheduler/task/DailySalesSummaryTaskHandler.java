@@ -127,7 +127,7 @@ public class DailySalesSummaryTaskHandler implements ScheduledTaskHandler {
                 RealtimeMessage botMsg = RealtimeMessage.builder()
                         .roomId("GLOBAL")
                         .senderUsername("copilot")
-                        .senderFullName("🤖 ERP AI Copilot")
+                        .senderFullName("ERP Copilot")
                         .senderAvatarUrl("https://api.dicebear.com/7.x/bottts/svg?seed=copilot")
                         .content(botChatContent)
                         .type(MessageType.CHAT)

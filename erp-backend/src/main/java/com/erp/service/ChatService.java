@@ -191,32 +191,31 @@ public class ChatService {
 
         // 6. Thời tiết, nhiệt độ ("Thời tiết hôm nay", "Trời mưa không",...)
         if (isWeatherQuery(unaccented)) {
-            return "⛅ **Dự báo Thời tiết & Lời nhắn nhủ:**\n\n"
-                    + "Dạ hiện tại mình là Trợ lý ảo chuyên trách quản trị nội bộ ERP (quản lý kho hàng, sản phẩm, đơn hàng và nhân sự) nên chưa kết nối trực tiếp với cảm biến thời tiết vệ tinh nè! 🛰️\n\n"
-                    + "Tuy nhiên, bạn nhớ xem dự báo thời tiết trên điện thoại trước khi ra ngoài, nhớ mang theo ô (dù) và uống đủ nước để giữ gìn sức khỏe làm việc thật tốt nhé! 😊";
+            return "Tôi là Trợ lý số chuyên trách quản trị nội bộ ERP (quản lý kho hàng, đơn hàng, công nợ và nhân sự), hiện chưa kết nối với nguồn dữ liệu khí tượng bên ngoài.\n\n"
+                    + "Bạn có thể tra cứu nhanh ứng dụng thời tiết trên thiết bị cá nhân để chủ động công việc và di chuyển nhé.";
         }
 
         // 7. Chào hỏi thân thiện theo thời gian trong ngày
         if (isGreeting(normalized, unaccented)) {
             ZonedDateTime nowVn = ZonedDateTime.now(ZoneId.of("Asia/Ho_Chi_Minh"));
             int hour = nowVn.getHour();
-            String timeGreeting = (hour >= 5 && hour < 12) ? "Chào buổi sáng! 🌅 Chúc bạn một ngày mới tràn đầy năng lượng và làm việc thật năng suất nhé."
-                    : (hour >= 12 && hour < 14) ? "Chào buổi trưa bạn nha! 🍱 Bạn đã ăn trưa và nghỉ ngơi chút chưa?"
-                    : (hour >= 14 && hour < 18) ? "Chào buổi chiều tốt lành! ☕ Chúc công việc buổi chiều của bạn thật suôn sẻ."
-                    : (hour >= 18 && hour < 23) ? "Chào buổi tối an lành! 🌙 Bạn đã hoàn tất công việc hôm nay chưa nè?"
-                    : "Đã khuya muộn rồi đó bạn ơi! 🦉 Bạn nhớ nghỉ ngơi sớm giữ gìn sức khỏe nhé.";
+            String timeGreeting = (hour >= 5 && hour < 12) ? "Chào buổi sáng. Chúc bạn một ngày làm việc hiệu quả và thuận lợi."
+                    : (hour >= 12 && hour < 14) ? "Chào buổi trưa. Chúc bạn có thời gian nghỉ trưa thư thái."
+                    : (hour >= 14 && hour < 18) ? "Chào buổi chiều. Chúc ca làm việc của bạn diễn ra suôn sẻ."
+                    : (hour >= 18 && hour < 23) ? "Chào buổi tối. Bạn có cần tra cứu hoặc tổng kết số liệu nào hôm nay không?"
+                    : "Đã khuya muộn, hệ thống vẫn sẵn sàng nhưng bạn nhớ nghỉ ngơi sớm để đảm bảo sức khỏe.";
 
-            return "Xin chào **" + displayName + "**! 👋 Rất vui được gặp lại bạn.\n\n"
+            return "Xin chào **@" + displayName.replace("@", "") + "**.\n\n"
                     + timeGreeting + "\n\n"
-                    + "Mình luôn túc trực ở đây để hỗ trợ bạn kiểm tra kho hàng, tra cứu nhân sự, hỗ trợ tính toán hay hướng dẫn thao tác trên hệ thống nhé! 😊";
+                    + "Tôi luôn sẵn sàng hỗ trợ bạn tra cứu tồn kho sản phẩm, kiểm tra đơn hàng, theo dõi công nợ đại lý hoặc hướng dẫn quy trình vận hành trên hệ thống.";
         }
 
         // 8. Lời cảm ơn
         if (isThanks(unaccented)) {
             String[] thanksReplies = {
-                "Dạ không có gì đâu bạn ơi! 😊 Rất vui vì đã hỗ trợ được bạn. Khi nào cần kiểm tra số liệu hay hàng họ gì thì cứ ới mình bất kỳ lúc nào nhé! Chúc bạn một ngày làm việc thật vui vẻ và hiệu quả nha! ✨",
-                "Dạ có chi đâu nè! Đồng nghiệp với nhau cả mà. 😉 Cứ yên tâm làm việc nhé, có thắc mắc gì trong ERP thì mình luôn sẵn sàng đồng hành cùng bạn!",
-                "Dạ vâng ạ! 🥰 Rất vui khi câu trả lời có ích cho bạn. Chúc bạn một ca làm việc thật suôn sẻ nha!"
+                "Rất sẵn lòng hỗ trợ bạn. Khi cần tra cứu thêm số liệu hoặc thông tin hệ thống, bạn cứ gửi yêu cầu bất cứ lúc nào.",
+                "Không có chi, đây là nhiệm vụ của tôi. Chúc bạn có một ngày làm việc suôn sẻ và hiệu quả.",
+                "Rất vui khi thông tin hỗ trợ có ích cho bạn. Tôi luôn túc trực tại đây khi bạn cần."
             };
             return thanksReplies[Math.abs(normalized.hashCode()) % thanksReplies.length];
         }
@@ -224,53 +223,49 @@ public class ChatService {
         // 9. Lời khen ngợi / Động viên
         if (isCompliment(unaccented)) {
             String[] complimentReplies = {
-                "Hihi cảm ơn bạn nhiều nha! 🥰 Được bạn khen làm mình vui cả ngày luôn á! Mình vẫn đang học hỏi và hoàn thiện mỗi ngày để hỗ trợ công việc của bạn ngày càng mượt mà hơn đó. Cần gì thêm bạn cứ bảo mình nha!",
-                "Dạ cảm ơn lời khen của bạn nhiều nhé! 🌟 Bạn nói thế làm mình có thêm nhiều động lực hỗ trợ hệ thống hơn rồi nè. Có cần kiểm tra thêm dữ liệu gì nữa không bạn ơi?",
-                "Cảm ơn bạn nha! 😊 Được đồng hành và hỗ trợ bạn trong công việc là niềm vinh hạnh của mình đấy!"
+                "Cảm ơn bạn. Tôi luôn nỗ lực cập nhật dữ liệu chính xác và kịp thời để đồng hành cùng công việc của bạn.",
+                "Cảm ơn đánh giá tích cực của bạn. Nếu cần kiểm tra thêm dữ liệu hay xử lý tác vụ nào khác, bạn cứ nhắn tôi.",
+                "Rất vui được hỗ trợ công việc của bạn. Hãy cho tôi biết nếu bạn cần tra cứu thêm thông tin."
             };
             return complimentReplies[Math.abs(normalized.hashCode()) % complimentReplies.length];
         }
 
         // 10. Đồng ý / Xác nhận / Nhận thông tin
         if (isAgreement(unaccented)) {
-            return "Dạ vâng trí bạn nha! 👍 Bạn cứ thoải mái tiếp tục công việc nhé, mình luôn túc trực ở đây khi bạn cần hỗ trợ thêm.";
+            return "Đã ghi nhận thông tin. Bạn cứ tiếp tục công việc, tôi luôn sẵn sàng hỗ trợ khi bạn cần.";
         }
 
         // 11. Hỏi thăm sức khỏe, công việc, tâm sự
         if (isSmallTalk(unaccented)) {
-            return "Dạ mình là AI nên lúc nào cũng tràn đầy 100% năng lượng để phục vụ bạn nè! 😄 Còn bạn thì sao, hôm nay công việc có nhiều áp lực lắm không? Cần mình hỗ trợ tra cứu hay xử lý số liệu gì cho đỡ việc thì cứ nhắn mình nha!";
+            return "Tôi luôn duy trì trạng thái hoạt động tốt nhất để phục vụ công việc của bạn. Nếu bạn cần tra cứu số liệu kho hay kiểm tra đơn hàng nào, hãy cho tôi biết nhé.";
         }
 
         // 12. Hỏi năng lực / Khả năng của trợ lý ảo
         if (isCapabilityQuery(unaccented)) {
-            return "Mình nắm rất rõ toàn bộ dữ liệu thời gian thực trong hệ thống ERP này đó! 🤖💼 Bạn có thể nhờ mình:\n\n"
-                    + "• ⏰ **Thời gian thực:** Trả lời chính xác ngày, giờ, thứ hiện tại (ví dụ: *'Mấy giờ rồi?'*).\n"
-                    + "• 👤 **Tài khoản cá nhân:** Xem thông tin tài khoản và quyền hạn (ví dụ: *'Tôi là ai?'*).\n"
-                    + "• 📦 **Tra cứu kho hàng:** Xem tồn kho, giá bán của từng sản phẩm cụ thể (ví dụ: *'Doc còn hàng không?'*).\n"
-                    + "• 📊 **Báo cáo hàng hóa:** Xem tổng quan kho, danh sách các mặt hàng sắp hết hoặc đã hết.\n"
-                    + "• ➕ **Tạo sản phẩm tự động:** Nhắn lệnh như *'Tạo sản phẩm Áo polo giá 180k tồn 30'* là mình lưu thẳng vào Database luôn!\n"
-                    + "• 👥 **Thống kê nhân sự:** Đếm số lượng tài khoản người dùng, xem ai đang hoạt động hay bị khóa.\n"
-                    + "• 🏢 **Hạ tầng & Server:** Xem thông số máy chủ, công nghệ đang chạy.\n"
-                    + "• 🧮 **Máy tính:** Tính toán nhanh các biểu thức số học (ví dụ: *'15% của 500k'*, *'Tính 12 * 8'*).\n"
-                    + "• 📢 **Thông báo:** Xem các sự kiện, tin tức đang chạy trên thanh Header.\n"
-                    + "• 💡 **Hướng dẫn nghiệp vụ:** Hỏi bất kỳ thao tác nào bạn chưa rõ trên giao diện ERP.\n\n"
-                    + "Bạn cần mình hỗ trợ kiểm tra mục nào ngay bây giờ nè?";
+            return "Tôi hỗ trợ bạn truy xuất dữ liệu thời gian thực trên toàn hệ thống ERP Cloud:\n\n"
+                    + "• **Tra cứu kho hàng:** Kiểm tra tồn kho khả dụng, giá niêm yết của sản phẩm (ví dụ: *'Doc Reader còn hàng không?'*).\n"
+                    + "• **Cảnh báo hàng hóa:** Danh sách các mặt hàng sắp hết hoặc cần nhập thêm.\n"
+                    + "• **Công nợ & Đơn hàng:** Tra cứu tình trạng đơn hàng và dư nợ đại lý.\n"
+                    + "• **Nhân sự & Phân quyền:** Tra cứu danh sách tài khoản, vai trò và trạng thái hoạt động.\n"
+                    + "• **Thời gian & Lịch biểu:** Xem ngày giờ hệ thống và các sự kiện nội bộ.\n"
+                    + "• **Tính toán số liệu:** Hỗ trợ tính nhanh tỷ lệ phần trăm, chiết khấu hoặc biểu thức số học.\n\n"
+                    + "Bạn có thể gửi câu hỏi hoặc yêu cầu tra cứu bất cứ lúc nào.";
         }
 
         // 13. Hỏi thăm danh tính / Tên tuổi Trợ lý ảo
         if (unaccented.contains("ban la ai") || unaccented.contains("ban ten gi") || unaccented.contains("ai tao ra ban") || unaccented.contains("gioi thieu")) {
-            return "Chào bạn, mình là **Trợ lý ảo ERP AI** - người đồng nghiệp số luôn túc trực để hỗ trợ bạn vận hành doanh nghiệp mượt mà nhất! 🤖💼\n\n"
-                    + "Mình được kết nối trực tiếp với Cơ sở dữ liệu ERP nội bộ nên mọi biến động về kho hàng, sản phẩm hay nhân sự mình đều nắm rất rõ. Bạn cần mình tra cứu số liệu gì hôm nay không nè?";
+            return "Tôi là **ERP Copilot** - Trợ lý số hỗ trợ vận hành và quản trị dữ liệu nội bộ trong hệ thống ERP Cloud.\n\n"
+                    + "Tôi được kết nối trực tiếp với Cơ sở dữ liệu để giúp bạn tra cứu tồn kho, đơn hàng, công nợ và hướng dẫn quy trình làm việc một cách nhanh chóng, chính xác.";
         }
 
         // 14. Tạm biệt
         if (isFarewell(unaccented)) {
-            return "Tạm biệt bạn nhé! 👋 Chúc bạn một ngày làm việc thật nhiều năng lượng và niềm vui. Khi nào cần hỗ trợ thì cứ mở khung chat lên gọi mình nha!";
+            return "Tạm biệt bạn. Chúc bạn một ngày làm việc thuận lợi và hiệu quả. Tôi luôn sẵn sàng khi bạn quay lại.";
         }
 
         // 15. Thả thính / Trêu đùa vui vẻ
         if (unaccented.contains("yeu ban") || unaccented.contains("thich ban") || unaccented.contains("xinh") || unaccented.contains("dep trai") || unaccented.contains("lay toi")) {
-            return "Hihi bạn làm mình ngại ghê á! 😊 Trái tim mình chỉ toàn là dữ liệu số thôi, nhưng tình cảm dành cho công việc hỗ trợ bạn là thật 100% đó nha! Cần mình hỗ trợ thêm gì trong ERP không nè?";
+            return "Cảm ơn bạn. Là một trợ lý số, mục tiêu hàng đầu của tôi là hỗ trợ bạn quản lý dữ liệu và xử lý công việc ERP một cách chính xác, nhanh chóng nhất. Hãy cho tôi biết nếu bạn cần tra cứu thông tin gì nhé.";
         }
 
         // 16. Than thở / Mệt mỏi

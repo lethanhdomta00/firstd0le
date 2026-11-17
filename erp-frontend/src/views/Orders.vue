@@ -70,8 +70,67 @@
       </div>
     </header>
 
-    <!-- 4 THẺ KPI ĐƠN HÀNG & DOANH THU -->
-    <section class="orders-metrics-grid">
+    <!-- 4 THẺ KPI THEO NGỮ CẢNH TAB (ĐƠN HÀNG HOẶC TUỔI NỢ ĐẠI LÝ) -->
+    <section v-if="activeTab === 'aging'" class="orders-metrics-grid">
+      <div class="kpi-stat-card">
+        <div class="kpi-stat-content">
+          <span class="kpi-stat-label">Tổng Dư nợ Đại lý</span>
+          <span class="kpi-stat-value text-indigo">{{ formatCompactRevenue(totalMarketDebt) }}</span>
+          <span class="kpi-stat-sub text-muted">{{ agingList.length }} đại lý còn phát sinh dư nợ</span>
+        </div>
+        <div class="kpi-stat-icon icon-indigo">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="4" width="20" height="16" rx="2" />
+            <line x1="2" y1="10" x2="22" y2="10" />
+          </svg>
+        </div>
+      </div>
+
+      <div class="kpi-stat-card">
+        <div class="kpi-stat-content">
+          <span class="kpi-stat-label">Trong hạn (0 - 30 ngày)</span>
+          <span class="kpi-stat-value text-green">{{ formatCompactRevenue(totalCurrentDue) }}</span>
+          <span class="kpi-stat-sub text-muted">Dư nợ tín dụng an toàn</span>
+        </div>
+        <div class="kpi-stat-icon icon-teal">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+            <polyline points="22 4 12 14.01 9 11.01" />
+          </svg>
+        </div>
+      </div>
+
+      <div class="kpi-stat-card">
+        <div class="kpi-stat-content">
+          <span class="kpi-stat-label">Quá hạn (31 - 90 ngày)</span>
+          <span class="kpi-stat-value text-amber">{{ formatCompactRevenue(totalOverdue31To90) }}</span>
+          <span class="kpi-stat-sub text-muted">Cần đôn đốc thanh toán / nhắc nợ</span>
+        </div>
+        <div class="kpi-stat-icon icon-amber">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
+          </svg>
+        </div>
+      </div>
+
+      <div class="kpi-stat-card">
+        <div class="kpi-stat-content">
+          <span class="kpi-stat-label">Nợ xấu (&gt; 90 ngày)</span>
+          <span class="kpi-stat-value text-red">{{ formatCompactRevenue(totalBadDebtOver90) }}</span>
+          <span class="kpi-stat-sub text-muted">Khóa xuất hàng tự động</span>
+        </div>
+        <div class="kpi-stat-icon icon-red">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+        </div>
+      </div>
+    </section>
+
+    <section v-else class="orders-metrics-grid">
       <div class="kpi-stat-card">
         <div class="kpi-stat-content">
           <span class="kpi-stat-label">Tổng đơn hàng</span>
@@ -647,7 +706,7 @@
     <!-- TAB 3: BÁO CÁO TUỔI NỢ ĐẠI LÝ (CUSTOMER DEBT AGING)       -->
     <!-- ========================================================== -->
     <template v-else-if="activeTab === 'aging'">
-      <!-- TOOLBAR LỌC & TÌM KIẾM -->
+      <!-- TOOLBAR LỌC & TÌM KIẾM (ĐỒNG BỘ BASE CHUẨN) -->
       <section class="filter-toolbar-card">
         <div class="filter-controls-row">
           <div class="search-input-wrap">
@@ -658,47 +717,31 @@
             <input
               v-model="agingKeyword"
               type="text"
-              class="filter-input-text"
+              class="custom-search-input"
               placeholder="Tìm theo tên đại lý, số điện thoại hoặc mã KH..."
-              @keydown.enter="fetchAgingReport"
+              @input="handleAgingSearchDebounce"
+              @keyup.enter="fetchAgingReport"
             />
           </div>
 
-          <div class="filter-actions-cluster">
-            <button
-              type="button"
-              class="btn-filter-action"
-              @click="fetchAgingReport"
-            >
-              Làm mới / Đối soát nợ
-            </button>
-          </div>
+          <button
+            type="button"
+            class="btn-reset-filter"
+            title="Làm mới dữ liệu đối soát nợ"
+            @click="resetAgingFilters"
+          >
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="23 4 23 10 17 10" />
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+            </svg>
+            <span>Làm mới đối soát</span>
+          </button>
+        </div>
+
+        <div class="filter-summary-right">
+          Đại lý phát sinh nợ: <strong>{{ agingList.length }}</strong> khách hàng
         </div>
       </section>
-
-      <!-- KPI TỔNG HỢP CÔNG NỢ & TUỔI NỢ -->
-      <div class="aging-summary-grid">
-        <div class="aging-kpi-card">
-          <div class="aging-kpi-label">Tổng Dư nợ Đại lý</div>
-          <div class="aging-kpi-val text-slate">{{ formatCurrency(totalMarketDebt) }}</div>
-          <div class="aging-kpi-sub">{{ agingList.length }} đại lý còn phát sinh dư nợ</div>
-        </div>
-        <div class="aging-kpi-card">
-          <div class="aging-kpi-label">Trong hạn (0 - 30 ngày)</div>
-          <div class="aging-kpi-val text-green">{{ formatCurrency(totalCurrentDue) }}</div>
-          <div class="aging-kpi-sub">Dư nợ tín dụng an toàn</div>
-        </div>
-        <div class="aging-kpi-card">
-          <div class="aging-kpi-label">Quá hạn (31 - 90 ngày)</div>
-          <div class="aging-kpi-val text-amber">{{ formatCurrency(totalOverdue31To90) }}</div>
-          <div class="aging-kpi-sub">Cần đôn đốc thanh toán / nhắc nợ</div>
-        </div>
-        <div class="aging-kpi-card">
-          <div class="aging-kpi-label">Nợ xấu (&gt; 90 ngày)</div>
-          <div class="aging-kpi-val text-red">{{ formatCurrency(totalBadDebtOver90) }}</div>
-          <div class="aging-kpi-sub">Khóa xuất hàng tự động</div>
-        </div>
-      </div>
 
       <!-- BẢNG DỮ LIỆU TUỔI NỢ -->
       <section class="table-container-card">
@@ -1781,6 +1824,7 @@ const totalBadDebtOver90 = computed(() => {
 
 let orderSearchTimer = null
 let logSearchTimer = null
+let agingSearchTimer = null
 
 // =========================================================================
 // COMPUTED FOR ORDER FORM TOTALS
@@ -1943,6 +1987,18 @@ async function fetchAgingReport() {
   } finally {
     loadingAging.value = false
   }
+}
+
+function handleAgingSearchDebounce() {
+  clearTimeout(agingSearchTimer)
+  agingSearchTimer = setTimeout(() => {
+    fetchAgingReport()
+  }, 350)
+}
+
+function resetAgingFilters() {
+  agingKeyword.value = ''
+  fetchAgingReport()
 }
 
 function filterOrdersByCustomer(row) {
@@ -2744,6 +2800,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   clearTimeout(orderSearchTimer)
   clearTimeout(logSearchTimer)
+  clearTimeout(agingSearchTimer)
 })
 </script>
 
@@ -2941,6 +2998,7 @@ onBeforeUnmount(() => {
 .icon-amber { background: #fffbeb; color: #d97706; }
 .icon-teal { background: #ecfdf5; color: #059669; }
 .icon-indigo { background: #eef2ff; color: #4338ca; }
+.icon-red { background: #fef2f2; color: #dc2626; }
 
 /* MODULE TABS */
 .module-tabs-bar {
@@ -4432,37 +4490,8 @@ onBeforeUnmount(() => {
 }
 
 /* ========================================================================= */
-/* AGING DEBT SUMMARY & REPORT                                               */
+/* AGING DEBT REPORT TABLE & BADGES                                          */
 /* ========================================================================= */
-.aging-summary-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 14px;
-}
-.aging-kpi-card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.aging-kpi-label {
-  font-size: 12px;
-  color: #64748b;
-  font-weight: 500;
-}
-.aging-kpi-val {
-  font-size: 18px;
-  font-weight: 700;
-}
-.aging-kpi-sub {
-  font-size: 11px;
-  color: #94a3b8;
-}
-
 .table-loading-skeleton {
   padding: 24px;
 }
@@ -4506,15 +4535,4 @@ onBeforeUnmount(() => {
 .text-orange { color: #ea580c; }
 .text-green { color: #16a34a; }
 .text-red { color: #dc2626; }
-
-@media (max-width: 992px) {
-  .aging-summary-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (max-width: 576px) {
-  .aging-summary-grid {
-    grid-template-columns: 1fr;
-  }
-}
 </style>

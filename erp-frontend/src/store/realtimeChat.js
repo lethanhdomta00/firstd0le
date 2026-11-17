@@ -95,6 +95,10 @@ export const useRealtimeChatStore = defineStore('realtimeChat', {
     },
     currentPinnedMessages: (state) => state.pinnedMessagesByRoom[state.activeRoomId] || [],
     currentTypingUsers: (state) => state.typingUsers[state.activeRoomId] || [],
+    currentTypingNames: (state) => {
+      const list = state.typingUsers[state.activeRoomId] || []
+      return list.map(u => (typeof u === 'string' ? u : (u.name || u.username || 'Ai đó'))).filter(Boolean).join(', ')
+    },
     isUserOnline: (state) => (username) => {
       if (!username) return false
       return state.onlineUsers.some(u => u?.toLowerCase() === username?.toLowerCase())
