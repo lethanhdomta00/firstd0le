@@ -19,6 +19,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -194,6 +195,14 @@ public class OrderController {
     @PostMapping("/payment-webhook")
     public ResponseEntity<Map<String, Object>> handlePaymentWebhook(@RequestBody PaymentWebhookRequest request) {
         return ResponseEntity.ok(vietQrService.handlePaymentWebhook(request));
+    }
+
+    @GetMapping("/debt-aging")
+    @PreAuthorize("hasAnyAuthority('ORDER_VIEW', 'ANALYTICS_VIEW', 'ROLE_ADMIN', 'ROLE_MANAGER', 'ROLE_ACCOUNTANT')")
+    public ResponseEntity<List<com.erp.order.dto.CustomerDebtAgingDto>> getDebtAgingReport(
+            @RequestParam(required = false) String keyword
+    ) {
+        return ResponseEntity.ok(orderService.getDebtAgingReport(keyword));
     }
 
     @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})

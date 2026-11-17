@@ -31,6 +31,9 @@ class MultiStateInventoryAndCostTest {
     private OrderService orderService;
 
     @Autowired
+    private com.erp.order.service.VietQrService vietQrService;
+
+    @Autowired
     private ProductRepository productRepository;
 
     @Autowired
@@ -226,5 +229,119 @@ class MultiStateInventoryAndCostTest {
         // Sau khi đã phê duyệt nợ => Xuất kho thành công!
         OrderDto confirmedOrder = orderService.updateOrderStatus(orderDto.getId(), OrderStatus.CONFIRMED, "Duyệt xuất kho", "admin");
         assertEquals(OrderStatus.CONFIRMED, confirmedOrder.getStatus());
+    }
+
+    @Test
+    @DisplayName("7. Giai đoạn 2: Kiểm tra UoM Conversion Rate - Quy đổi đơn vị tính Thùng/Hộp sang Tồn cơ sở")
+    void testUomConversionRateAndStockDeduction() {
+        // testProduct có 10 Cái
+        // Đặt mua 1 Thùng (hệ số quy đổi 5 cái / thùng)
+        CreateOrderRequest request = new CreateOrderRequest();
+        request.setCustomerName("Đại lý Bia Sài Gòn");
+        request.setCustomerPhone("0988776655");
+
+        OrderItemRequest itemRequest = new OrderItemRequest();
+        itemRequest.setProductId(testProduct.getId());
+        itemRequest.setQuantity(1); // 1 Thùng
+        itemRequest.setUomName("Thùng");
+        itemRequest.setUomConversionRate(5); // 1 Thùng = 5 Cái
+        request.setItems(List.of(itemRequest));
+
+        OrderDto orderDto = orderService.createOrder(request, "admin");
+
+        // Sau khi tạo đơn: Tồn giữ chỗ phải tăng 5 Cái cơ sở, Tồn khả dụng còn 10 - 5 = 5 Cái
+        Product prodAfterReserve = productRepository.findById(testProduct.getId()).orElseThrow();
+        assertEquals(5, prodAfterReserve.getReservedStock(), "Reserved stock phải là 5 cái");
+        assertEquals(5, prodAfterReserve.getAvailableStock(), "Available stock còn lại 5 cái");
+
+        // Xuất kho: Physical stock phải giảm 5 cái, còn lại 10 - 5 = 5 cái
+        orderService.updateOrderStatus(orderDto.getId(), OrderStatus.CONFIRMED, "Xuất kho 1 thùng", "admin");
+        Product prodAfterDeduct = productRepository.findById(testProduct.getId()).orElseThrow();
+        assertEquals(5, prodAfterDeduct.getPhysicalStock(), "Physical stock phải bị trừ 5 cái theo hệ số UoM");
+        assertEquals(0, prodAfterDeduct.getReservedStock(), "Reserved stock giải phóng về 0");
+    }
+
+    @Test
+    @DisplayName("8. Giai đoạn 2: Kiểm tra Pricing Resolution Engine - Bậc số lượng (Volume Tier) & Hạng khách (VIP)")
+    void testPricingResolutionEngine() {
+        // Cập nhật tồn kho lên 50 cái để test mua số lượng lớn
+        testProduct.setPhysicalStock(50);
+        testProduct.setStock(50);
+        productRepository.saveAndFlush(testProduct);
+
+        // Case 1: Khách lẻ mua 2 cái (< 10) => Đơn giá niêm yết 150.000đ
+        CreateOrderRequest req1 = new CreateOrderRequest();
+        req1.setCustomerName("Khách Mua Lẻ 1");
+        req1.setCustomerPhone("0900000001");
+        req1.setItems(List.of(OrderItemRequest.builder().productId(testProduct.getId()).quantity(2).build()));
+        OrderDto order1 = orderService.createOrder(req1, "admin");
+        assertEquals(0, new BigDecimal("300000.00").compareTo(order1.getSubtotal()), "2 cái x 150.000đ = 300.000đ");
+
+        // Case 2: Khách lẻ mua 10 cái (Volume Tier >= 10) => Tự động áp giá sỉ 130.000đ
+        CreateOrderRequest req2 = new CreateOrderRequest();
+        req2.setCustomerName("Khách Mua Lớn");
+        req2.setCustomerPhone("0900000002");
+        req2.setItems(List.of(OrderItemRequest.builder().productId(testProduct.getId()).quantity(10).build()));
+        OrderDto order2 = orderService.createOrder(req2, "admin");
+        assertEquals(0, new BigDecimal("1300000.00").compareTo(order2.getSubtotal()), "10 cái x 130.000đ giá sỉ = 1.300.000đ");
+
+        // Case 3: Khách hàng đạt hạng VIP mua 1 cái => Tự động áp giá VIP 120.000đ
+        Customer vipCustomer = new Customer();
+        vipCustomer.setName("Khách Hàng VIP Trâm Anh");
+        vipCustomer.setPhone("0999888777");
+        vipCustomer.setPriceTier("VIP");
+        customerRepository.saveAndFlush(vipCustomer);
+
+        CreateOrderRequest req3 = new CreateOrderRequest();
+        req3.setCustomerName(vipCustomer.getName());
+        req3.setCustomerPhone(vipCustomer.getPhone());
+        req3.setItems(List.of(OrderItemRequest.builder().productId(testProduct.getId()).quantity(1).build()));
+        OrderDto order3 = orderService.createOrder(req3, "admin");
+        assertEquals(0, new BigDecimal("120000.00").compareTo(order3.getSubtotal()), "1 cái hạng VIP áp giá 120.000đ");
+    }
+
+    @Test
+    @DisplayName("9. Giai đoạn 2: Báo cáo Tuổi nợ (Aging Debt) & Webhook Gạch nợ Idempotent chống trùng lặp")
+    void testDebtAgingAndWebhookIdempotency() {
+        String phone = "0933333333";
+        Customer debtor = new Customer();
+        debtor.setName("Đại lý Miền Trung");
+        debtor.setPhone(phone);
+        debtor.setCreditLimit(new BigDecimal("10000000"));
+        debtor.setCurrentDebt(new BigDecimal("2000000"));
+        customerRepository.saveAndFlush(debtor);
+
+        // 1. Kiểm tra Báo cáo Tuổi nợ (Debt Aging Report)
+        List<com.erp.order.dto.CustomerDebtAgingDto> agingReport = orderService.getDebtAgingReport(debtor.getName());
+        assertFalse(agingReport.isEmpty(), "Báo cáo tuổi nợ phải tìm thấy khách hàng");
+        com.erp.order.dto.CustomerDebtAgingDto row = agingReport.get(0);
+        assertEquals(0, new BigDecimal("2000000").compareTo(row.getCurrentDebt()), "Dư nợ khớp 2.000.000đ");
+
+        // 2. Tạo một đơn hàng nợ để test Webhook gạch nợ
+        CreateOrderRequest req = new CreateOrderRequest();
+        req.setCustomerName(debtor.getName());
+        req.setCustomerPhone(phone);
+        req.setPaymentStatus(com.erp.order.model.PaymentStatus.UNPAID);
+        req.setItems(List.of(OrderItemRequest.builder().productId(testProduct.getId()).quantity(1).build()));
+        OrderDto createdOrder = orderService.createOrder(req, "admin");
+
+        // 3. Webhook lần 1: Thanh toán thành công & gạch nợ
+        String transId = "MB-TRANS-" + System.nanoTime();
+        com.erp.order.dto.PaymentWebhookRequest webhookReq = com.erp.order.dto.PaymentWebhookRequest.builder()
+                .transactionId(transId)
+                .orderCode(createdOrder.getOrderCode())
+                .amount(createdOrder.getTotalAmount())
+                .gateway("MB_BANK")
+                .content("DH " + createdOrder.getOrderCode())
+                .build();
+
+        var res1 = vietQrService.handlePaymentWebhook(webhookReq);
+        assertEquals(true, res1.get("success"));
+        assertEquals("PAID", res1.get("status"));
+
+        // 4. Webhook lần 2 với cùng transactionId => Idempotent Protection chặn xử lý đúp
+        var res2 = vietQrService.handlePaymentWebhook(webhookReq);
+        assertEquals(true, res2.get("success"));
+        assertEquals("ALREADY_PROCESSED", res2.get("status"), "Lần 2 phải nhận diện là ALREADY_PROCESSED chống trừ nợ trùng lặp");
     }
 }

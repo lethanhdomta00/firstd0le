@@ -32,4 +32,9 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE Customer c SET c.currentDebt = CASE WHEN COALESCE(c.currentDebt, 0) >= :amount THEN c.currentDebt - :amount ELSE 0 END WHERE c.id = :customerId")
     int decreaseDebt(@Param("customerId") Long customerId, @Param("amount") BigDecimal amount);
+
+    /**
+     * Tìm danh sách khách hàng có dư nợ để xuất Báo cáo Tuổi nợ (Aging Debt)
+     */
+    java.util.List<Customer> findByCurrentDebtGreaterThanOrderByCurrentDebtDesc(BigDecimal amount);
 }

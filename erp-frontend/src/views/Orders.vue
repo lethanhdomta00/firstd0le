@@ -37,8 +37,8 @@
           </button>
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item command="excel">📊 Xuất Excel (.xls đa sheet)</el-dropdown-item>
-              <el-dropdown-item command="csv">📄 Xuất CSV (UTF-8)</el-dropdown-item>
+              <el-dropdown-item command="excel">Xuất Excel (.xls đa sheet)</el-dropdown-item>
+              <el-dropdown-item command="csv">Xuất CSV (UTF-8)</el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
@@ -157,6 +157,16 @@
         <span>Lịch sử Xuất - Nhập Kho</span>
         <span class="tab-count-pill">{{ logTotalElements }}</span>
       </button>
+
+      <button
+        type="button"
+        class="module-tab-btn"
+        :class="{ active: activeTab === 'aging' }"
+        @click="switchTab('aging')"
+      >
+        <span>Báo cáo Tuổi nợ Đại lý</span>
+        <span v-if="agingList.length" class="tab-count-pill">{{ agingList.length }}</span>
+      </button>
     </div>
 
     <!-- ========================================================== -->
@@ -230,7 +240,14 @@
         </div>
 
         <div v-else-if="orders.length === 0" class="empty-state-box">
-          <div class="empty-icon-circle">🧾</div>
+          <div class="empty-icon-circle">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#94a3b8" stroke-width="1.8">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+            </svg>
+          </div>
           <h4>Chưa có đơn hàng nào phù hợp</h4>
           <p>Nhấn nút <strong>"Tạo đơn hàng"</strong> để lập phiếu bán hàng &amp; xuất kho tự động đầu tiên.</p>
           <button type="button" class="btn-header-primary" @click="openOrderModal()">
@@ -357,14 +374,14 @@
                         <template #dropdown>
                           <el-dropdown-menu>
                             <el-dropdown-item v-if="order.status === 'PENDING'" command="edit">
-                              ✏️ Sửa đơn hàng
+                              Sửa đơn hàng
                             </el-dropdown-item>
                             <el-dropdown-item
                               v-if="authStore.isAdmin && (order.status === 'PENDING' || order.status === 'CANCELLED')"
                               command="delete"
                               divided
                             >
-                              <span style="color: #dc2626;">🗑️ Xóa đơn</span>
+                              <span style="color: #dc2626;">Xóa đơn</span>
                             </el-dropdown-item>
                           </el-dropdown-menu>
                         </template>
@@ -459,7 +476,7 @@
     <!-- ========================================================== -->
     <!-- TAB 2: LỊCH SỬ XUẤT - NHẬP KHO (INVENTORY LOGS)            -->
     <!-- ========================================================== -->
-    <template v-else>
+    <template v-else-if="activeTab === 'inventory'">
       <section class="filter-toolbar-card">
         <div class="filter-controls-row">
           <div class="search-input-wrap">
@@ -627,6 +644,141 @@
     </template>
 
     <!-- ========================================================== -->
+    <!-- TAB 3: BÁO CÁO TUỔI NỢ ĐẠI LÝ (CUSTOMER DEBT AGING)       -->
+    <!-- ========================================================== -->
+    <template v-else-if="activeTab === 'aging'">
+      <!-- TOOLBAR LỌC & TÌM KIẾM -->
+      <section class="filter-toolbar-card">
+        <div class="filter-controls-row">
+          <div class="search-input-wrap">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#94a3b8" stroke-width="2">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input
+              v-model="agingKeyword"
+              type="text"
+              class="filter-input-text"
+              placeholder="Tìm theo tên đại lý, số điện thoại hoặc mã KH..."
+              @keydown.enter="fetchAgingReport"
+            />
+          </div>
+
+          <div class="filter-actions-cluster">
+            <button
+              type="button"
+              class="btn-filter-action"
+              @click="fetchAgingReport"
+            >
+              Làm mới / Đối soát nợ
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- KPI TỔNG HỢP CÔNG NỢ & TUỔI NỢ -->
+      <div class="aging-summary-grid">
+        <div class="aging-kpi-card">
+          <div class="aging-kpi-label">Tổng Dư nợ Đại lý</div>
+          <div class="aging-kpi-val text-slate">{{ formatCurrency(totalMarketDebt) }}</div>
+          <div class="aging-kpi-sub">{{ agingList.length }} đại lý còn phát sinh dư nợ</div>
+        </div>
+        <div class="aging-kpi-card">
+          <div class="aging-kpi-label">Trong hạn (0 - 30 ngày)</div>
+          <div class="aging-kpi-val text-green">{{ formatCurrency(totalCurrentDue) }}</div>
+          <div class="aging-kpi-sub">Dư nợ tín dụng an toàn</div>
+        </div>
+        <div class="aging-kpi-card">
+          <div class="aging-kpi-label">Quá hạn (31 - 90 ngày)</div>
+          <div class="aging-kpi-val text-amber">{{ formatCurrency(totalOverdue31To90) }}</div>
+          <div class="aging-kpi-sub">Cần đôn đốc thanh toán / nhắc nợ</div>
+        </div>
+        <div class="aging-kpi-card">
+          <div class="aging-kpi-label">Nợ xấu (&gt; 90 ngày)</div>
+          <div class="aging-kpi-val text-red">{{ formatCurrency(totalBadDebtOver90) }}</div>
+          <div class="aging-kpi-sub">Khóa xuất hàng tự động</div>
+        </div>
+      </div>
+
+      <!-- BẢNG DỮ LIỆU TUỔI NỢ -->
+      <section class="table-container-card">
+        <div v-if="loadingAging" class="table-loading-skeleton">
+          <el-skeleton :rows="5" animated />
+        </div>
+
+        <div v-else-if="agingList.length === 0" class="empty-state-box">
+          <h4>Không có dữ liệu công nợ phù hợp</h4>
+          <p>Hiện không có khách hàng nào còn dư nợ hoặc kết quả tìm kiếm không khớp.</p>
+        </div>
+
+        <template v-else>
+          <div class="desktop-table-wrap table-responsive-scroll">
+            <table class="erp-table">
+              <thead>
+                <tr>
+                  <th style="min-width: 220px;">Khách hàng / Đại lý</th>
+                  <th style="min-width: 130px;" class="text-right">Hạn mức tín dụng</th>
+                  <th style="min-width: 140px;" class="text-right">Tổng Dư nợ</th>
+                  <th style="min-width: 120px;" class="text-right">Trong hạn (0-30d)</th>
+                  <th style="min-width: 120px;" class="text-right">Quá hạn (31-60d)</th>
+                  <th style="min-width: 120px;" class="text-right">Cảnh báo (61-90d)</th>
+                  <th style="min-width: 120px;" class="text-right">Nợ xấu (&gt;90d)</th>
+                  <th style="min-width: 140px;" class="text-center">Trạng thái Tín dụng</th>
+                  <th style="min-width: 110px;" class="text-center">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in agingList" :key="row.customerId">
+                  <td>
+                    <div class="customer-name-bold">{{ row.customerName }}</div>
+                    <div class="sub-muted-line">
+                      {{ row.phone || 'Chưa có SĐT' }} • Hạng: <strong>{{ row.tier || 'STANDARD' }}</strong>
+                    </div>
+                  </td>
+                  <td class="text-right font-medium">
+                    {{ formatCurrency(row.creditLimit) }}
+                  </td>
+                  <td class="text-right font-bold" :class="{ 'text-red': Number(row.totalDebt) > Number(row.creditLimit) }">
+                    {{ formatCurrency(row.totalDebt) }}
+                  </td>
+                  <td class="text-right text-green font-medium">
+                    {{ formatCurrency(row.currentDue) }}
+                  </td>
+                  <td class="text-right" :class="{ 'text-amber font-medium': Number(row.overdue31To60) > 0 }">
+                    {{ Number(row.overdue31To60) > 0 ? formatCurrency(row.overdue31To60) : '—' }}
+                  </td>
+                  <td class="text-right" :class="{ 'text-orange font-bold': Number(row.overdue61To90) > 0 }">
+                    {{ Number(row.overdue61To90) > 0 ? formatCurrency(row.overdue61To90) : '—' }}
+                  </td>
+                  <td class="text-right" :class="{ 'text-red font-bold': Number(row.badDebtOver90) > 0 }">
+                    {{ Number(row.badDebtOver90) > 0 ? formatCurrency(row.badDebtOver90) : '—' }}
+                  </td>
+                  <td class="text-center">
+                    <span v-if="row.isLocked" class="status-badge-soft danger">
+                      Bị khóa xuất hàng
+                    </span>
+                    <span v-else class="status-badge-soft success">
+                      Đủ điều kiện xuất
+                    </span>
+                  </td>
+                  <td class="text-center">
+                    <button
+                      type="button"
+                      class="btn-row-action"
+                      @click="filterOrdersByCustomer(row)"
+                    >
+                      Xem {{ row.unpaidOrdersCount }} đơn
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </template>
+      </section>
+    </template>
+
+    <!-- ========================================================== -->
     <!-- MODAL 1: TẠO / SỬA ĐƠN HÀNG                                 -->
     <!-- ========================================================== -->
     <div v-if="orderModalVisible" class="custom-modal-overlay" @click.self="closeOrderModal">
@@ -713,21 +865,43 @@
             </div>
           </div>
 
-          <!-- CHỌN SẢN PHẨM TỪ KHO -->
+          <!-- CHỌN SẢN PHẨM TỪ KHO & UOM -->
           <div class="form-section-box">
-            <div class="section-box-title">2. Chọn Sản phẩm Xuất Kho</div>
+            <div class="section-box-title">2. Chọn Sản phẩm Xuất Kho &amp; Đơn vị tính (UoM)</div>
+
+            <!-- POS BARCODE / SKU SCANNER BOX -->
+            <div class="barcode-scanner-box">
+              <div class="barcode-input-wrap">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 5v14M8 5v14M12 5v14M17 5v14M21 5v14" />
+                </svg>
+                <input
+                  ref="barcodeInputRef"
+                  v-model="barcodeScanText"
+                  type="text"
+                  class="erp-input barcode-input"
+                  placeholder="Bắn súng quét mã vạch Barcode hoặc nhập mã SKU rồi nhấn Enter..."
+                  @keydown.enter.prevent="handleBarcodeScan"
+                />
+                <button type="button" class="btn-scan-action" @click="handleBarcodeScan">
+                  Quét / Thêm
+                </button>
+              </div>
+              <span class="barcode-tip">Hỗ trợ máy quét mã vạch cầm tay USB/Bluetooth tự động nhận diện và cộng dồn số lượng.</span>
+            </div>
+
             <div class="product-picker-row">
               <el-select
                 v-model="selectedProductToAdd"
                 filterable
-                placeholder="Tìm theo tên hoặc mã SKU để thêm vào đơn..."
+                placeholder="Hoặc tìm theo tên / SKU sản phẩm để thêm vào đơn..."
                 class="product-picker-select"
                 @change="addProductToOrder"
               >
                 <el-option
                   v-for="prod in availableProducts"
                   :key="prod.id"
-                  :label="`${prod.name} (${prod.sku}) — Tồn: ${prod.stock} — ${formatCurrency(prod.price)}`"
+                  :label="`${prod.name} (${prod.sku}${prod.barcode ? ' • ' + prod.barcode : ''}) — Tồn: ${prod.stock} — ${formatCurrency(prod.price)}`"
                   :value="prod.id"
                   :disabled="!editingOrderId && prod.stock <= 0"
                 />
@@ -735,7 +909,7 @@
             </div>
 
             <div v-if="orderForm.items.length === 0" class="empty-items-hint">
-              Chưa chọn sản phẩm nào. Hãy chọn ít nhất 1 mặt hàng ở thanh tìm kiếm phía trên.
+              Chưa chọn sản phẩm nào. Hãy bắn Barcode hoặc chọn mặt hàng ở thanh tìm kiếm phía trên.
             </div>
 
             <div v-else class="order-items-table-wrap">
@@ -743,6 +917,7 @@
                 <thead>
                   <tr>
                     <th>Sản phẩm</th>
+                    <th class="text-center" style="width: 140px;">Đơn vị tính</th>
                     <th class="text-right">Đơn giá</th>
                     <th class="text-center">Số lượng</th>
                     <th class="text-right">Thành tiền</th>
@@ -754,7 +929,21 @@
                     <td>
                       <div class="item-prod-name">{{ item.productName }}</div>
                       <div class="sub-muted-line">
-                        {{ item.productSku }} • Tồn kho khả dụng: <strong>{{ item.maxStock }}</strong>
+                        {{ item.productSku }} • Tồn kho khả dụng: <strong>{{ item.maxStock }}</strong> cái
+                      </div>
+                    </td>
+                    <td class="text-center">
+                      <select
+                        v-model.number="item.uomConversionRate"
+                        class="uom-select"
+                        @change="onUomChange(item)"
+                      >
+                        <option :value="1">Cái (x1)</option>
+                        <option :value="10">Hộp (x10)</option>
+                        <option :value="100">Thùng (x100)</option>
+                      </select>
+                      <div class="uom-hint-text">
+                        Quy đổi: <strong>{{ (item.quantity ?? 1) * (item.uomConversionRate ?? 1) }}</strong> cái cơ sở
                       </div>
                     </td>
                     <td class="text-right">{{ formatCurrency(item.unitPrice) }}</td>
@@ -765,7 +954,7 @@
                           v-model.number="item.quantity"
                           type="number"
                           min="1"
-                          :max="item.maxStock"
+                          @change="validateItemQty(item)"
                         />
                         <button type="button" @click="stepItemQty(idx, 1)">+</button>
                       </div>
@@ -1565,6 +1754,31 @@ const adjustForm = reactive({
 const exportingExcel = ref(false)
 const exportingCsv = ref(false)
 
+// POS Barcode scanner state
+const barcodeScanText = ref('')
+const barcodeInputRef = ref(null)
+
+// Customer Debt Aging state
+const loadingAging = ref(false)
+const agingList = ref([])
+const agingKeyword = ref('')
+
+const totalMarketDebt = computed(() => {
+  return agingList.value.reduce((sum, r) => sum + Number(r.totalDebt ?? 0), 0)
+})
+const totalCurrentDue = computed(() => {
+  return agingList.value.reduce((sum, r) => sum + Number(r.currentDue ?? 0), 0)
+})
+const totalOverdue31To90 = computed(() => {
+  return agingList.value.reduce(
+    (sum, r) => sum + Number(r.overdue31To60 ?? 0) + Number(r.overdue61To90 ?? 0),
+    0
+  )
+})
+const totalBadDebtOver90 = computed(() => {
+  return agingList.value.reduce((sum, r) => sum + Number(r.badDebtOver90 ?? 0), 0)
+})
+
 let orderSearchTimer = null
 let logSearchTimer = null
 
@@ -1710,9 +1924,34 @@ function switchTab(tab) {
   activeTab.value = tab
   if (tab === 'inventory') {
     fetchInventoryLogs()
+  } else if (tab === 'aging') {
+    fetchAgingReport()
   } else {
     fetchOrders()
   }
+}
+
+async function fetchAgingReport() {
+  loadingAging.value = true
+  try {
+    const res = await api.get('/orders/debt-aging', {
+      params: { keyword: agingKeyword.value?.trim() || '' }
+    })
+    agingList.value = res.data || []
+  } catch (err) {
+    ElMessage.error(err.response?.data?.message || 'Không thể tải báo cáo tuổi nợ đại lý!')
+  } finally {
+    loadingAging.value = false
+  }
+}
+
+function filterOrdersByCustomer(row) {
+  if (row.phone) {
+    orderFilter.keyword = row.phone
+  } else {
+    orderFilter.keyword = row.customerName
+  }
+  switchTab('orders')
 }
 
 // =========================================================================
@@ -1736,13 +1975,18 @@ async function openOrderModal(existingOrder = null) {
     orderForm.items = (existingOrder.items || []).map((item) => {
       const catalogProd = availableProducts.value.find((p) => p.id === item.productId)
       const currentCatalogStock = catalogProd ? Number(catalogProd.stock ?? 0) : 0
+      const rate = Number(item.uomConversionRate || 1)
+      const basePr = catalogProd ? Number(catalogProd.price ?? item.price ?? 0) : Number(item.price ?? 0)
       return {
         productId: item.productId,
         productName: item.productName,
         productSku: item.productSku,
-        unitPrice: Number(item.unitPrice ?? 0),
+        basePrice: basePr,
+        unitPrice: Number(item.price ?? item.unitPrice ?? (basePr * rate)),
         quantity: Number(item.quantity ?? 1),
-        maxStock: currentCatalogStock + Number(item.quantity ?? 0)
+        uomName: item.uomName || 'Cái',
+        uomConversionRate: rate,
+        maxStock: currentCatalogStock + Number(item.quantity ?? 0) * rate
       }
     })
   } else {
@@ -1760,12 +2004,82 @@ async function openOrderModal(existingOrder = null) {
     orderForm.items = []
   }
 
+  barcodeScanText.value = ''
   selectedProductToAdd.value = null
   orderModalVisible.value = true
 }
 
 function closeOrderModal() {
   orderModalVisible.value = false
+}
+
+function handleBarcodeScan() {
+  const code = barcodeScanText.value?.trim()
+  if (!code) return
+
+  const prod = availableProducts.value.find(
+    (p) =>
+      (p.barcode && p.barcode.trim().toLowerCase() === code.toLowerCase()) ||
+      (p.sku && p.sku.trim().toLowerCase() === code.toLowerCase())
+  )
+
+  if (!prod) {
+    ElMessage.warning(`Không tìm thấy sản phẩm với mã Barcode/SKU "${code}"!`)
+    return
+  }
+
+  const existing = orderForm.items.find((i) => i.productId === prod.id)
+  if (existing) {
+    const rate = Number(existing.uomConversionRate || 1)
+    if ((existing.quantity + 1) * rate <= existing.maxStock) {
+      existing.quantity += 1
+      ElMessage.success(`Đã tăng số lượng: ${prod.name} (${existing.quantity} ${existing.uomName})`)
+    } else {
+      ElMessage.warning(`Sản phẩm "${prod.name}" không đủ tồn kho để tăng thêm!`)
+    }
+  } else {
+    if ((prod.stock ?? 0) <= 0 && !editingOrderId.value) {
+      ElMessage.warning(`Sản phẩm "${prod.name}" đã hết hàng trong kho!`)
+    } else {
+      orderForm.items.push({
+        productId: prod.id,
+        productName: prod.name,
+        productSku: prod.sku,
+        basePrice: Number(prod.price ?? 0),
+        unitPrice: Number(prod.price ?? 0),
+        quantity: 1,
+        uomName: 'Cái',
+        uomConversionRate: 1,
+        maxStock: Number(prod.stock ?? 0)
+      })
+      ElMessage.success(`Đã thêm sản phẩm: ${prod.name}`)
+    }
+  }
+
+  barcodeScanText.value = ''
+  nextTick(() => {
+    barcodeInputRef.value?.focus()
+  })
+}
+
+function onUomChange(item) {
+  const rate = Number(item.uomConversionRate || 1)
+  if (rate === 1) item.uomName = 'Cái'
+  else if (rate === 10) item.uomName = 'Hộp'
+  else if (rate === 100) item.uomName = 'Thùng'
+  else item.uomName = 'Đơn vị'
+
+  item.unitPrice = Number(item.basePrice || 0) * rate
+  validateItemQty(item)
+}
+
+function validateItemQty(item) {
+  const rate = Number(item.uomConversionRate || 1)
+  if ((item.quantity ?? 1) * rate > item.maxStock) {
+    ElMessage.warning(
+      `Số lượng quy đổi (${item.quantity * rate} cái) vượt quá tồn kho khả dụng (${item.maxStock} cái)!`
+    )
+  }
 }
 
 function addProductToOrder(productId) {
@@ -1775,7 +2089,8 @@ function addProductToOrder(productId) {
 
   const existing = orderForm.items.find((i) => i.productId === prod.id)
   if (existing) {
-    if (existing.quantity < existing.maxStock) {
+    const rate = Number(existing.uomConversionRate || 1)
+    if ((existing.quantity + 1) * rate <= existing.maxStock) {
       existing.quantity += 1
     } else {
       ElMessage.warning(`Sản phẩm "${prod.name}" đã đạt tối đa tồn kho (${existing.maxStock})!`)
@@ -1788,8 +2103,11 @@ function addProductToOrder(productId) {
         productId: prod.id,
         productName: prod.name,
         productSku: prod.sku,
+        basePrice: Number(prod.price ?? 0),
         unitPrice: Number(prod.price ?? 0),
         quantity: 1,
+        uomName: 'Cái',
+        uomConversionRate: 1,
         maxStock: Number(prod.stock ?? 0)
       })
     }
@@ -1803,8 +2121,9 @@ function stepItemQty(index, delta) {
   if (!item) return
   const next = Number(item.quantity ?? 1) + delta
   if (next < 1) return
-  if (next > item.maxStock) {
-    ElMessage.warning(`Số lượng vượt quá tồn kho (${item.maxStock})!`)
+  const rate = Number(item.uomConversionRate || 1)
+  if (next * rate > item.maxStock) {
+    ElMessage.warning(`Số lượng quy đổi (${next * rate} cái) vượt quá tồn kho (${item.maxStock} cái)!`)
     return
   }
   item.quantity = next
@@ -1827,7 +2146,17 @@ function fillSampleOrder() {
   if (orderForm.items.length === 0) {
     const firstInStock = availableProducts.value.find((p) => (p.stock ?? 0) > 0)
     if (firstInStock) {
-      addProductToOrder(firstInStock.id)
+      orderForm.items.push({
+        productId: firstInStock.id,
+        productName: firstInStock.name,
+        productSku: firstInStock.sku,
+        basePrice: Number(firstInStock.price ?? 0),
+        unitPrice: Number(firstInStock.price ?? 0),
+        quantity: 2,
+        uomName: 'Cái',
+        uomConversionRate: 1,
+        maxStock: Number(firstInStock.stock ?? 0)
+      })
     }
   }
 }
@@ -1862,7 +2191,10 @@ async function submitOrderForm() {
       taxRate: Number(orderForm.taxRate ?? 0),
       items: orderForm.items.map((i) => ({
         productId: i.productId,
-        quantity: Number(i.quantity)
+        quantity: Number(i.quantity),
+        unitPrice: i.unitPrice != null ? Number(i.unitPrice) : null,
+        uomName: i.uomName || 'Cái',
+        uomConversionRate: Number(i.uomConversionRate || 1)
       }))
     }
 
@@ -4033,5 +4365,156 @@ onBeforeUnmount(() => {
 }
 .btn-reject-credit:hover:not(:disabled) {
   background: #fef2f2;
+}
+
+/* ========================================================================= */
+/* POS BARCODE SCANNER & UOM SELECTION                                       */
+/* ========================================================================= */
+.barcode-scanner-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.barcode-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.barcode-input {
+  flex: 1;
+  font-family: monospace;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+}
+.btn-scan-action {
+  height: 34px;
+  padding: 0 14px;
+  background: #0f172a;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.btn-scan-action:hover {
+  background: #1e293b;
+}
+.barcode-tip {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.uom-select {
+  padding: 4px 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #0f172a;
+  background: #ffffff;
+  outline: none;
+  cursor: pointer;
+}
+.uom-select:focus {
+  border-color: #2563eb;
+}
+.uom-hint-text {
+  font-size: 10.5px;
+  color: #64748b;
+  margin-top: 3px;
+}
+
+/* ========================================================================= */
+/* AGING DEBT SUMMARY & REPORT                                               */
+/* ========================================================================= */
+.aging-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.aging-kpi-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.aging-kpi-label {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 500;
+}
+.aging-kpi-val {
+  font-size: 18px;
+  font-weight: 700;
+}
+.aging-kpi-sub {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.table-loading-skeleton {
+  padding: 24px;
+}
+.btn-row-action {
+  padding: 5px 10px;
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.btn-row-action:hover {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.status-badge-soft {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.status-badge-soft.success {
+  background: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+.status-badge-soft.danger {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+.text-slate { color: #0f172a; }
+.text-amber { color: #d97706; }
+.text-orange { color: #ea580c; }
+.text-green { color: #16a34a; }
+.text-red { color: #dc2626; }
+
+@media (max-width: 992px) {
+  .aging-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 576px) {
+  .aging-summary-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

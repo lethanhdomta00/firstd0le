@@ -122,12 +122,12 @@ public class OrderService {
      * 1. Tạo đơn hàng mới:
      * - Áp dụng Atomic Stock Reservation (chống bán lố Race Condition)
      * - Đóng băng giá vốn snapshot_cost_price từ moving_avg_cost
+     * - Quy đổi đơn vị tính nâng cao (UoM Multi-level Hierarchy)
+     * - Tự động áp giá thông minh (Pricing Resolution Engine theo Tier & Volume)
      * - Kiểm soát hạn mức công nợ Credit Gatekeeper
      */
     @Transactional
     public OrderDto createOrder(CreateOrderRequest request, String username) {
-        Map<Long, Integer> mergedQuantities = mergeItemQuantities(request.getItems());
-
         Order order = new Order();
         order.setOrderCode(generateUniqueOrderCode());
         applyCustomerAndPaymentFields(order, request);
@@ -135,8 +135,12 @@ public class OrderService {
         order.setStockDeducted(true);
         order.setCreatedByUsername(username);
 
-        // Áp dụng sản phẩm, tính toán giá vốn & giữ chỗ tồn kho nguyên tử
-        applyItemsAndReserveStock(order, mergedQuantities, username, "Tạo đơn hàng mới (Giữ chỗ)");
+        // Nạp thông tin khách hàng trước để xác định priceTier cho Pricing Engine
+        syncCustomerPriceTier(order);
+
+        // Áp dụng sản phẩm, tính toán đơn giá theo bậc/UoM, đóng băng giá vốn & giữ chỗ tồn kho nguyên tử
+        List<OrderItemRequest> consolidatedItems = consolidateItemRequests(request.getItems());
+        applyItemsAndReserveStock(order, consolidatedItems, username, "Tạo đơn hàng mới (Giữ chỗ)");
 
         // Kiểm tra Hạn mức nợ của Khách hàng (Credit Gatekeeper)
         checkAndApplyCustomerCreditLimit(order);
@@ -165,8 +169,9 @@ public class OrderService {
         applyCustomerAndPaymentFields(order, request);
         order.setStockDeducted(true);
 
-        Map<Long, Integer> mergedQuantities = mergeItemQuantities(request.getItems());
-        applyItemsAndReserveStock(order, mergedQuantities, username, "Cập nhật đơn hàng (Giữ chỗ mới)");
+        syncCustomerPriceTier(order);
+        List<OrderItemRequest> consolidatedItems = consolidateItemRequests(request.getItems());
+        applyItemsAndReserveStock(order, consolidatedItems, username, "Cập nhật đơn hàng (Giữ chỗ mới)");
         checkAndApplyCustomerCreditLimit(order);
 
         Order saved = orderRepository.save(order);
@@ -384,50 +389,134 @@ public class OrderService {
     // =========================================================================
 
     /**
-     * Giữ chỗ tồn kho nguyên tử (Atomic Stock Reservation) & Đóng băng giá vốn MAC
+     * Đồng bộ priceTier của khách hàng vào Order trước khi chạy Pricing Engine
      */
-    private void applyItemsAndReserveStock(Order order, Map<Long, Integer> qtyByProduct, String username, String logPrefix) {
+    private void syncCustomerPriceTier(Order order) {
+        if (order.getCustomerPhone() != null && !order.getCustomerPhone().trim().isEmpty()) {
+            customerRepository.findByPhone(order.getCustomerPhone().trim()).ifPresent(c -> {
+                order.setPriceTier(c.getPriceTier());
+            });
+        }
+    }
+
+    /**
+     * Gộp các dòng sản phẩm trùng lặp cùng productId và cùng đơn vị tính UoM
+     */
+    private List<OrderItemRequest> consolidateItemRequests(List<OrderItemRequest> items) {
+        if (items == null) return Collections.emptyList();
+        Map<String, OrderItemRequest> map = new LinkedHashMap<>();
+        for (OrderItemRequest req : items) {
+            if (req.getProductId() == null) continue;
+            String key = req.getProductId() + "_" + (req.getUomName() != null ? req.getUomName().trim() : "default")
+                    + "_" + (req.getUomConversionRate() != null ? req.getUomConversionRate() : 1);
+            if (map.containsKey(key)) {
+                OrderItemRequest existing = map.get(key);
+                int q1 = existing.getQuantity() != null ? existing.getQuantity() : 0;
+                int q2 = req.getQuantity() != null ? req.getQuantity() : 0;
+                existing.setQuantity(q1 + q2);
+            } else {
+                OrderItemRequest copy = new OrderItemRequest();
+                copy.setProductId(req.getProductId());
+                copy.setQuantity(req.getQuantity());
+                copy.setUnitPrice(req.getUnitPrice());
+                copy.setUomName(req.getUomName());
+                copy.setUomConversionRate(req.getUomConversionRate());
+                map.put(key, copy);
+            }
+        }
+        return new ArrayList<>(map.values());
+    }
+
+    /**
+     * Giữ chỗ tồn kho nguyên tử (Atomic Stock Reservation)
+     * - Quy đổi đơn vị tính (UoM Multi-level Hierarchy): Cái, Hộp, Thùng...
+     * - Tự động áp giá (Pricing Resolution Engine): Ưu tiên Contract -> Customer Tier -> Volume Tier (>= 10) -> Retail Price
+     * - Đóng băng giá vốn Moving Average Cost (MAC)
+     */
+    private void applyItemsAndReserveStock(Order order, List<OrderItemRequest> itemRequests, String username, String logPrefix) {
+        if (itemRequests == null || itemRequests.isEmpty()) {
+            throw new IllegalArgumentException("Đơn hàng phải chứa ít nhất 1 sản phẩm!");
+        }
+
         BigDecimal subtotal = BigDecimal.ZERO;
         BigDecimal totalCostAmount = BigDecimal.ZERO;
 
-        for (Map.Entry<Long, Integer> entry : qtyByProduct.entrySet()) {
-            Long productId = entry.getKey();
-            int qty = entry.getValue();
+        for (OrderItemRequest req : itemRequests) {
+            if (req.getProductId() == null) {
+                throw new IllegalArgumentException("Product ID không được để trống!");
+            }
+            if (req.getQuantity() == null || req.getQuantity() <= 0) {
+                throw new IllegalArgumentException("Số lượng sản phẩm phải lớn hơn 0!");
+            }
 
-            Product product = productRepository.findById(productId)
-                    .orElseThrow(() -> new IllegalArgumentException("Sản phẩm ID #" + productId + " không tồn tại!"));
+            Product product = productRepository.findById(req.getProductId())
+                    .orElseThrow(() -> new IllegalArgumentException("Sản phẩm ID #" + req.getProductId() + " không tồn tại!"));
 
-            // 1. Giữ chỗ tồn kho nguyên tử (Atomic Check & Update)
-            int updatedRows = productRepository.reserveStockAtomic(productId, qty);
+            // 1. Hệ số quy đổi UoM
+            String uomName = (req.getUomName() != null && !req.getUomName().trim().isEmpty())
+                    ? req.getUomName().trim()
+                    : (product.getBaseUnit() != null ? product.getBaseUnit() : "Cái");
+            int rate = (req.getUomConversionRate() != null && req.getUomConversionRate() > 0)
+                    ? req.getUomConversionRate()
+                    : 1;
+
+            // Số lượng cơ sở cần giữ chỗ trên kệ kho
+            int baseQty = req.getQuantity() * rate;
+
+            // 2. Giữ chỗ tồn kho nguyên tử (Atomic Check & Update theo số lượng cơ sở)
+            int updatedRows = productRepository.reserveStockAtomic(product.getId(), baseQty);
             if (updatedRows == 0) {
                 int available = product.getAvailableStock();
                 throw new IllegalArgumentException(
                         "Sản phẩm '" + product.getName() + "' (" + product.getSku() + ") chỉ còn "
-                        + available + " tồn khả dụng, không đủ để giữ chỗ số lượng " + qty + "!"
+                        + available + " " + (product.getBaseUnit() != null ? product.getBaseUnit() : "Cái")
+                        + " khả dụng, không đủ để giữ chỗ " + req.getQuantity() + " " + uomName + " (= " + baseQty + " cái)!"
                 );
             }
 
-            BigDecimal unitPrice = product.getPrice() != null ? product.getPrice() : BigDecimal.ZERO;
-            BigDecimal lineTotal = unitPrice.multiply(BigDecimal.valueOf(qty)).setScale(2, RoundingMode.HALF_UP);
+            // 3. Pricing Resolution Engine (Bảng giá thông minh)
+            BigDecimal lineUnitPrice;
+            if (req.getUnitPrice() != null && req.getUnitPrice().compareTo(BigDecimal.ZERO) > 0) {
+                // Giá tùy chỉnh chỉ định
+                lineUnitPrice = req.getUnitPrice();
+            } else {
+                String tier = order.getPriceTier() != null ? order.getPriceTier() : "RETAIL";
+                BigDecimal basePrice;
+                if ("WHOLESALE".equalsIgnoreCase(tier) && product.getWholesalePrice() != null) {
+                    basePrice = product.getWholesalePrice();
+                } else if ("VIP".equalsIgnoreCase(tier) && product.getVipPrice() != null) {
+                    basePrice = product.getVipPrice();
+                } else if (baseQty >= 10 && product.getWholesalePrice() != null) {
+                    // Volume Tier: Mua >= 10 cái cơ sở tự động áp giá sỉ
+                    basePrice = product.getWholesalePrice();
+                } else {
+                    basePrice = product.getPrice() != null ? product.getPrice() : BigDecimal.ZERO;
+                }
+                // Nhân theo hệ số đơn vị tính UoM
+                lineUnitPrice = basePrice.multiply(BigDecimal.valueOf(rate)).setScale(2, RoundingMode.HALF_UP);
+            }
+
+            BigDecimal lineTotal = lineUnitPrice.multiply(BigDecimal.valueOf(req.getQuantity())).setScale(2, RoundingMode.HALF_UP);
             subtotal = subtotal.add(lineTotal);
 
-            // 2. Đóng băng giá vốn Moving Average Cost
-            BigDecimal snapshotCost = product.getMovingAvgCost() != null ? product.getMovingAvgCost() : BigDecimal.ZERO;
-            BigDecimal lineCost = snapshotCost.multiply(BigDecimal.valueOf(qty)).setScale(2, RoundingMode.HALF_UP);
-            totalCostAmount = totalCostAmount.add(lineCost);
+            // 4. Đóng băng giá vốn Moving Average Cost
+            BigDecimal baseSnapshotCost = product.getMovingAvgCost() != null ? product.getMovingAvgCost() : BigDecimal.ZERO;
+            BigDecimal lineTotalCost = baseSnapshotCost.multiply(BigDecimal.valueOf(baseQty)).setScale(2, RoundingMode.HALF_UP);
+            totalCostAmount = totalCostAmount.add(lineTotalCost);
 
             OrderItem item = new OrderItem();
             item.setProductId(product.getId());
             item.setProductName(product.getName());
             item.setProductSku(product.getSku());
             item.setProductImageUrl(product.getImageUrl());
-            item.setUomName(product.getBaseUnit() != null ? product.getBaseUnit() : "Cái");
-            item.setUomConversionRate(BigDecimal.ONE);
-            item.setUnitPrice(unitPrice);
-            item.setQuantity(qty);
+            item.setUomName(uomName);
+            item.setUomConversionRate(BigDecimal.valueOf(rate));
+            item.setUnitPrice(lineUnitPrice);
+            item.setQuantity(req.getQuantity());
             item.setLineTotal(lineTotal);
-            item.setSnapshotCostPrice(snapshotCost);
-            item.calculateGrossProfit();
+            // Giá vốn trên 1 đơn vị bán = giá vốn cơ sở * hệ số UoM
+            item.setSnapshotCostPrice(baseSnapshotCost.multiply(BigDecimal.valueOf(rate)).setScale(2, RoundingMode.HALF_UP));
+            item.setGrossProfit(lineTotal.subtract(lineTotalCost).setScale(2, RoundingMode.HALF_UP));
             order.addItem(item);
         }
 
@@ -451,25 +540,26 @@ public class OrderService {
     }
 
     /**
-     * Xuất kho thực tế (trừ Physical Stock và Reserved Stock, ghi nhận Thẻ kho)
+     * Xuất kho thực tế (trừ Physical Stock và Reserved Stock theo số lượng cơ sở UoM, ghi nhận Thẻ kho)
      */
     private void deductPhysicalStockForOrder(Order order, String username, String note) {
         for (OrderItem item : order.getItems()) {
             productRepository.findById(item.getProductId()).ifPresent(product -> {
                 int physicalBefore = product.getPhysicalStock() != null ? product.getPhysicalStock() : 0;
-                int qty = item.getQuantity();
+                int rate = item.getUomConversionRate() != null ? item.getUomConversionRate().intValue() : 1;
+                int baseQty = item.getQuantity() * (rate > 0 ? rate : 1);
 
-                productRepository.deductPhysicalStock(product.getId(), qty);
-                int physicalAfter = Math.max(0, physicalBefore - qty);
+                productRepository.deductPhysicalStock(product.getId(), baseQty);
+                int physicalAfter = Math.max(0, physicalBefore - baseQty);
 
                 recordInventoryLog(
                         product,
                         InventoryMovementType.EXPORT_ORDER,
-                        -qty,
+                        -baseQty,
                         physicalBefore,
                         physicalAfter,
                         order.getOrderCode(),
-                        note,
+                        note + " (" + item.getQuantity() + " " + item.getUomName() + ")",
                         username
                 );
             });
@@ -481,7 +571,9 @@ public class OrderService {
      */
     private void releaseOrderReservation(Order order, String username, String reason) {
         for (OrderItem item : order.getItems()) {
-            productRepository.releaseReservedStock(item.getProductId(), item.getQuantity());
+            int rate = item.getUomConversionRate() != null ? item.getUomConversionRate().intValue() : 1;
+            int baseQty = item.getQuantity() * (rate > 0 ? rate : 1);
+            productRepository.releaseReservedStock(item.getProductId(), baseQty);
         }
     }
 
@@ -501,15 +593,16 @@ public class OrderService {
             for (OrderItem item : order.getItems()) {
                 productRepository.findById(item.getProductId()).ifPresent(product -> {
                     int physicalBefore = product.getPhysicalStock() != null ? product.getPhysicalStock() : 0;
-                    int qty = item.getQuantity();
+                    int rate = item.getUomConversionRate() != null ? item.getUomConversionRate().intValue() : 1;
+                    int baseQty = item.getQuantity() * (rate > 0 ? rate : 1);
 
-                    productRepository.restorePhysicalStock(product.getId(), qty);
-                    int physicalAfter = physicalBefore + qty;
+                    productRepository.restorePhysicalStock(product.getId(), baseQty);
+                    int physicalAfter = physicalBefore + baseQty;
 
                     recordInventoryLog(
                             product,
                             InventoryMovementType.IMPORT_CANCEL,
-                            qty,
+                            baseQty,
                             physicalBefore,
                             physicalAfter,
                             order.getOrderCode(),
@@ -519,6 +612,84 @@ public class OrderService {
                 });
             }
         }
+    }
+
+    /**
+     * Báo cáo Tuổi nợ Đại lý (Aging Debt Report):
+     * Phân loại công nợ theo 0-30 ngày (Trong hạn), 31-60 ngày, 61-90 ngày, và Nợ xấu (> 90 ngày)
+     */
+    @Transactional(readOnly = true)
+    public List<CustomerDebtAgingDto> getDebtAgingReport(String keyword) {
+        List<Customer> customers;
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            customers = customerRepository.searchCustomers(keyword.trim(), PageRequest.of(0, 100)).getContent();
+        } else {
+            customers = customerRepository.findByCurrentDebtGreaterThanOrderByCurrentDebtDesc(BigDecimal.ZERO);
+            if (customers.isEmpty()) {
+                customers = customerRepository.findAll(PageRequest.of(0, 50)).getContent();
+            }
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        List<CustomerDebtAgingDto> report = new ArrayList<>();
+
+        for (Customer c : customers) {
+            String phone = c.getPhone();
+            List<Order> unpaidOrders = (phone != null && !phone.trim().isEmpty())
+                    ? orderRepository.findByCustomerPhoneAndPaymentStatusNotAndStatusNot(phone.trim(), PaymentStatus.PAID, OrderStatus.CANCELLED)
+                    : Collections.emptyList();
+
+            BigDecimal currentDue = BigDecimal.ZERO;
+            BigDecimal overdue31To60 = BigDecimal.ZERO;
+            BigDecimal overdue61To90 = BigDecimal.ZERO;
+            BigDecimal badDebtOver90 = BigDecimal.ZERO;
+            int maxDays = 0;
+
+            for (Order o : unpaidOrders) {
+                long days = (o.getCreatedAt() != null)
+                        ? java.time.temporal.ChronoUnit.DAYS.between(o.getCreatedAt(), now)
+                        : 0;
+                if (days < 0) days = 0;
+                if (days > maxDays) maxDays = (int) days;
+
+                BigDecimal amount = o.getTotalAmount() != null ? o.getTotalAmount() : BigDecimal.ZERO;
+                if (days <= 30) {
+                    currentDue = currentDue.add(amount);
+                } else if (days <= 60) {
+                    overdue31To60 = overdue31To60.add(amount);
+                } else if (days <= 90) {
+                    overdue61To90 = overdue61To90.add(amount);
+                } else {
+                    badDebtOver90 = badDebtOver90.add(amount);
+                }
+            }
+
+            // Nếu khách có dư nợ sổ cái lớn hơn tổng đơn chưa thanh toán, đưa phần lệch vào nợ hiện tại
+            BigDecimal sumUnpaid = currentDue.add(overdue31To60).add(overdue61To90).add(badDebtOver90);
+            BigDecimal currentDebt = c.getCurrentDebt() != null ? c.getCurrentDebt() : BigDecimal.ZERO;
+            if (currentDebt.compareTo(sumUnpaid) > 0) {
+                currentDue = currentDue.add(currentDebt.subtract(sumUnpaid));
+            }
+
+            boolean isLocked = c.isCreditLocked() || maxDays > 60 || c.isExceedingCreditLimit(BigDecimal.ZERO);
+
+            report.add(CustomerDebtAgingDto.builder()
+                    .customerId(c.getId())
+                    .customerName(c.getName())
+                    .customerPhone(c.getPhone())
+                    .priceTier(c.getPriceTier())
+                    .creditLimit(c.getCreditLimit())
+                    .currentDebt(currentDebt)
+                    .currentDue(currentDue)
+                    .overdue31To60(overdue31To60)
+                    .overdue61To90(overdue61To90)
+                    .badDebtOver90(badDebtOver90)
+                    .maxOverdueDays(maxDays)
+                    .isCreditLocked(isLocked)
+                    .build());
+        }
+
+        return report;
     }
 
     /**

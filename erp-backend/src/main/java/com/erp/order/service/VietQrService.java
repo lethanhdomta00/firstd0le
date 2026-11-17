@@ -6,7 +6,10 @@ import com.erp.order.model.Order;
 import com.erp.order.model.OrderStatus;
 import com.erp.order.model.PaymentMethod;
 import com.erp.order.model.PaymentStatus;
+import com.erp.order.model.PaymentTransaction;
 import com.erp.order.repository.OrderRepository;
+import com.erp.order.repository.PaymentTransactionRepository;
+import com.erp.repository.CustomerRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -32,6 +35,8 @@ public class VietQrService {
 
     private final OrderRepository orderRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final PaymentTransactionRepository paymentTransactionRepository;
+    private final CustomerRepository customerRepository;
 
     /**
      * Sinh thông tin mã VietQR động chuẩn NAPAS cho một đơn hàng
@@ -101,6 +106,16 @@ public class VietQrService {
         log.info("Xác nhận thanh toán VietQR thành công cho đơn hàng: [{}] (Tổng: {} đ, Giao dịch: {})",
                 saved.getOrderCode(), saved.getTotalAmount(), transactionId);
 
+        // Tự động gạch nợ cho Khách hàng nếu khách có dư nợ công nợ
+        if (saved.getCustomerPhone() != null && !saved.getCustomerPhone().trim().isEmpty()) {
+            customerRepository.findByPhone(saved.getCustomerPhone().trim())
+                    .ifPresent(customer -> {
+                        customerRepository.decreaseDebt(customer.getId(), saved.getTotalAmount());
+                        log.info("Đã tự động gạch nợ {} đ cho khách hàng [{}] ({}) sau thanh toán đơn {}",
+                                saved.getTotalAmount(), customer.getName(), customer.getPhone(), saved.getOrderCode());
+                    });
+        }
+
         // Broadcast sự kiện thanh toán qua WebSocket STOMP
         broadcastPaymentEvent(saved, transactionId, paymentChannel);
 
@@ -108,10 +123,23 @@ public class VietQrService {
     }
 
     /**
-     * Nhận và xử lý Webhook tự động từ cổng thanh toán ngân hàng
+     * Nhận và xử lý Webhook tự động từ cổng thanh toán ngân hàng (Idempotency Protection)
      */
     @Transactional
     public Map<String, Object> handlePaymentWebhook(PaymentWebhookRequest webhook) {
+        String transId = webhook.getTransactionId() != null ? webhook.getTransactionId().trim() : null;
+
+        // 1. Kiểm tra Idempotency chống callback trùng lặp
+        if (transId != null && paymentTransactionRepository.existsByTransactionId(transId)) {
+            log.info("Webhook giao dịch [{}] đã được xử lý trước đó (Idempotent bypass).", transId);
+            return Map.of(
+                    "success", true,
+                    "orderCode", webhook.getOrderCode() != null ? webhook.getOrderCode() : "",
+                    "status", "ALREADY_PROCESSED",
+                    "message", "Giao dịch đã được ghi nhận trước đó"
+            );
+        }
+
         String code = webhook.getOrderCode();
         if (code == null || code.trim().isEmpty()) {
             // Trích xuất mã đơn từ nội dung chuyển khoản
@@ -133,7 +161,20 @@ public class VietQrService {
         }
 
         Order order = orderOpt.get();
-        processPaymentSuccess(order.getId(), webhook.getTransactionId(), webhook.getGateway());
+
+        // 2. Lưu lịch sử giao dịch thanh toán
+        if (transId != null) {
+            PaymentTransaction pt = new PaymentTransaction();
+            pt.setTransactionId(transId);
+            pt.setOrderCode(order.getOrderCode());
+            pt.setAmount(webhook.getAmount() != null ? webhook.getAmount() : order.getTotalAmount());
+            pt.setPaymentGateway(webhook.getGateway() != null ? webhook.getGateway() : "VIETQR");
+            pt.setNote(webhook.getContent());
+            pt.setStatus("SUCCESS");
+            paymentTransactionRepository.save(pt);
+        }
+
+        processPaymentSuccess(order.getId(), transId, webhook.getGateway());
 
         return Map.of(
                 "success", true,

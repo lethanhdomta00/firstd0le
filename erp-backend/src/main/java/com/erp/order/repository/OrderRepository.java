@@ -66,4 +66,15 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             @Param("status") OrderStatus status,
             @Param("paymentStatus") PaymentStatus paymentStatus
     );
+
+    /**
+     * Tìm danh sách đơn hàng chưa thanh toán và chưa bị hủy để tính toán Báo cáo Tuổi nợ (Aging Debt)
+     */
+    List<Order> findByCustomerPhoneAndPaymentStatusNotAndStatusNot(
+            String customerPhone, PaymentStatus paymentStatus, OrderStatus status
+    );
+
+    List<Order> findByPaymentStatusNotAndStatusNot(
+            PaymentStatus paymentStatus, OrderStatus status
+    );
 }
