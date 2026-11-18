@@ -21,7 +21,8 @@ import java.util.List;
     @Index(name = "idx_orders_status", columnList = "status"),
     @Index(name = "idx_orders_payment_status", columnList = "payment_status"),
     @Index(name = "idx_orders_order_code", columnList = "order_code"),
-    @Index(name = "idx_orders_customer_phone", columnList = "customer_phone")
+    @Index(name = "idx_orders_customer_phone", columnList = "customer_phone"),
+    @Index(name = "idx_orders_tracking_code", columnList = "tracking_code")
 })
 public class Order {
 
@@ -110,6 +111,42 @@ public class Order {
      */
     @Column(name = "credit_approval_status", length = 32)
     private String creditApprovalStatus = "NONE";
+
+    /**
+     * Đơn vị vận chuyển logistics: GHN, GHTK, VIETTEL_POST, EXPRESS, SELF_PICKUP
+     */
+    @Column(name = "shipping_carrier", length = 50)
+    private String shippingCarrier;
+
+    /**
+     * Mã vận đơn theo dõi (Tracking Code)
+     */
+    @Column(name = "tracking_code", length = 60)
+    private String trackingCode;
+
+    /**
+     * Cước phí vận chuyển
+     */
+    @Column(name = "shipping_fee", precision = 18, scale = 2)
+    private BigDecimal shippingFee = BigDecimal.ZERO;
+
+    /**
+     * Tiền thu hộ COD (Cash on Delivery)
+     */
+    @Column(name = "cod_amount", precision = 18, scale = 2)
+    private BigDecimal codAmount = BigDecimal.ZERO;
+
+    /**
+     * Trạng thái giao vận: NONE, READY_TO_SHIP, IN_TRANSIT, DELIVERED, RETURNED
+     */
+    @Column(name = "shipping_status", length = 30)
+    private String shippingStatus = "NONE";
+
+    /**
+     * Thời điểm xuất kho / bàn giao cho đơn vị vận chuyển
+     */
+    @Column(name = "dispatched_at")
+    private LocalDateTime dispatchedAt;
 
     @Column(name = "stock_deducted", nullable = false)
     private boolean stockDeducted = true;

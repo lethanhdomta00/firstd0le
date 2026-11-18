@@ -36,6 +36,12 @@ public class OrderDto {
     private BigDecimal grossProfit;
     private boolean creditExceeded;
     private String creditApprovalStatus;
+    private String shippingCarrier;
+    private String trackingCode;
+    private BigDecimal shippingFee;
+    private BigDecimal codAmount;
+    private String shippingStatus;
+    private LocalDateTime dispatchedAt;
     private boolean stockDeducted;
     private String createdByUsername;
     private LocalDateTime confirmedAt;

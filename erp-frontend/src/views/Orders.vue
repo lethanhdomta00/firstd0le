@@ -70,7 +70,7 @@
       </div>
     </header>
 
-    <!-- 4 THẺ KPI THEO NGỮ CẢNH TAB (ĐƠN HÀNG HOẶC TUỔI NỢ ĐẠI LÝ) -->
+    <!-- 4 THẺ KPI THEO NGỮ CẢNH TAB (ĐƠN HÀNG, TUỔI NỢ ĐẠI LÝ HOẶC DỰ BÁO KHO AI) -->
     <section v-if="activeTab === 'aging'" class="orders-metrics-grid">
       <div class="kpi-stat-card">
         <div class="kpi-stat-content">
@@ -125,6 +125,65 @@
             <circle cx="12" cy="12" r="10" />
             <line x1="12" y1="8" x2="12" y2="12" />
             <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+        </div>
+      </div>
+    </section>
+
+    <!-- KPI CHO TAB DỰ BÁO CẠN KHO AI -->
+    <section v-else-if="activeTab === 'forecast'" class="orders-metrics-grid">
+      <div class="kpi-stat-card">
+        <div class="kpi-stat-content">
+          <span class="kpi-stat-label">Tổng SKU Theo dõi</span>
+          <span class="kpi-stat-value text-indigo">{{ forecastList.length }}</span>
+          <span class="kpi-stat-sub text-muted">Danh mục hàng hóa đang lưu kho</span>
+        </div>
+        <div class="kpi-stat-icon icon-indigo">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+          </svg>
+        </div>
+      </div>
+
+      <div class="kpi-stat-card">
+        <div class="kpi-stat-content">
+          <span class="kpi-stat-label">Cảnh báo Khẩn cấp</span>
+          <span class="kpi-stat-value text-red">{{ criticalStockCount }}</span>
+          <span class="kpi-stat-sub text-muted">Hết hàng hoặc còn dưới 3 ngày</span>
+        </div>
+        <div class="kpi-stat-icon icon-red">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+        </div>
+      </div>
+
+      <div class="kpi-stat-card">
+        <div class="kpi-stat-content">
+          <span class="kpi-stat-label">Cần Chú ý</span>
+          <span class="kpi-stat-value text-amber">{{ warningStockCount }}</span>
+          <span class="kpi-stat-sub text-muted">Tồn kho đủ từ 4 đến 7 ngày</span>
+        </div>
+        <div class="kpi-stat-icon icon-amber">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
+          </svg>
+        </div>
+      </div>
+
+      <div class="kpi-stat-card">
+        <div class="kpi-stat-content">
+          <span class="kpi-stat-label">Dự toán Nhập thêm</span>
+          <span class="kpi-stat-value text-green">{{ formatCompactRevenue(totalForecastRestockCost) }}</span>
+          <span class="kpi-stat-sub text-muted">Chi phí đề xuất đặt hàng NCC</span>
+        </div>
+        <div class="kpi-stat-icon icon-teal">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="1" x2="12" y2="23" />
+            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
           </svg>
         </div>
       </div>
@@ -225,6 +284,16 @@
       >
         <span>Báo cáo Tuổi nợ Đại lý</span>
         <span v-if="agingList.length" class="tab-count-pill">{{ agingList.length }}</span>
+      </button>
+
+      <button
+        type="button"
+        class="module-tab-btn"
+        :class="{ active: activeTab === 'forecast' }"
+        @click="switchTab('forecast')"
+      >
+        <span>Dự báo Cạn kho AI</span>
+        <span v-if="criticalStockCount" class="tab-count-pill pill-danger">{{ criticalStockCount }}</span>
       </button>
     </div>
 
@@ -378,6 +447,15 @@
                       <span class="badge-dot"></span>
                       {{ order.statusLabel }}
                     </span>
+                    <div
+                      v-if="order.trackingCode"
+                      class="carrier-cell-badge"
+                      :title="'Tra cứu lịch trình ' + order.shippingCarrier + ' (' + order.trackingCode + ')'"
+                      @click="openTrackingModal(order)"
+                    >
+                      <span class="carrier-tag-name">{{ order.shippingCarrier }}</span>
+                      <span class="carrier-tag-code">{{ order.trackingCode }}</span>
+                    </div>
                   </td>
 
                   <td>
@@ -407,6 +485,25 @@
                       </button>
 
                       <button
+                        v-if="order.trackingCode"
+                        type="button"
+                        class="btn-row-action tracking-btn"
+                        title="Xem lịch trình vận đơn"
+                        @click="openTrackingModal(order)"
+                      >
+                        Vận đơn
+                      </button>
+                      <button
+                        v-else-if="order.status === 'CONFIRMED' || order.status === 'PENDING'"
+                        type="button"
+                        class="btn-row-action dispatch-btn"
+                        title="Bàn giao ĐVVC (GHN / GHTK / Viettel Post)"
+                        @click="openDispatchModal(order)"
+                      >
+                        ĐVVC
+                      </button>
+
+                      <button
                         type="button"
                         class="btn-row-action primary"
                         title="Xem chi tiết &amp; chuyển trạng thái"
@@ -425,13 +522,24 @@
                       </button>
 
                       <el-dropdown
-                        v-if="order.status === 'PENDING' || (authStore.isAdmin && order.status === 'CANCELLED')"
                         trigger="click"
                         @command="(cmd) => handleOrderRowCommand(cmd, order)"
                       >
                         <button type="button" class="btn-row-more" title="Thao tác khác">⋯</button>
                         <template #dropdown>
                           <el-dropdown-menu>
+                            <el-dropdown-item command="shipping-label">
+                              🖨️ In Vận đơn (A5/K80)
+                            </el-dropdown-item>
+                            <el-dropdown-item
+                              v-if="!order.trackingCode && (order.status === 'CONFIRMED' || order.status === 'PENDING')"
+                              command="dispatch"
+                            >
+                              🚚 Bàn giao ĐVVC
+                            </el-dropdown-item>
+                            <el-dropdown-item v-if="order.trackingCode" command="tracking">
+                              🔍 Tra cứu vận đơn
+                            </el-dropdown-item>
                             <el-dropdown-item v-if="order.status === 'PENDING'" command="edit">
                               Sửa đơn hàng
                             </el-dropdown-item>
@@ -494,11 +602,30 @@
                 >
                   VietQR
                 </button>
+                <button
+                  v-if="order.trackingCode"
+                  type="button"
+                  class="btn-row-action tracking-btn"
+                  @click="openTrackingModal(order)"
+                >
+                  🚚 Vận đơn
+                </button>
+                <button
+                  v-else-if="order.status === 'CONFIRMED' || order.status === 'PENDING'"
+                  type="button"
+                  class="btn-row-action dispatch-btn"
+                  @click="openDispatchModal(order)"
+                >
+                  ĐVVC
+                </button>
                 <button type="button" class="btn-row-action primary" @click="openDetailModal(order)">
-                  Chi tiết / Xử lý
+                  Chi tiết
+                </button>
+                <button type="button" class="btn-row-action" @click="printShippingLabel(order)">
+                  In Vận đơn
                 </button>
                 <button type="button" class="btn-row-action pdf" @click="printOrderInvoice(order)">
-                  Xuất PDF
+                  PDF
                 </button>
                 <button
                   v-if="order.status === 'PENDING'"
@@ -822,6 +949,120 @@
     </template>
 
     <!-- ========================================================== -->
+    <!-- TAB 4: DỰ BÁO CẠN KHO AI (INVENTORY FORECAST)              -->
+    <!-- ========================================================== -->
+    <template v-else-if="activeTab === 'forecast'">
+      <!-- TOOLBAR DỰ BÁO -->
+      <section class="filter-toolbar-card">
+        <div class="filter-controls-row">
+          <div class="search-input-wrap">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#94a3b8" stroke-width="2">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input
+              v-model="forecastKeyword"
+              type="text"
+              class="custom-search-input"
+              placeholder="Tìm theo mã SKU hoặc tên sản phẩm..."
+            />
+          </div>
+
+          <button
+            type="button"
+            class="btn-reset-filter"
+            title="Làm mới phân tích dự báo kho"
+            @click="fetchInventoryForecast"
+          >
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="23 4 23 10 17 10" />
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+            </svg>
+            <span>Phân tích lại AI</span>
+          </button>
+        </div>
+
+        <div class="filter-summary-right">
+          Mặt hàng cần theo dõi: <strong>{{ filteredForecastList.length }}</strong> SKU
+        </div>
+      </section>
+
+      <!-- BẢNG DỮ LIỆU DỰ BÁO CẠN KHO -->
+      <section class="table-container-card">
+        <div v-if="loadingForecast" class="table-loading-skeleton">
+          <el-skeleton :rows="5" animated />
+        </div>
+
+        <div v-else-if="filteredForecastList.length === 0" class="empty-state-box">
+          <h4>Không tìm thấy sản phẩm dự báo</h4>
+          <p>Tất cả sản phẩm hiện tại đều ở ngưỡng tồn kho an toàn.</p>
+        </div>
+
+        <template v-else>
+          <div class="desktop-table-wrap table-responsive-scroll">
+            <table class="erp-table">
+              <thead>
+                <tr>
+                  <th style="min-width: 220px;">Sản phẩm &amp; SKU</th>
+                  <th style="min-width: 120px;" class="text-center">Tồn khả dụng</th>
+                  <th style="min-width: 130px;" class="text-center">Đã bán 30 ngày</th>
+                  <th style="min-width: 130px;" class="text-center">Tốc độ bán TB/ngày</th>
+                  <th style="min-width: 140px;" class="text-center">Dự kiến cạn kho</th>
+                  <th style="min-width: 150px;" class="text-center">Mức độ rủi ro</th>
+                  <th style="min-width: 150px;" class="text-right">Đề xuất nhập thêm</th>
+                  <th style="min-width: 120px;" class="text-center">Hành động</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in filteredForecastList" :key="row.productId">
+                  <td>
+                    <div class="customer-name-bold">{{ row.productName }}</div>
+                    <div class="sub-muted-line">
+                      SKU: <strong>{{ row.productSku }}</strong> • ĐVT: {{ row.baseUnit }}
+                    </div>
+                  </td>
+                  <td class="text-center font-bold" :class="row.availableStock <= row.minStockAlert ? 'text-red' : 'text-slate'">
+                    {{ row.availableStock }} {{ row.baseUnit }}
+                  </td>
+                  <td class="text-center font-medium">
+                    {{ row.totalSoldLast30Days }} {{ row.baseUnit }}
+                  </td>
+                  <td class="text-center font-medium text-indigo">
+                    {{ row.avgDailySales }} {{ row.baseUnit }}/ngày
+                  </td>
+                  <td class="text-center font-bold" :class="row.daysOfStockRemaining <= 3 ? 'text-red' : (row.daysOfStockRemaining <= 7 ? 'text-amber' : 'text-green')">
+                    {{ row.daysOfStockRemaining === 0 ? 'ĐÃ HẾT HÀNG' : 'Còn ~ ' + row.daysOfStockRemaining + ' ngày' }}
+                  </td>
+                  <td class="text-center">
+                    <span
+                      class="status-badge-soft"
+                      :class="row.riskLevel === 'CRITICAL' ? 'danger' : (row.riskLevel === 'WARNING' ? 'warning' : 'success')"
+                    >
+                      {{ row.riskLevelLabel }}
+                    </span>
+                  </td>
+                  <td class="text-right">
+                    <div class="font-bold text-slate">{{ row.suggestedRestockQty }} {{ row.baseUnit }}</div>
+                    <div class="sub-muted-line">~ {{ formatCurrency(row.estimatedRestockCost) }}</div>
+                  </td>
+                  <td class="text-center">
+                    <button
+                      type="button"
+                      class="btn-row-action primary"
+                      @click="quickAdjustStock(row)"
+                    >
+                      Nhập hàng
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </template>
+      </section>
+    </template>
+
+    <!-- ========================================================== -->
     <!-- MODAL 1: TẠO / SỬA ĐƠN HÀNG                                 -->
     <!-- ========================================================== -->
     <div v-if="orderModalVisible" class="custom-modal-overlay" @click.self="closeOrderModal">
@@ -845,11 +1086,76 @@
             >
               Điền mẫu nhanh
             </button>
+            <button
+              v-if="!editingOrderId"
+              type="button"
+              class="btn-ai-trigger"
+              :class="{ active: showAiParseBox }"
+              @click="showAiParseBox = !showAiParseBox"
+            >
+              <span>⚡ Nhập bằng AI</span>
+            </button>
             <button type="button" class="btn-modal-close" @click="closeOrderModal">✕</button>
           </div>
         </div>
 
         <div class="modal-body-scroll">
+          <!-- KHỐI BÓC TÁCH TIN NHẮN ĐẶT HÀNG BẰNG AI COPILOT -->
+          <div v-if="showAiParseBox" class="ai-parse-container">
+            <div class="ai-parse-header">
+              <div class="ai-parse-title">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#2563eb" stroke-width="2">
+                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                </svg>
+                <span>AI Copilot Smart Order Parser (Bóc tách tin nhắn đặt hàng)</span>
+              </div>
+              <span class="ai-badge-pill">AI ENGINE</span>
+            </div>
+            <p class="ai-parse-desc">
+              Dán nội dung tin nhắn của khách sỉ/đại lý từ Zalo, Messenger hoặc SMS. AI sẽ tự động trích xuất thông tin khách, địa chỉ, hình thức nợ và khớp SKU trong kho.
+            </p>
+            <div class="ai-sample-pills-row">
+              <span class="sample-label">Thử mẫu nhanh:</span>
+              <button
+                type="button"
+                class="btn-sample-pill"
+                @click="setAiSampleText('Anh Tuấn 0987654321 giao về 123 Cầu Giấy Hà Nội lấy 2 thùng Áo Polo Nam Classic, ghi nợ cho anh nhé')"
+              >
+                Mẫu 1: Ghi nợ sỉ
+              </button>
+              <button
+                type="button"
+                class="btn-sample-pill"
+                @click="setAiSampleText('Chị Lan 0912345678 ship về 45 Lê Lợi Quận 1 TP.HCM 5 cái Quần Tây Âu, thanh toán chuyển khoản VietQR')"
+              >
+                Mẫu 2: Chuyển khoản VietQR
+              </button>
+            </div>
+            <textarea
+              v-model="aiParseText"
+              class="ai-parse-textarea"
+              rows="3"
+              placeholder="Dán nội dung tin nhắn khách tại đây (VD: 'Anh Tuấn 0987654321 giao về 123 Cầu Giấy Hà Nội lấy 2 thùng Áo Polo, ghi nợ cho anh nhé')..."
+            ></textarea>
+            <div class="ai-parse-actions">
+              <button
+                type="button"
+                class="btn-action-primary"
+                :disabled="parsingAiOrder || !aiParseText.trim()"
+                @click="handleAiParseOrder"
+              >
+                <span v-if="parsingAiOrder">Đang phân tích AI...</span>
+                <span v-else>⚡ Phân tích &amp; Điền tự động vào Đơn hàng</span>
+              </button>
+              <button
+                type="button"
+                class="btn-reset-filter"
+                @click="showAiParseBox = false"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
           <!-- KHÁCH HÀNG & THANH TOÁN -->
           <div class="form-section-box">
             <div class="section-box-title">1. Thông tin Khách hàng &amp; Thanh toán</div>
@@ -1119,6 +1425,9 @@
             >
               Quét mã VietQR
             </button>
+            <button type="button" class="btn-header-outline" @click="printShippingLabel(activeOrder)">
+              In Vận đơn (A5/K80)
+            </button>
             <button type="button" class="btn-header-outline" @click="printOrderInvoice(activeOrder)">
               Xuất Hóa đơn PDF (A4)
             </button>
@@ -1201,6 +1510,44 @@
               <div class="clean-meta-kv" v-if="activeOrder.note">
                 <span>Ghi chú</span>
                 <span>{{ activeOrder.note }}</span>
+              </div>
+            </div>
+
+            <div class="clean-meta-col">
+              <div class="clean-section-kicker">Giao vận &amp; Logistics</div>
+              <div v-if="activeOrder.trackingCode" class="carrier-detail-box">
+                <div class="clean-meta-kv">
+                  <span>Đơn vị</span>
+                  <strong class="text-indigo">{{ formatCarrierName(activeOrder.shippingCarrier) }}</strong>
+                </div>
+                <div class="clean-meta-kv">
+                  <span>Mã vận đơn</span>
+                  <strong class="font-mono">{{ activeOrder.trackingCode }}</strong>
+                </div>
+                <div class="clean-meta-kv" v-if="activeOrder.codAmount">
+                  <span>Thu hộ COD</span>
+                  <strong class="text-red">{{ formatCurrency(activeOrder.codAmount) }}</strong>
+                </div>
+                <div class="carrier-btn-row">
+                  <button type="button" class="btn-carrier-pill" @click="openTrackingModal(activeOrder)">
+                    🚚 Lịch trình
+                  </button>
+                  <button type="button" class="btn-carrier-pill outline" @click="printShippingLabel(activeOrder)">
+                    🖨️ In Vận đơn
+                  </button>
+                </div>
+              </div>
+              <div v-else class="carrier-empty-box">
+                <span class="sub-muted-line">Chưa bàn giao đơn vị vận chuyển</span>
+                <button
+                  v-if="activeOrder.status === 'CONFIRMED' || activeOrder.status === 'PENDING'"
+                  type="button"
+                  class="btn-row-action primary"
+                  style="margin-top: 6px;"
+                  @click="openDispatchModal(activeOrder)"
+                >
+                  🚚 Bàn giao ĐVVC
+                </button>
               </div>
             </div>
           </div>
@@ -1491,6 +1838,195 @@
         </div>
       </div>
     </div>
+
+    <!-- ========================================================== -->
+    <!-- MODAL 5: BÀN GIAO ĐƠN VỊ VẬN CHUYỂN LOGISTICS              -->
+    <!-- ========================================================== -->
+    <div v-if="dispatchModalVisible && dispatchOrderTarget" class="custom-modal-overlay" @click.self="dispatchModalVisible = false">
+      <div class="custom-modal-card dispatch-modal-card">
+        <div class="modal-head">
+          <div class="modal-title-row">
+            <span class="vietqr-napas-badge">LOGISTICS AUTOMATION</span>
+            <h3>Bàn giao Đơn vị Vận chuyển</h3>
+          </div>
+          <button type="button" class="btn-modal-close" @click="dispatchModalVisible = false">✕</button>
+        </div>
+
+        <div class="modal-body-scroll dispatch-body">
+          <div class="dispatch-target-summary">
+            <div class="summary-line">
+              <span>Đơn hàng:</span>
+              <strong class="font-mono text-indigo">{{ dispatchOrderTarget.orderCode }}</strong>
+            </div>
+            <div class="summary-line">
+              <span>Khách nhận:</span>
+              <strong>{{ dispatchOrderTarget.customerName }}</strong> • {{ dispatchOrderTarget.customerPhone || '—' }}
+            </div>
+            <div class="summary-line">
+              <span>Địa chỉ giao:</span>
+              <span>{{ dispatchOrderTarget.shippingAddress || 'Nhận tại kho' }}</span>
+            </div>
+          </div>
+
+          <div class="form-section-box">
+            <div class="section-box-title">1. Chọn Đối tác Vận chuyển &amp; Cước phí</div>
+            <div class="form-grid-2">
+              <div class="field-group">
+                <label class="field-label">Đơn vị vận chuyển <span class="required-star">*</span></label>
+                <el-select v-model="dispatchForm.carrier" style="width: 100%;">
+                  <el-option label="Giao Hàng Nhanh (GHN)" value="GHN" />
+                  <el-option label="Giao Hàng Tiết Kiệm (GHTK)" value="GHTK" />
+                  <el-option label="Viettel Post (VTP)" value="VIETTEL_POST" />
+                  <el-option label="Hỏa tốc Nội thành (Express)" value="EXPRESS" />
+                </el-select>
+              </div>
+
+              <div class="field-group">
+                <label class="field-label">Cước phí giao hàng (VNĐ)</label>
+                <input
+                  v-model.number="dispatchForm.shippingFee"
+                  type="number"
+                  min="0"
+                  step="1000"
+                  class="erp-input"
+                  placeholder="30000"
+                />
+              </div>
+            </div>
+
+            <div class="form-grid-2" style="margin-top: 10px;">
+              <div class="field-group">
+                <label class="field-label">Tiền thu hộ COD (VNĐ)</label>
+                <input
+                  v-model.number="dispatchForm.codAmount"
+                  type="number"
+                  min="0"
+                  step="1000"
+                  class="erp-input"
+                  placeholder="0"
+                />
+                <span class="field-hint" v-if="dispatchOrderTarget.paymentStatus === 'PAID'">
+                  ✅ Đơn đã thanh toán đủ, COD đề xuất: 0 VNĐ.
+                </span>
+                <span class="field-hint text-amber" v-else>
+                  ⚠️ Đơn chưa thanh toán. Gợi ý COD: {{ formatCurrency(dispatchOrderTarget.totalAmount) }}
+                </span>
+              </div>
+
+              <div class="field-group">
+                <label class="field-label">Ghi chú điều phối / Chỉ dẫn bưu tá</label>
+                <input
+                  v-model="dispatchForm.note"
+                  type="text"
+                  class="erp-input"
+                  placeholder="Cho khách xem hàng, giao giờ hành chính..."
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-foot">
+          <span class="foot-hint">Hệ thống sẽ kết nối API ĐVVC, sinh mã vận đơn và chuyển trạng thái đơn sang Đang giao</span>
+          <div class="foot-buttons">
+            <button type="button" class="btn-header-outline" @click="dispatchModalVisible = false">Hủy</button>
+            <button
+              type="button"
+              class="btn-header-primary"
+              :disabled="dispatchingCarrier"
+              @click="submitDispatchCarrier"
+            >
+              {{ dispatchingCarrier ? 'Đang kết nối ĐVVC...' : '🚀 Xác nhận & Bàn giao ĐVVC' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================== -->
+    <!-- MODAL 6: LỊCH TRÌNH VẬN ĐƠN THỜI GIAN THỰC (REALTIME TRACKING) -->
+    <!-- ========================================================== -->
+    <div v-if="trackingModalVisible" class="custom-modal-overlay" @click.self="trackingModalVisible = false">
+      <div class="custom-modal-card tracking-modal-card">
+        <div class="modal-head">
+          <div class="modal-title-row">
+            <span class="vietqr-napas-badge">LIVE TRACKING</span>
+            <h3>Hành trình Vận đơn {{ currentTrackingData?.trackingCode }}</h3>
+          </div>
+          <button type="button" class="btn-modal-close" @click="trackingModalVisible = false">✕</button>
+        </div>
+
+        <div v-loading="loadingTracking" class="modal-body-scroll tracking-body">
+          <template v-if="currentTrackingData">
+            <!-- TỔNG QUAN VẬN ĐƠN -->
+            <div class="tracking-summary-card">
+              <div class="ts-col">
+                <span class="ts-label">Đơn vị vận chuyển:</span>
+                <strong class="ts-val text-indigo">{{ currentTrackingData.carrierName }}</strong>
+              </div>
+              <div class="ts-col">
+                <span class="ts-label">Mã vận đơn:</span>
+                <strong class="ts-val font-mono">{{ currentTrackingData.trackingCode }}</strong>
+              </div>
+              <div class="ts-col">
+                <span class="ts-label">Trạng thái:</span>
+                <span class="status-badge-soft warning">{{ currentTrackingData.shippingStatusLabel }}</span>
+              </div>
+              <div class="ts-col">
+                <span class="ts-label">Tiền thu hộ COD:</span>
+                <strong class="ts-val text-red">{{ formatCurrency(currentTrackingData.codAmount) }}</strong>
+              </div>
+            </div>
+
+            <div class="tracking-recipient-info">
+              <div>Người nhận: <strong>{{ currentTrackingData.customerName }}</strong> • {{ currentTrackingData.customerPhone || '—' }}</div>
+              <div class="sub-muted-line">Địa chỉ: {{ currentTrackingData.shippingAddress }}</div>
+            </div>
+
+            <!-- TIMELINE CÁC SỰ KIỆN HÀNH TRÌNH -->
+            <div class="tracking-timeline-box">
+              <h4 class="timeline-title">Lịch trình cập nhật từ hệ thống ĐVVC:</h4>
+              <div class="timeline-list">
+                <div
+                  v-for="(ev, idx) in currentTrackingData.events"
+                  :key="idx"
+                  class="timeline-event-item"
+                  :class="{ latest: idx === 0 }"
+                >
+                  <div class="event-marker">
+                    <span class="marker-dot"></span>
+                    <span v-if="idx < currentTrackingData.events.length - 1" class="marker-line"></span>
+                  </div>
+                  <div class="event-content">
+                    <div class="event-time">{{ formatDateTime(ev.timestamp) }}</div>
+                    <div class="event-desc">
+                      <strong>{{ ev.description }}</strong>
+                    </div>
+                    <div class="event-loc sub-muted-line">📍 {{ ev.location }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <div class="modal-foot">
+          <div class="foot-buttons">
+            <button
+              v-if="currentTrackingData"
+              type="button"
+              class="btn-header-outline"
+              @click="printShippingLabel(currentTrackingData)"
+            >
+              🖨️ In Phiếu Vận Đơn (A5/K80)
+            </button>
+            <button type="button" class="btn-header-primary" @click="trackingModalVisible = false">
+              Đóng
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -1548,6 +2084,32 @@ function formatPaymentShort(method) {
     case 'CREDIT': return 'Công nợ'
     default: return 'Tiền mặt'
   }
+}
+
+function formatCarrierName(carrier) {
+  switch (carrier) {
+    case 'GHN': return 'Giao Hàng Nhanh (GHN)'
+    case 'GHTK': return 'Giao Hàng Tiết Kiệm (GHTK)'
+    case 'VIETTEL_POST': return 'Viettel Post (VTP)'
+    case 'EXPRESS': return 'Hỏa tốc Express'
+    default: return carrier || 'Đơn vị vận chuyển'
+  }
+}
+
+function generateBarcodeSvg(code) {
+  const clean = String(code || 'ORD').toUpperCase().replace(/[^A-Z0-9]/g, '')
+  let bars = ''
+  let x = 10
+  for (let i = 0; i < clean.length; i++) {
+    const charCode = clean.charCodeAt(i)
+    const w1 = (charCode % 3) + 1.5
+    const w2 = ((charCode * 2) % 3) + 1.2
+    bars += `<rect x="${x}" y="0" width="${w1}" height="42" fill="#0f172a" />`
+    x += w1 + 2
+    bars += `<rect x="${x}" y="0" width="${w2}" height="42" fill="#0f172a" />`
+    x += w2 + 3
+  }
+  return `<svg viewBox="0 0 ${Math.max(260, x + 10)} 46" width="100%" height="46" xmlns="http://www.w3.org/2000/svg">${bars}</svg>`
 }
 
 function formatDateYmd(d) {
@@ -1806,6 +2368,53 @@ const loadingAging = ref(false)
 const agingList = ref([])
 const agingKeyword = ref('')
 
+// AI Order Parser state
+const showAiParseBox = ref(false)
+const aiParseText = ref('')
+const parsingAiOrder = ref(false)
+
+// Logistics Carrier Dispatch state
+const dispatchModalVisible = ref(false)
+const dispatchOrderTarget = ref(null)
+const dispatchingCarrier = ref(false)
+const dispatchForm = reactive({
+  carrier: 'GHN',
+  shippingFee: 30000,
+  codAmount: 0,
+  note: ''
+})
+
+// Logistics Tracking state
+const trackingModalVisible = ref(false)
+const loadingTracking = ref(false)
+const currentTrackingData = ref(null)
+
+// AI Inventory Forecast state
+const forecastList = ref([])
+const forecastKeyword = ref('')
+const loadingForecast = ref(false)
+
+const filteredForecastList = computed(() => {
+  const kw = (forecastKeyword.value || '').trim().toLowerCase()
+  if (!kw) return forecastList.value
+  return forecastList.value.filter(item =>
+    (item.productSku && item.productSku.toLowerCase().includes(kw)) ||
+    (item.productName && item.productName.toLowerCase().includes(kw))
+  )
+})
+
+const criticalStockCount = computed(() => {
+  return forecastList.value.filter(item => item.riskLevel === 'CRITICAL').length
+})
+
+const warningStockCount = computed(() => {
+  return forecastList.value.filter(item => item.riskLevel === 'WARNING').length
+})
+
+const totalForecastRestockCost = computed(() => {
+  return forecastList.value.reduce((sum, item) => sum + Number(item.estimatedRestockCost || 0), 0)
+})
+
 const totalMarketDebt = computed(() => {
   return agingList.value.reduce((sum, r) => sum + Number(r.totalDebt ?? 0), 0)
 })
@@ -1970,9 +2579,32 @@ function switchTab(tab) {
     fetchInventoryLogs()
   } else if (tab === 'aging') {
     fetchAgingReport()
+  } else if (tab === 'forecast') {
+    fetchInventoryForecast()
   } else {
     fetchOrders()
   }
+}
+
+async function fetchInventoryForecast() {
+  loadingForecast.value = true
+  try {
+    const res = await api.get('/orders/inventory-forecast')
+    forecastList.value = res.data || []
+  } catch (err) {
+    ElMessage.error(err.response?.data?.message || 'Không thể tải dự báo cạn kho AI!')
+  } finally {
+    loadingForecast.value = false
+  }
+}
+
+async function quickAdjustStock(row) {
+  await fetchProductsCatalog()
+  adjustForm.productId = row.productId
+  adjustForm.quantityDelta = Math.max(10, row.suggestedRestockQty || 10)
+  adjustForm.inboundCostPrice = null
+  adjustForm.note = `Nhập hàng theo đề xuất AI cạn kho (${row.riskLevelLabel})`
+  adjustModalVisible.value = true
 }
 
 async function fetchAgingReport() {
@@ -2008,6 +2640,63 @@ function filterOrdersByCustomer(row) {
     orderFilter.keyword = row.customerName
   }
   switchTab('orders')
+}
+
+// =========================================================================
+// AI COPILOT SMART ORDER PARSER
+// =========================================================================
+function setAiSampleText(text) {
+  aiParseText.value = text
+}
+
+async function handleAiParseOrder() {
+  if (!aiParseText.value.trim()) {
+    ElMessage.warning('Vui lòng nhập nội dung tin nhắn cần phân tích!')
+    return
+  }
+  parsingAiOrder.value = true
+  try {
+    const res = await api.post('/orders/ai-parse', { text: aiParseText.value.trim() })
+    const data = res.data
+    if (!data) return
+
+    if (data.customerName) orderForm.customerName = data.customerName
+    if (data.customerPhone) orderForm.customerPhone = data.customerPhone
+    if (data.shippingAddress) orderForm.shippingAddress = data.shippingAddress
+    if (data.paymentMethod) orderForm.paymentMethod = data.paymentMethod
+    if (data.paymentMethod === 'CREDIT') {
+      orderForm.paymentStatus = 'UNPAID'
+    }
+
+    if (Array.isArray(data.items) && data.items.length > 0) {
+      await fetchProductsCatalog()
+      const newItems = []
+      for (const item of data.items) {
+        const found = availableProducts.value.find((p) => p.id === item.productId || p.sku === item.productSku)
+        const rate = Number(item.uomConversionRate || 1)
+        const basePr = found ? Number(found.price ?? 0) : Number(item.unitPrice ?? 0)
+        newItems.push({
+          productId: item.productId,
+          productName: item.productName,
+          productSku: item.productSku,
+          basePrice: basePr,
+          unitPrice: Number(item.unitPrice ?? basePr),
+          quantity: Number(item.quantity ?? 1),
+          uomName: item.uomName || 'Cái',
+          uomConversionRate: rate,
+          maxStock: found ? Number(found.stock ?? 0) : Number(item.availableStock ?? 100)
+        })
+      }
+      orderForm.items = newItems
+      ElMessage.success(`AI Copilot đã trích xuất thành công ${data.items.length} mặt hàng & thông tin giao nhận!`)
+    } else {
+      ElMessage.info('AI Copilot đã trích xuất thông tin khách hàng, nhưng chưa tìm thấy sản phẩm khớp trong tin nhắn.')
+    }
+  } catch (err) {
+    ElMessage.error(err.response?.data?.message || 'Không thể phân tích tin nhắn đặt hàng qua AI!')
+  } finally {
+    parsingAiOrder.value = false
+  }
 }
 
 // =========================================================================
@@ -2501,6 +3190,61 @@ function handleExportCommand(cmd) {
 function handleOrderRowCommand(cmd, order) {
   if (cmd === 'edit') openOrderModal(order)
   else if (cmd === 'delete') confirmDeleteOrder(order)
+  else if (cmd === 'dispatch') openDispatchModal(order)
+  else if (cmd === 'shipping-label') printShippingLabel(order)
+  else if (cmd === 'tracking') openTrackingModal(order)
+}
+
+// =========================================================================
+// LOGISTICS CARRIER DISPATCH & LIVE TRACKING
+// =========================================================================
+function openDispatchModal(order) {
+  if (!order) return
+  dispatchOrderTarget.value = order
+  dispatchForm.carrier = order.shippingCarrier || 'GHN'
+  dispatchForm.shippingFee = order.shippingFee || 30000
+  dispatchForm.codAmount = order.paymentStatus === 'PAID' ? 0 : Number(order.totalAmount || 0)
+  dispatchForm.note = order.shippingCarrier ? '' : 'Cho khách xem hàng trước khi nhận'
+  dispatchModalVisible.value = true
+}
+
+async function submitDispatchCarrier() {
+  if (!dispatchOrderTarget.value) return
+  dispatchingCarrier.value = true
+  try {
+    const res = await api.post(`/orders/${dispatchOrderTarget.value.id}/dispatch-carrier`, {
+      carrier: dispatchForm.carrier,
+      shippingFee: Number(dispatchForm.shippingFee || 0),
+      codAmount: Number(dispatchForm.codAmount || 0),
+      note: dispatchForm.note?.trim() || null
+    })
+    ElMessage.success(`Bàn giao ĐVVC ${res.data.shippingCarrier} thành công! Mã vận đơn: ${res.data.trackingCode}`)
+    dispatchModalVisible.value = false
+    if (activeOrder.value && activeOrder.value.id === dispatchOrderTarget.value.id) {
+      activeOrder.value = res.data
+    }
+    await Promise.all([fetchOrders(), fetchOrderStats()])
+  } catch (err) {
+    ElMessage.error(err.response?.data?.message || 'Không thể bàn giao đơn vị vận chuyển!')
+  } finally {
+    dispatchingCarrier.value = false
+  }
+}
+
+async function openTrackingModal(order) {
+  if (!order || !order.id) return
+  trackingModalVisible.value = true
+  loadingTracking.value = true
+  currentTrackingData.value = null
+  try {
+    const res = await api.get(`/orders/${order.id}/tracking`)
+    currentTrackingData.value = res.data
+  } catch (err) {
+    ElMessage.error(err.response?.data?.message || 'Không thể tra cứu lịch trình vận đơn!')
+    trackingModalVisible.value = false
+  } finally {
+    loadingTracking.value = false
+  }
 }
 
 async function handleExportExcel() {
@@ -2774,6 +3518,231 @@ function printOrderInvoice(order) {
           <strong>NGƯỜI LẬP PHIẾU</strong>
           <span>(Ký, đóng dấu doanh nghiệp)</span>
           <div class="sign-space"></div>
+        </div>
+      </div>
+    </div>
+    <script>
+      window.onload = function() { setTimeout(function() { window.print(); }, 250); };
+    <\/script>
+  </body>
+  </html>`
+
+  win.document.open()
+  win.document.write(html)
+  win.document.close()
+}
+
+function printShippingLabel(order) {
+  if (!order) return
+  const win = window.open('', '_blank', 'width=840,height=720')
+  if (!win) {
+    ElMessage.warning('Trình duyệt đang chặn cửa sổ bật lên (Pop-up). Hãy cho phép Pop-up để in tem vận đơn!')
+    return
+  }
+
+  const carrierText = formatCarrierName(order.shippingCarrier || order.carrierName)
+  const trackingCode = order.trackingCode || ('EXP-' + (order.orderCode || '000'))
+  const codText = (order.paymentStatus === 'PAID' || Number(order.codAmount || 0) <= 0)
+    ? '0 VNĐ (ĐÃ THANH TOÁN - KHÔNG THU TIỀN)'
+    : formatCurrency(order.codAmount || order.totalAmount)
+
+  const itemsHtml = (order.items || []).map((it, idx) => `
+    <tr>
+      <td style="text-align: center; width: 30px;">${idx + 1}</td>
+      <td><strong>${escapeHtml(it.productName)}</strong></td>
+      <td style="text-align: center; width: 60px;">${it.quantity} ${escapeHtml(it.baseUnit || it.uomName || 'Cái')}</td>
+    </tr>
+  `).join('')
+
+  const html = `<!DOCTYPE html>
+  <html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Phieu-giao-hang-${escapeHtml(order.orderCode || trackingCode)}</title>
+    <style>
+      @page { size: A5 landscape; margin: 8mm; }
+      * { box-sizing: border-box; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        color: #0f172a;
+        margin: 0;
+        padding: 12px;
+        background: #fff;
+        font-size: 12px;
+      }
+      .label-wrap {
+        border: 2px solid #0f172a;
+        border-radius: 8px;
+        padding: 12px;
+        max-width: 760px;
+        margin: 0 auto;
+      }
+      .label-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 2px solid #0f172a;
+        padding-bottom: 8px;
+        margin-bottom: 8px;
+      }
+      .carrier-badge {
+        font-size: 16px;
+        font-weight: 900;
+        text-transform: uppercase;
+        background: #0f172a;
+        color: #fff;
+        padding: 4px 10px;
+        border-radius: 4px;
+        letter-spacing: 0.5px;
+      }
+      .barcode-box {
+        text-align: center;
+        margin: 4px 0;
+      }
+      .barcode-code {
+        font-family: monospace;
+        font-size: 14px;
+        font-weight: 800;
+        letter-spacing: 2px;
+        margin-top: 2px;
+      }
+      .address-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        border-bottom: 1.5px solid #0f172a;
+        margin-bottom: 8px;
+        padding-bottom: 8px;
+        gap: 12px;
+      }
+      .addr-col { font-size: 12px; line-height: 1.4; }
+      .addr-col h4 {
+        margin: 0 0 4px;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #475569;
+      }
+      .receiver-name { font-size: 15px; font-weight: 800; }
+      .receiver-phone { font-size: 15px; font-weight: 800; color: #1d4ed8; }
+      .cod-banner {
+        border: 2px dashed #dc2626;
+        background: #fef2f2;
+        border-radius: 6px;
+        padding: 8px 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+      .cod-label { font-size: 12px; font-weight: 700; color: #991b1b; }
+      .cod-amount { font-size: 20px; font-weight: 900; color: #dc2626; }
+      .items-summary-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 11.5px;
+        margin-bottom: 8px;
+      }
+      .items-summary-table th {
+        background: #f1f5f9;
+        padding: 5px 6px;
+        border: 1px solid #cbd5e1;
+        text-align: left;
+      }
+      .items-summary-table td {
+        padding: 5px 6px;
+        border: 1px solid #cbd5e1;
+      }
+      .label-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        border-top: 1px solid #cbd5e1;
+        padding-top: 8px;
+        font-size: 11px;
+        color: #475569;
+      }
+      .signature-box {
+        text-align: center;
+        width: 180px;
+        border-top: 1px dashed #94a3b8;
+        padding-top: 4px;
+        margin-top: 24px;
+      }
+      .print-btn-bar { text-align: right; margin-bottom: 10px; }
+      .btn-p {
+        background: #1d4ed8;
+        color: #fff;
+        padding: 8px 16px;
+        border-radius: 6px;
+        border: none;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      @media print {
+        .print-btn-bar { display: none; }
+        body { padding: 0; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="print-btn-bar">
+      <button class="btn-p" onclick="window.print()">🖨️ In Phiếu Vận Đơn (A5 / K80)</button>
+    </div>
+    <div class="label-wrap">
+      <div class="label-header">
+        <div>
+          <span class="carrier-badge">${escapeHtml(carrierText)}</span>
+          <div style="font-size: 11px; color: #475569; margin-top: 3px;">Mã đơn ERP: <strong>${escapeHtml(order.orderCode || '—')}</strong></div>
+        </div>
+        <div class="barcode-box">
+          ${generateBarcodeSvg(trackingCode)}
+          <div class="barcode-code">${escapeHtml(trackingCode)}</div>
+        </div>
+      </div>
+
+      <div class="address-grid">
+        <div class="addr-col">
+          <h4>Từ (Người gửi):</h4>
+          <div><strong>ERP CLOUD ENTERPRISE LOGISTICS</strong></div>
+          <div>Kho tổng: 123 Cầu Giấy, P. Dịch Vọng, Cầu Giấy, Hà Nội</div>
+          <div>Hotline hỗ trợ: <strong>1900 6868</strong></div>
+        </div>
+        <div class="addr-col">
+          <h4>Đến (Người nhận):</h4>
+          <div class="receiver-name">${escapeHtml(order.customerName)}</div>
+          <div class="receiver-phone">SĐT: ${escapeHtml(order.customerPhone || '—')}</div>
+          <div>Địa chỉ: <strong>${escapeHtml(order.shippingAddress || 'Nhận tại bưu cục')}</strong></div>
+        </div>
+      </div>
+
+      <div class="cod-banner">
+        <div>
+          <div class="cod-label">TIỀN THU HỘ (COD):</div>
+          <div style="font-size: 11px; color: #7f1d1d;">Khách hàng kiểm tra hàng trước khi thanh toán</div>
+        </div>
+        <div class="cod-amount">${escapeHtml(codText)}</div>
+      </div>
+
+      <table class="items-summary-table">
+        <thead>
+          <tr>
+            <th style="text-align: center;">#</th>
+            <th>Nội dung hàng hóa (Tên sản phẩm)</th>
+            <th style="text-align: center;">SL</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${itemsHtml || '<tr><td colspan="3" style="text-align:center;">Kiện hàng thương mại ERP Cloud</td></tr>'}
+        </tbody>
+      </table>
+
+      <div class="label-footer">
+        <div>
+          <div>Chỉ dẫn giao hàng: <strong>${escapeHtml(order.note || 'Cho khách xem hàng, không cho thử.')}</strong></div>
+          <div>Ngày tạo vận đơn: ${escapeHtml(formatDateTime(order.dispatchedAt || order.createdAt))}</div>
+        </div>
+        <div class="signature-box">
+          Chữ ký người nhận
         </div>
       </div>
     </div>
@@ -4535,4 +5504,321 @@ onBeforeUnmount(() => {
 .text-orange { color: #ea580c; }
 .text-green { color: #16a34a; }
 .text-red { color: #dc2626; }
+
+/* ========================================================================= */
+/* AI ORDER PARSER CONTAINER                                                 */
+/* ========================================================================= */
+.btn-ai-trigger {
+  padding: 5px 12px;
+  background: linear-gradient(135deg, #eff6ff 0%, #e0e7ff 100%);
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.15s;
+}
+.btn-ai-trigger:hover,
+.btn-ai-trigger.active {
+  background: #2563eb;
+  color: #ffffff;
+  border-color: #1d4ed8;
+}
+
+.ai-parse-container {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+}
+.ai-parse-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.ai-parse-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e3a8a;
+}
+.ai-badge-pill {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #2563eb;
+  color: #ffffff;
+}
+.ai-parse-desc {
+  font-size: 12px;
+  color: #475569;
+  margin: 0 0 8px;
+  line-height: 1.4;
+}
+.ai-sample-pills-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.sample-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #64748b;
+}
+.btn-sample-pill {
+  font-size: 11px;
+  padding: 3px 8px;
+  background: #ffffff;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.btn-sample-pill:hover {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
+.ai-parse-textarea {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  color: #0f172a;
+  outline: none;
+  font-family: inherit;
+  resize: vertical;
+  box-sizing: border-box;
+}
+.ai-parse-textarea:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+.ai-parse-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.btn-action-primary {
+  padding: 6px 14px;
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-action-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ========================================================================= */
+/* LOGISTICS DISPATCH & TRACKING BADGES                                      */
+/* ========================================================================= */
+.carrier-cell-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 2px 6px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 4px;
+  font-size: 10.5px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.carrier-cell-badge:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+.carrier-tag-name {
+  font-weight: 700;
+  color: #1d4ed8;
+}
+.carrier-tag-code {
+  font-family: monospace;
+  color: #334155;
+}
+
+.carrier-detail-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.carrier-btn-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.btn-carrier-pill {
+  padding: 4px 8px;
+  background: #2563eb;
+  color: #ffffff;
+  border: 1px solid #2563eb;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-carrier-pill.outline {
+  background: #ffffff;
+  color: #2563eb;
+  border-color: #bfdbfe;
+}
+.carrier-empty-box {
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* MODALS LOGISTICS */
+.dispatch-modal-card {
+  max-width: 580px;
+  width: 95%;
+}
+.dispatch-target-summary {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+}
+.summary-line {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #334155;
+}
+.summary-line span {
+  color: #64748b;
+  margin-right: 6px;
+}
+
+.tracking-modal-card {
+  max-width: 620px;
+  width: 95%;
+}
+.tracking-summary-card {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+}
+.ts-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ts-label {
+  font-size: 11px;
+  color: #64748b;
+}
+.ts-val {
+  font-size: 13px;
+}
+.tracking-recipient-info {
+  font-size: 12.5px;
+  padding: 0 4px;
+  margin-bottom: 14px;
+  line-height: 1.4;
+}
+
+.tracking-timeline-box {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 12px;
+}
+.timeline-title {
+  margin: 0 0 12px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #1e293b;
+}
+.timeline-list {
+  display: flex;
+  flex-direction: column;
+}
+.timeline-event-item {
+  display: flex;
+  gap: 12px;
+  position: relative;
+  padding-bottom: 16px;
+}
+.timeline-event-item:last-child {
+  padding-bottom: 4px;
+}
+.event-marker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 16px;
+  flex-shrink: 0;
+}
+.marker-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #cbd5e1;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px #94a3b8;
+  margin-top: 3px;
+}
+.timeline-event-item.latest .marker-dot {
+  background: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+}
+.marker-line {
+  flex: 1;
+  width: 2px;
+  background: #e2e8f0;
+  margin-top: 3px;
+}
+.event-content {
+  flex: 1;
+}
+.event-time {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 2px;
+}
+.event-desc {
+  font-size: 12.5px;
+  color: #0f172a;
+}
+.event-loc {
+  font-size: 11.5px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.pill-danger {
+  background: #fee2e2 !important;
+  color: #dc2626 !important;
+  font-weight: 700;
+}
 </style>

@@ -30,6 +30,9 @@ public class OrderController {
     private final OrderService orderService;
     private final OrderExportService orderExportService;
     private final com.erp.order.service.VietQrService vietQrService;
+    private final com.erp.order.service.AiOrderParserService aiOrderParserService;
+    private final com.erp.order.service.ShippingLogisticsService shippingLogisticsService;
+    private final com.erp.order.service.InventoryForecastService inventoryForecastService;
 
     @GetMapping
     @PreAuthorize("hasAnyAuthority('ORDER_VIEW', 'ROLE_ADMIN')")
@@ -203,6 +206,35 @@ public class OrderController {
             @RequestParam(required = false) String keyword
     ) {
         return ResponseEntity.ok(orderService.getDebtAgingReport(keyword));
+    }
+
+    @PostMapping("/ai-parse")
+    @PreAuthorize("hasAnyAuthority('ORDER_CREATE', 'ROLE_ADMIN')")
+    public ResponseEntity<ParsedOrderResultDto> parseOrderMessage(@Valid @RequestBody ParseOrderMessageRequest request) {
+        return ResponseEntity.ok(aiOrderParserService.parseOrderMessage(request));
+    }
+
+    @PostMapping("/{id}/dispatch-carrier")
+    @PreAuthorize("hasAnyAuthority('ORDER_STATUS', 'ORDER_CREATE', 'ROLE_ADMIN')")
+    public ResponseEntity<OrderDto> dispatchCarrier(
+            @PathVariable Long id,
+            @Valid @RequestBody DispatchCarrierRequest request,
+            Authentication authentication
+    ) {
+        String username = authentication != null ? authentication.getName() : "system";
+        return ResponseEntity.ok(shippingLogisticsService.dispatchOrderToCarrier(id, request, username));
+    }
+
+    @GetMapping("/{id}/tracking")
+    @PreAuthorize("hasAnyAuthority('ORDER_VIEW', 'ROLE_ADMIN')")
+    public ResponseEntity<ShippingTrackingDto> getShippingTracking(@PathVariable Long id) {
+        return ResponseEntity.ok(shippingLogisticsService.getShippingTracking(id));
+    }
+
+    @GetMapping("/inventory-forecast")
+    @PreAuthorize("hasAnyAuthority('PRODUCT_VIEW', 'ORDER_VIEW', 'ANALYTICS_VIEW', 'ROLE_ADMIN')")
+    public ResponseEntity<List<InventoryForecastDto>> getInventoryForecast() {
+        return ResponseEntity.ok(inventoryForecastService.getInventoryForecast());
     }
 
     @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
