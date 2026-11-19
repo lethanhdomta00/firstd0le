@@ -72,7 +72,7 @@
       <div 
         v-if="isOpen" 
         class="chat-window"
-        :class="isDarkMode ? 'theme-dark' : 'theme-light'"
+        :class="[isDarkMode ? 'theme-dark' : 'theme-light', { 'is-maximized': isMaximized }]"
       >
         <!-- HEADER -->
         <div class="chat-header">
@@ -90,12 +90,21 @@
               </div>
               <div class="bot-status">
                 <span class="status-dot">●</span>
-                <span class="status-desc">Túc trực cùng bạn 24/7</span>
+                <span class="status-desc">Agentic Copilot Ultra VIP</span>
               </div>
             </div>
           </div>
 
           <div class="header-actions">
+            <!-- Nút phóng to / thu nhỏ không gian điều hành -->
+            <button 
+              class="header-btn" 
+              :title="isMaximized ? 'Thu nhỏ cửa sổ' : 'Phóng to không gian điều hành'" 
+              @click="isMaximized = !isMaximized"
+            >
+              <el-icon><CopyDocument v-if="isMaximized" /><FullScreen v-else /></el-icon>
+            </button>
+
             <!-- Nút chuyển đổi nhanh Nền Đậm (Dark) / Nền Sáng (Light) -->
             <button 
               class="header-btn" 
@@ -175,14 +184,332 @@
                 <el-icon><Cpu /></el-icon>
               </div>
 
-              <!-- Message Bubble -->
+              <!-- Message Bubble Wrap -->
               <div class="msg-bubble-wrap">
+                <!-- KHỐI QUÁ TRÌNH SUY LUẬN (THINKING TRACE BOX) - CHỈ HIỆN KHI CÓ TRACE VÀ THU GỌN MẶC ĐỊNH -->
+                <div 
+                  v-if="msg.thinkingTrace && msg.thinkingTrace.length" 
+                  class="thinking-trace-card" 
+                  :class="{ 'is-expanded': msg.showTrace }"
+                >
+                  <div class="trace-header" @click="msg.showTrace = !msg.showTrace">
+                    <span class="trace-icon">🧠</span>
+                    <span class="trace-title">Quá trình suy luận ({{ msg.thinkingTrace.length }} bước)</span>
+                    <span class="trace-arrow">{{ msg.showTrace ? '▲ Thu gọn' : '▼ Chi tiết' }}</span>
+                  </div>
+                  <div v-if="msg.showTrace" class="trace-steps">
+                    <div v-for="(st, sIdx) in msg.thinkingTrace" :key="sIdx" class="trace-step-item">
+                      <span class="step-bullet">↳</span>
+                      <span class="step-text">{{ st.message }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- BONG BÓNG TIN NHẮN CHÍNH -->
                 <div class="msg-bubble">
-                  <!-- Formatted HTML text support for bold, bullet points, line breaks -->
+                  <!-- Nút Loa Đọc Text-to-Speech -->
+                  <button 
+                    v-if="msg.role === 'ASSISTANT' && msg.content && !msg.isTyping"
+                    type="button" 
+                    class="btn-tts-speaker" 
+                    :class="{ 'is-speaking': speakingIndex === index }" 
+                    :title="speakingIndex === index ? 'Dừng đọc' : 'Đọc câu trả lời bằng tiếng Việt'"
+                    @click="speakText(msg.content, index)"
+                  >
+                    <span>{{ speakingIndex === index ? '⏹️' : '🔊' }}</span>
+                  </button>
+
+                  <!-- Formatted HTML text support -->
                   <div class="msg-text" v-html="formatMessage(msg.content)"></div>
-                  <!-- Hiệu ứng con trỏ nhấp nháy khi đang gõ từng chữ (typing streaming) -->
+                  <!-- Hiệu ứng con trỏ nhấp nháy khi đang gõ từng chữ -->
                   <span v-if="msg.isTyping" class="typewriter-cursor">▌</span>
                 </div>
+
+                <!-- ======================================================== -->
+                <!-- GENERATIVE UI INTERACTIVE WIDGETS                        -->
+                <!-- ======================================================== -->
+
+                <!-- 1. THẺ TẢI FILE BÁO CÁO THÔNG MINH (FILE_DOWNLOAD_CARD) -->
+                <div 
+                  v-if="msg.uiWidget && msg.uiWidget.type === 'FILE_DOWNLOAD_CARD' && !msg.isTyping" 
+                  class="copilot-widget file-download-widget"
+                >
+                  <div class="file-card-top">
+                    <div class="file-badge-icon" :class="msg.uiWidget.data?.format === 'CSV' ? 'is-csv' : 'is-excel'">
+                      {{ msg.uiWidget.data?.format === 'CSV' ? '📄' : '📊' }}
+                    </div>
+                    <div class="file-meta-col">
+                      <div class="file-title-name">{{ msg.uiWidget.data?.fileName }}</div>
+                      <div class="file-sub-tags">
+                        <span class="ftag ftag-fmt">{{ msg.uiWidget.data?.format || 'EXCEL' }}</span>
+                        <span class="ftag ftag-size">{{ msg.uiWidget.data?.fileSize || '35 KB' }}</span>
+                        <span class="ftag ftag-status">Sẵn sàng tải</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div v-if="msg.uiWidget.data?.stats && msg.uiWidget.data.stats.length" class="file-stats-strip">
+                    <div v-for="(st, stIdx) in msg.uiWidget.data.stats" :key="stIdx" class="f-stat-item">
+                      <span class="f-lbl">{{ st.label }}:</span>
+                      <span class="f-val">{{ st.value }}</span>
+                    </div>
+                  </div>
+
+                  <button 
+                    type="button" 
+                    class="btn-download-action" 
+                    @click="downloadReport(msg.uiWidget.data?.fileId, msg.uiWidget.data?.fileName)"
+                  >
+                    📥 Tải xuống File {{ msg.uiWidget.data?.format === 'CSV' ? 'CSV' : 'Excel' }} (.{{ (msg.uiWidget.data?.format || 'xlsx').toLowerCase() }})
+                  </button>
+                </div>
+
+                <!-- 2. THẺ CẢNH BÁO TỒN KHO & NHẬP HÀNG (STOCK_ALERT_CARD) -->
+                <div 
+                  v-if="msg.uiWidget && msg.uiWidget.type === 'STOCK_ALERT_CARD' && !msg.isTyping" 
+                  class="copilot-widget stock-alert-widget"
+                >
+                  <div class="stock-top-row">
+                    <span 
+                      class="stock-risk-pill" 
+                      :class="'is-' + (msg.uiWidget.data?.riskLevel || 'safe').toLowerCase()"
+                    >
+                      {{ msg.uiWidget.data?.riskLevel === 'CRITICAL' ? '🚨 NGUY CẤP CỦA KHO' : '⚠️ CẢNH BÁO TỒN KHO' }}
+                    </span>
+                    <span class="stock-sku-badge">{{ msg.uiWidget.data?.sku }}</span>
+                  </div>
+
+                  <div class="stock-info-row">
+                    <div class="stock-prod-name">{{ msg.uiWidget.data?.name }}</div>
+                    <div class="stock-metrics-grid">
+                      <div class="s-metric">
+                        <span class="sm-lbl">Tồn khả dụng</span>
+                        <span class="sm-val highlight">{{ msg.uiWidget.data?.availableStock }} {{ msg.uiWidget.data?.baseUnit || 'Cái' }}</span>
+                      </div>
+                      <div class="s-metric" v-if="msg.uiWidget.data?.daysLeft !== undefined">
+                        <span class="sm-lbl">Hết hàng sau</span>
+                        <span class="sm-val text-danger">{{ msg.uiWidget.data?.daysLeft }} ngày</span>
+                      </div>
+                      <div class="s-metric" v-if="msg.uiWidget.data?.dailySalesVelocity">
+                        <span class="sm-lbl">Tốc độ bán</span>
+                        <span class="sm-val">{{ msg.uiWidget.data?.dailySalesVelocity }} c/ngày</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button 
+                    type="button" 
+                    class="btn-restock-action" 
+                    @click="handleQuickRestock(msg.uiWidget.data)"
+                  >
+                    ⚡ Lập lệnh nhập thêm {{ msg.uiWidget.data?.suggestedRestockQty || 50 }} cái
+                  </button>
+                </div>
+
+                <!-- 3. THẺ HÀNH ĐỘNG CÓ THẨM QUYỀN (ACTION_CONFIRMATION_CARD) -->
+                <div 
+                  v-if="msg.uiWidget && msg.uiWidget.type === 'ACTION_CONFIRMATION_CARD' && !msg.isTyping" 
+                  class="copilot-widget action-confirm-widget"
+                >
+                  <div class="action-card-header">
+                    <span class="action-shield">🛡️</span>
+                    <span class="action-title-text">{{ msg.uiWidget.data?.title }}</span>
+                  </div>
+
+                  <div class="action-card-body">
+                    <p class="action-reason-text">{{ msg.uiWidget.data?.reason || msg.uiWidget.data?.note }}</p>
+                    <div class="action-details-row">
+                      <span v-if="msg.uiWidget.data?.targetName">Đối tượng: <strong>{{ msg.uiWidget.data?.targetName }}</strong></span>
+                      <span v-if="msg.uiWidget.data?.amountFormatted"> • Số tiền: <strong>{{ msg.uiWidget.data?.amountFormatted }}</strong></span>
+                      <span v-if="msg.uiWidget.data?.overdueDays"> • Trễ hạn: <strong class="text-danger">{{ msg.uiWidget.data?.overdueDays }} ngày</strong></span>
+                    </div>
+                  </div>
+
+                  <div class="action-card-btns">
+                    <div v-if="executedActions[index]?.executed" class="action-done-banner">
+                      {{ executedActions[index]?.message }}
+                    </div>
+                    <template v-else>
+                      <button 
+                        type="button" 
+                        class="btn-confirm-exec" 
+                        @click="confirmAction(msg.uiWidget.data, index)"
+                      >
+                        {{ msg.uiWidget.data?.confirmButtonText || '🔴 Xác nhận Thực Hiện' }}
+                      </button>
+                      <button 
+                        type="button" 
+                        class="btn-cancel-exec" 
+                        @click="cancelAction(index)"
+                      >
+                        {{ msg.uiWidget.data?.cancelButtonText || 'Hủy bỏ' }}
+                      </button>
+                    </template>
+                  </div>
+                </div>
+
+                <!-- 4. THẺ LỊCH TRÌNH VẬN ĐƠN (SHIPMENT_TRACKING_CARD) -->
+                <div 
+                  v-if="msg.uiWidget && msg.uiWidget.type === 'SHIPMENT_TRACKING_CARD' && !msg.isTyping" 
+                  class="copilot-widget tracking-widget"
+                >
+                  <div class="track-header-row">
+                    <span class="carrier-tag">{{ msg.uiWidget.data?.carrierName || msg.uiWidget.data?.carrier }}</span>
+                    <span class="track-code-text">{{ msg.uiWidget.data?.trackingCode }}</span>
+                    <span class="track-status-pill">{{ msg.uiWidget.data?.shippingStatusLabel }}</span>
+                  </div>
+
+                  <div class="track-info-summary">
+                    <div>Người nhận: <strong>{{ msg.uiWidget.data?.customerName }}</strong> (📞 {{ msg.uiWidget.data?.customerPhone }})</div>
+                    <div v-if="msg.uiWidget.data?.codAmountFormatted">Tiền thu hộ COD: <strong>{{ msg.uiWidget.data?.codAmountFormatted }}</strong></div>
+                  </div>
+
+                  <div v-if="msg.uiWidget.data?.events && msg.uiWidget.data.events.length" class="track-timeline-wrap">
+                    <div 
+                      v-for="(ev, evIdx) in msg.uiWidget.data.events" 
+                      :key="evIdx" 
+                      class="track-tl-node" 
+                      :class="{ 'is-done': ev.completed }"
+                    >
+                      <span class="tl-bullet"></span>
+                      <div class="tl-body">
+                        <div class="tl-title-line">{{ ev.title }}</div>
+                        <div class="tl-sub-line">{{ ev.timestamp }} • {{ ev.location }}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 5. BIỂU ĐỒ DOANH SỐ MINI (MINI_SPARKLINE_CHART) -->
+                <div 
+                  v-if="msg.uiWidget && msg.uiWidget.type === 'MINI_SPARKLINE_CHART' && !msg.isTyping" 
+                  class="copilot-widget sparkline-widget"
+                >
+                  <div class="spark-title-row">
+                    <span class="sp-title">{{ msg.uiWidget.data?.title || 'Biến động Doanh số 7 ngày' }}</span>
+                    <span class="sp-total">{{ msg.uiWidget.data?.totalRevenueFormatted }}</span>
+                  </div>
+
+                  <div class="spark-svg-container">
+                    <svg class="spark-svg" viewBox="0 0 280 84">
+                      <rect 
+                        v-for="(val, vIdx) in (msg.uiWidget.data?.values || [])" 
+                        :key="vIdx"
+                        :x="vIdx * 38 + 12" 
+                        :y="68 - Math.max(6, Math.min(56, (val / getSparkMax(msg.uiWidget.data.values)) * 56))" 
+                        width="20" 
+                        :height="Math.max(6, Math.min(56, (val / getSparkMax(msg.uiWidget.data.values)) * 56))" 
+                        rx="4"
+                        class="spark-bar"
+                      />
+                      <text 
+                        v-for="(lbl, lIdx) in (msg.uiWidget.data?.labels || [])" 
+                        :key="'lbl-' + lIdx"
+                        :x="lIdx * 38 + 22" 
+                        y="80" 
+                        text-anchor="middle" 
+                        class="spark-lbl"
+                      >
+                        {{ lbl }}
+                      </text>
+                    </svg>
+                  </div>
+                </div>
+
+                <!-- 6. THẺ ĐƠN HÀNG DỰ THẢO (ORDER_DRAFT_CARD - CONVERSATIONAL POS) -->
+                <div 
+                  v-if="msg.uiWidget && msg.uiWidget.type === 'ORDER_DRAFT_CARD' && !msg.isTyping" 
+                  class="copilot-widget order-draft-widget"
+                >
+                  <div class="draft-card-header">
+                    <div class="draft-header-title">
+                      <span class="draft-icon">🛒</span>
+                      <span class="draft-title-text">Đơn Hàng Dự Thảo (Conversational POS)</span>
+                    </div>
+                    <span 
+                      class="draft-stock-status-badge"
+                      :class="msg.uiWidget.data?.allInStock ? 'is-in-stock' : 'is-out-stock'"
+                    >
+                      {{ msg.uiWidget.data?.allInStock ? '🟢 Đủ tồn kho khả dụng' : '⚠️ Thiếu tồn kho' }}
+                    </span>
+                  </div>
+
+                  <!-- Thông tin khách hàng & Giao vận -->
+                  <div class="draft-customer-strip">
+                    <div class="draft-cust-col">
+                      <div class="cust-name-line">👤 <strong>{{ msg.uiWidget.data?.customerName || 'Khách mua lẻ' }}</strong></div>
+                      <div class="cust-sub-line" v-if="msg.uiWidget.data?.customerPhone">📞 {{ msg.uiWidget.data?.customerPhone }}</div>
+                    </div>
+                    <div class="draft-delivery-col">
+                      <div class="delivery-pay-tag">💳 {{ msg.uiWidget.data?.paymentMethod || 'CASH' }}</div>
+                      <div class="delivery-addr-line" :title="msg.uiWidget.data?.shippingAddress">📍 {{ msg.uiWidget.data?.shippingAddress || 'Giao tận nơi' }}</div>
+                    </div>
+                  </div>
+
+                  <!-- Bảng danh sách mặt hàng -->
+                  <div class="draft-items-list">
+                    <div class="draft-item-header">
+                      <span>Sản phẩm</span>
+                      <span class="col-center">SL</span>
+                      <span class="col-right">Đơn giá</span>
+                      <span class="col-right">Thành tiền</span>
+                    </div>
+                    <div 
+                      v-for="(it, itIdx) in (msg.uiWidget.data?.items || [])" 
+                      :key="itIdx" 
+                      class="draft-item-row"
+                    >
+                      <div class="item-name-col">
+                        <span class="item-name">{{ it.productName }}</span>
+                        <span class="item-sku">({{ it.sku }})</span>
+                        <span v-if="!it.inStock" class="item-stock-warn">⚠️ Thiếu</span>
+                      </div>
+                      <div class="item-qty-col col-center">x{{ it.quantity }}</div>
+                      <div class="item-price-col col-right">{{ formatCurrency(it.unitPrice) }}</div>
+                      <div class="item-total-col col-right">{{ formatCurrency(it.lineTotal) }}</div>
+                    </div>
+                  </div>
+
+                  <!-- Khối tổng kết tài chính -->
+                  <div class="draft-finance-summary">
+                    <div class="finance-row">
+                      <span>Tạm tính hàng hóa:</span>
+                      <strong>{{ formatCurrency(msg.uiWidget.data?.subtotal) }}</strong>
+                    </div>
+                    <div class="finance-row">
+                      <span>Thuế VAT (10%):</span>
+                      <span>+{{ formatCurrency(msg.uiWidget.data?.taxAmount) }}</span>
+                    </div>
+                    <div class="finance-row total-row">
+                      <span>Tổng thanh toán:</span>
+                      <span class="total-price-text">{{ formatCurrency(msg.uiWidget.data?.totalAmount) }}</span>
+                    </div>
+                  </div>
+
+                  <!-- Thao tác xác nhận 1-click -->
+                  <div class="draft-actions-wrap">
+                    <div v-if="executedActions[index]?.executed" class="draft-done-banner">
+                      {{ executedActions[index]?.message }}
+                    </div>
+                    <template v-else>
+                      <button 
+                        type="button" 
+                        class="btn-confirm-order-exec" 
+                        @click="confirmDraftOrder(msg.uiWidget.data, index)"
+                      >
+                        ✅ Xác nhận Tạo Đơn Hàng (Giữ chỗ kho)
+                      </button>
+                      <button 
+                        type="button" 
+                        class="btn-cancel-exec" 
+                        @click="cancelAction(index)"
+                      >
+                        Hủy bỏ
+                      </button>
+                    </template>
+                  </div>
+                </div>
+
                 <div class="msg-time">{{ formatTime(msg.createdAt) }}</div>
               </div>
 
@@ -213,23 +540,50 @@
 
         <!-- FOOTER: INPUT BAR -->
         <div class="chat-footer">
-          <!-- Suggestion pills when history exists -->
-          <div v-if="messages.length > 0" class="mini-chips-scroll">
-            <button 
-              v-for="(chip, idx) in quickPrompts" 
-              :key="'mini-' + idx" 
-              class="mini-chip"
-              :disabled="loading || isStreaming"
-              @click="sendQuickPrompt(chip)"
-            >
-              {{ chip }}
-            </button>
+          <!-- Suggestion pills when history exists (Ưu tiên gợi ý động từ API) -->
+          <div class="mini-chips-scroll">
+            <template v-if="dynamicSuggestions.length">
+              <button 
+                v-for="sug in dynamicSuggestions" 
+                :key="sug.id" 
+                class="mini-chip"
+                :disabled="loading || isStreaming"
+                @click="sendQuickPrompt(sug.prompt)"
+              >
+                <span>{{ sug.icon }} {{ sug.label }}</span>
+              </button>
+            </template>
+            <template v-else>
+              <button 
+                v-for="(chip, idx) in quickPrompts" 
+                :key="'mini-' + idx" 
+                class="mini-chip"
+                :disabled="loading || isStreaming"
+                @click="sendQuickPrompt(chip)"
+              >
+                {{ chip }}
+              </button>
+            </template>
           </div>
 
           <div class="input-form">
+            <!-- Nút Micro Ra lệnh giọng nói -->
+            <button 
+              type="button" 
+              class="btn-voice-mic" 
+              :class="{ 'is-listening': isListening }"
+              :title="isListening ? 'Đang lắng nghe... Bấm để dừng' : 'Bấm micro để nói tiếng Việt'"
+              @click="toggleVoiceInput"
+            >
+              <span v-if="isListening" class="voice-wave-bars">
+                <span></span><span></span><span></span>
+              </span>
+              <el-icon v-else><Microphone /></el-icon>
+            </button>
+
             <el-input 
               v-model="inputMessage" 
-              placeholder="Nhập câu hỏi hoặc ra lệnh cho Trợ lý AI..." 
+              placeholder="Hỏi hoặc ra lệnh (vd: 'Hôm nay ấm no ko?', 'Xuất file excel doanh thu')..." 
               :disabled="loading || isStreaming"
               clearable
               class="chat-input"
@@ -247,7 +601,7 @@
           </div>
 
           <div class="footer-note">
-            <span>Trợ lý ERP AI Copilot • Kết nối thời gian thực Database</span>
+            <span>Agentic Copilot Ultra VIP • Voice & File Exporter • Database Realtime</span>
           </div>
         </div>
       </div>
@@ -271,8 +625,20 @@ import {
   Opportunity, 
   Loading,
   Sunny,
-  Moon
+  Moon,
+  FullScreen,
+  CopyDocument,
+  Microphone
 } from '@element-plus/icons-vue'
+
+// Helpers đặt trước computed / watch để tránh lỗi Temporal Dead Zone
+const getSparkMax = (values) => {
+  if (!values || !values.length) return 1
+  const max = Math.max(...values)
+  return max > 0 ? max : 1
+}
+
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms))
 
 const route = useRoute()
 const authStore = useAuthStore()
@@ -302,12 +668,19 @@ const hideTeaser = () => {
 
 // State điều khiển mở/đóng và theme
 const isOpen = ref(false)
+const isMaximized = ref(false)
 const inputMessage = ref('')
 const messages = ref([])
 const loading = ref(false) // Hiệu ứng suy nghĩ (dots)
 const isStreaming = ref(false) // Hiệu ứng gõ từng chữ (typing streaming)
 const fetchingHistory = ref(false)
 const messagesContainerRef = ref(null)
+
+// Năng lực Voice & Generative UI
+const isListening = ref(false)
+const speakingIndex = ref(null)
+const executedActions = reactive({})
+const dynamicSuggestions = ref([])
 
 // Theme nền: Mặc định là Dark Mode (Màu nền đậm phẳng, không đổ bóng)
 const isDarkMode = ref(localStorage.getItem('erp_chat_theme') !== 'light')
@@ -318,12 +691,12 @@ const toggleTheme = () => {
 }
 
 const quickPrompts = [
-  '💰 Báo cáo doanh thu & đơn hàng',
-  '📦 Kiểm tra tồn kho sản phẩm',
-  '📅 Lịch họp & công việc hôm nay',
-  '🛡️ Ma trận phân quyền 6 roles',
-  '👥 Thống kê tài khoản người dùng',
-  '➕ Tạo sản phẩm mới tự động'
+  '🛒 Lên đơn cho chị Lan: 2 áo Polo đen, chuyển khoản',
+  '📊 Xuất file Excel doanh thu tuần này',
+  '🚨 Quét các mặt hàng có nguy cơ cạn kho AI',
+  '💰 Hôm nay ấm no không mày?',
+  '🛡️ Khách nào nợ dai nhất?',
+  '📦 Kho còn cái áo Polo đen không?'
 ]
 
 const userDisplayName = computed(() => {
@@ -389,8 +762,11 @@ const fetchHistory = async () => {
   if (!authStore.isAuthenticated) return
   fetchingHistory.value = true
   try {
-    const res = await api.get('/chat/history')
-    messages.value = res.data || []
+    const [resHist, _] = await Promise.all([
+      api.get('/chat/history'),
+      fetchDynamicSuggestions()
+    ])
+    messages.value = resHist.data || []
     scrollToBottom()
   } catch (err) {
     console.error('Lỗi khi tải lịch sử chat:', err)
@@ -406,6 +782,7 @@ const toggleWidget = () => {
     fetchHistory()
   }
   if (isOpen.value) {
+    fetchDynamicSuggestions()
     scrollToBottom()
   }
 }
@@ -417,8 +794,209 @@ const sendQuickPrompt = (promptText) => {
   handleSend()
 }
 
-// Helper tạm dừng (delay ms)
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms))
+// Tải gợi ý câu hỏi thông minh
+const fetchDynamicSuggestions = async () => {
+  try {
+    const res = await api.get('/copilot/quick-suggestions')
+    if (res.data && res.data.length) {
+      dynamicSuggestions.value = res.data
+    }
+  } catch (e) {
+    // Không làm gián đoạn UI
+  }
+}
+
+// ==========================================
+// VOICE SPEECH-TO-TEXT & TEXT-TO-SPEECH
+// ==========================================
+let recognitionInstance = null
+
+const initSpeechRecognition = () => {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+  if (!SpeechRecognition) {
+    ElMessage.warning('Trình duyệt chưa hỗ trợ nhận diện giọng nói Web Speech API.')
+    return null
+  }
+  const recog = new SpeechRecognition()
+  recog.lang = 'vi-VN'
+  recog.continuous = false
+  recog.interimResults = true
+
+  recog.onresult = (event) => {
+    let transcript = ''
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      transcript += event.results[i][0].transcript
+    }
+    inputMessage.value = transcript
+  }
+
+  recog.onend = () => {
+    isListening.value = false
+  }
+
+  recog.onerror = (err) => {
+    console.warn('Speech recognition error:', err)
+    isListening.value = false
+  }
+
+  return recog
+}
+
+const toggleVoiceInput = () => {
+  if (isListening.value) {
+    if (recognitionInstance) recognitionInstance.stop()
+    isListening.value = false
+    return
+  }
+
+  if (!recognitionInstance) {
+    recognitionInstance = initSpeechRecognition()
+  }
+  if (recognitionInstance) {
+    try {
+      recognitionInstance.start()
+      isListening.value = true
+      ElMessage.info('Đang lắng nghe giọng nói tiếng Việt... Hãy ra lệnh cho Copilot!')
+    } catch (e) {
+      console.warn('Start voice failed:', e)
+      isListening.value = false
+    }
+  }
+}
+
+const speakText = (text, index) => {
+  if (!('speechSynthesis' in window)) {
+    ElMessage.warning('Trình duyệt không hỗ trợ đọc Text-to-Speech.')
+    return
+  }
+  if (speakingIndex.value === index) {
+    window.speechSynthesis.cancel()
+    speakingIndex.value = null
+    return
+  }
+
+  window.speechSynthesis.cancel()
+  const plainText = (text || '').replace(/[*#`_\[\]()]/g, '').replace(/https?:\/\/\S+/g, '')
+  const utter = new SpeechSynthesisUtterance(plainText)
+  utter.lang = 'vi-VN'
+  utter.rate = 1.05
+
+  utter.onend = () => {
+    speakingIndex.value = null
+  }
+  utter.onerror = () => {
+    speakingIndex.value = null
+  }
+
+  speakingIndex.value = index
+  window.speechSynthesis.speak(utter)
+}
+
+// ==========================================
+// GENERATIVE UI ACTIONS
+// ==========================================
+const downloadReport = async (fileId, fileName) => {
+  if (!fileId) return
+  try {
+    ElMessage.info('Đang chuẩn bị tệp tải xuống...')
+    const res = await api.get(`/copilot/reports/download/${fileId}`, { responseType: 'blob' })
+    const blob = new Blob([res.data])
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = fileName || 'Bao-cao-ERP.xlsx'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+    ElMessage.success('Tải file báo cáo thành công!')
+  } catch (err) {
+    console.error('Download report error:', err)
+    ElMessage.error('Lỗi khi tải file báo cáo hoặc file đã hết hạn!')
+  }
+}
+
+const confirmAction = async (widgetData, index) => {
+  if (!widgetData) return
+  try {
+    const payload = {
+      actionType: widgetData.actionType,
+      targetId: String(widgetData.targetId ?? ''),
+      confirmed: true,
+      payload: widgetData
+    }
+    const res = await api.post('/copilot/execute-action', payload)
+    if (res.data?.success) {
+      executedActions[index] = {
+        executed: true,
+        message: res.data?.message || '✅ Đã thực thi thành công!'
+      }
+      ElMessage.success(res.data?.message || 'Đã thực thi thành công!')
+    } else {
+      ElMessage.error(res.data?.message || 'Thực thi không thành công!')
+    }
+  } catch (err) {
+    console.error('Action error:', err)
+    ElMessage.error('Lỗi khi thực thi: ' + (err.response?.data?.message || err.message))
+  }
+}
+
+const cancelAction = (index) => {
+  executedActions[index] = {
+    executed: true,
+    message: '⚪ Đã hủy thao tác này.'
+  }
+}
+
+const handleQuickRestock = (stockData) => {
+  ElMessage.success(`Đã ghi nhận đề xuất nhập thêm ${stockData?.suggestedRestockQty ?? 50} cái [${stockData?.sku ?? ''}]!`)
+}
+
+const formatCurrency = (val) => {
+  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val ?? 0)
+}
+
+const confirmDraftOrder = async (draftData, index) => {
+  try {
+    const payload = {
+      actionType: 'CONFIRM_DRAFT_ORDER',
+      confirmed: true,
+      payload: {
+        customerName: draftData?.customerName,
+        customerPhone: draftData?.customerPhone,
+        shippingAddress: draftData?.shippingAddress,
+        paymentMethod: draftData?.paymentMethod || 'CASH',
+        items: (draftData?.items || []).map(i => ({
+          productId: i.productId,
+          quantity: i.quantity,
+          unitPrice: i.unitPrice
+        })),
+        note: draftData?.note
+      }
+    }
+    const res = await api.post('/copilot/execute-action', payload)
+    if (res.data?.success) {
+      executedActions[index] = {
+        executed: true,
+        message: res.data?.message || '🎉 Đã tạo đơn hàng thành công!'
+      }
+      ElMessage.success(res.data?.message || 'Đã tạo đơn hàng thành công!')
+      
+      messages.value.push({
+        id: Date.now(),
+        role: 'ASSISTANT',
+        content: res.data?.message || `🎉 Đã tạo thành công đơn hàng **${res.data?.orderCode}**! Mã đơn đã được lưu vào hệ thống và giữ chỗ kho.`,
+        createdAt: new Date().toISOString()
+      })
+      scrollToBottom()
+    } else {
+      ElMessage.error(res.data?.message || 'Không thể tạo đơn hàng!')
+    }
+  } catch (err) {
+    console.error('Lỗi tạo đơn draft:', err)
+    ElMessage.error('Lỗi khi tạo đơn: ' + (err.response?.data?.message || err.message))
+  }
+}
 
 // Gửi tin nhắn với hiệu ứng delay thinking và typing streaming mượt mà
 const handleSend = async () => {
@@ -439,14 +1017,28 @@ const handleSend = async () => {
   scrollToBottom()
 
   try {
-    // Thêm độ trễ suy nghĩ tối thiểu (~750ms) để người dùng cảm nhận AI đang tính toán tra cứu DB
-    const minThinkingDelay = sleep(750)
-    const apiCall = api.post('/chat/send', { message: content })
-    const [_, res] = await Promise.all([minThinkingDelay, apiCall])
+    const minThinkingDelay = sleep(350)
+    let res
+    try {
+      const [_, response] = await Promise.all([
+        minThinkingDelay,
+        api.post('/copilot/chat', { message: content })
+      ])
+      res = response
+    } catch (copilotErr) {
+      console.warn('Endpoint /copilot/chat gặp sự cố, fallback sang /chat/send:', copilotErr)
+      const [_, response] = await Promise.all([
+        minThinkingDelay,
+        api.post('/chat/send', { message: content })
+      ])
+      res = response
+    }
 
-    // 3. Tắt indicator suy nghĩ, bắt đầu hiệu ứng gõ từng chữ (Typewriter Effect)
     loading.value = false
     const fullText = res.data?.content || ''
+    const uiWidget = res.data?.uiWidget || null
+    const thinkingTrace = res.data?.thinkingTrace || []
+    const tier = res.data?.tier || null
 
     // Tạo tin nhắn trợ lý rỗng và gõ dần vào
     const botMsg = reactive({
@@ -454,21 +1046,25 @@ const handleSend = async () => {
       role: 'ASSISTANT',
       content: '',
       createdAt: res.data?.createdAt || new Date().toISOString(),
-      isTyping: true
+      isTyping: true,
+      thinkingTrace: thinkingTrace,
+      showTrace: false, // Mặc định luôn thu gọn, không gây rối màn hình
+      uiWidget: null, // Sẽ gắn sau khi gõ xong
+      tier: tier
     })
     messages.value.push(botMsg)
     isStreaming.value = true
 
-    // Thuật toán gõ chữ mượt mà: gõ theo cụm 2-4 ký tự mỗi 18ms
+    // Thuật toán gõ chữ mượt mà
     const step = Math.max(1, Math.min(4, Math.floor(fullText.length / 40)))
     for (let i = 0; i < fullText.length; i += step) {
       botMsg.content = fullText.slice(0, i + step)
       scrollToBottom()
-      await sleep(18)
+      await sleep(15)
     }
 
-    // Đảm bảo gõ trọn vẹn văn bản cuối cùng
     botMsg.content = fullText
+    botMsg.uiWidget = uiWidget
     botMsg.isTyping = false
     isStreaming.value = false
     scrollToBottom()
@@ -1476,5 +2072,734 @@ defineExpose({
     bottom: 64px;
     height: 500px;
   }
+}
+
+/* ======================================================== */
+/* COPILOT ULTRA VIP STYLES: GENERATIVE UI & VOICE COMMAND  */
+/* ======================================================== */
+
+/* Phóng to toàn màn hình điều hành */
+.chat-window.is-maximized {
+  width: 580px !important;
+  height: 720px !important;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 84px);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Nút Loa Text-to-Speech */
+.btn-tts-speaker {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: transparent;
+  border: none;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 3px;
+  border-radius: 6px;
+  opacity: 0.65;
+  transition: all 0.15s;
+}
+.btn-tts-speaker:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.12);
+  transform: scale(1.1);
+}
+.btn-tts-speaker.is-speaking {
+  opacity: 1;
+  background: rgba(239, 68, 68, 0.2);
+}
+
+/* Thinking Trace Card (Thiết kế dạng Capsule Pill siêu nhỏ gọn, tinh tế, không choán diện tích) */
+.thinking-trace-card {
+  margin-bottom: 5px;
+  background: rgba(15, 23, 42, 0.4);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 9999px;
+  overflow: hidden;
+  font-size: 10.5px;
+  display: inline-block;
+  max-width: fit-content;
+  transition: all 0.2s ease;
+}
+.thinking-trace-card.is-expanded {
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.6);
+}
+.theme-light .thinking-trace-card {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+}
+.theme-light .thinking-trace-card.is-expanded {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+.trace-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-weight: 500;
+  opacity: 0.8;
+  user-select: none;
+  transition: opacity 0.15s;
+}
+.trace-header:hover {
+  opacity: 1;
+}
+.trace-title {
+  font-size: 10.5px;
+  color: #94a3b8;
+}
+.theme-light .trace-title {
+  color: #64748b;
+}
+.trace-arrow {
+  font-size: 9px;
+  opacity: 0.85;
+  color: #38bdf8;
+  margin-left: 2px;
+}
+.trace-steps {
+  padding: 5px 8px 6px 10px;
+  border-top: 1px dashed rgba(148, 163, 184, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: rgba(0, 0, 0, 0.1);
+}
+.theme-light .trace-steps {
+  background: rgba(255, 255, 255, 0.5);
+}
+.trace-step-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  line-height: 1.4;
+  color: #94a3b8;
+  font-size: 11px;
+}
+.theme-light .trace-step-item {
+  color: #475569;
+}
+.step-bullet {
+  color: #38bdf8;
+  font-weight: bold;
+}
+
+/* ================== GENERATIVE UI WIDGETS ================== */
+.copilot-widget {
+  margin-top: 10px;
+  border-radius: 12px;
+  padding: 12px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #f8fafc;
+  font-size: 13px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+}
+.theme-light .copilot-widget {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  color: #0f172a;
+}
+
+/* 1. File Download Widget */
+.file-card-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.file-badge-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  background: #065f46;
+}
+.file-badge-icon.is-csv {
+  background: #0369a1;
+}
+.file-meta-col {
+  flex: 1;
+  min-width: 0;
+}
+.file-title-name {
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.file-sub-tags {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: 10.5px;
+}
+.ftag {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+}
+.ftag-fmt {
+  background: #10b981;
+  color: #ffffff;
+  font-weight: bold;
+}
+.file-badge-icon.is-csv + .file-meta-col .ftag-fmt {
+  background: #0ea5e9;
+}
+.file-stats-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  margin-bottom: 10px;
+  font-size: 11.5px;
+}
+.theme-light .file-stats-strip {
+  background: #f8fafc;
+}
+.btn-download-action {
+  width: 100%;
+  padding: 8px 12px;
+  background: #10b981;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-download-action:hover {
+  background: #059669;
+  transform: translateY(-1px);
+}
+
+/* 2. Stock Alert Widget */
+.stock-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.stock-risk-pill {
+  font-size: 10.5px;
+  font-weight: bold;
+  padding: 2px 7px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+.stock-risk-pill.is-critical {
+  background: #ef4444;
+  color: #ffffff;
+}
+.stock-risk-pill.is-warning {
+  background: #f59e0b;
+  color: #ffffff;
+}
+.stock-risk-pill.is-safe {
+  background: #10b981;
+  color: #ffffff;
+}
+.stock-sku-badge {
+  font-family: monospace;
+  font-size: 11px;
+  color: #94a3b8;
+}
+.stock-prod-name {
+  font-weight: 600;
+  font-size: 13.5px;
+  margin-bottom: 8px;
+}
+.stock-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.s-metric {
+  background: rgba(0, 0, 0, 0.18);
+  padding: 6px 8px;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+}
+.theme-light .s-metric {
+  background: #f8fafc;
+}
+.sm-lbl {
+  font-size: 10px;
+  color: #94a3b8;
+}
+.theme-light .sm-lbl {
+  color: #64748b;
+}
+.sm-val {
+  font-weight: bold;
+  font-size: 13px;
+  margin-top: 2px;
+}
+.sm-val.highlight {
+  color: #38bdf8;
+}
+.text-danger {
+  color: #ef4444 !important;
+}
+.btn-restock-action {
+  width: 100%;
+  padding: 8px 12px;
+  background: #3b82f6;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-restock-action:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+}
+
+/* 3. Action Confirmation Widget */
+.action-confirm-widget {
+  border-left: 4px solid #f59e0b;
+}
+.action-card-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  font-weight: bold;
+  color: #f59e0b;
+}
+.action-reason-text {
+  font-size: 12.5px;
+  line-height: 1.4;
+  margin-bottom: 6px;
+}
+.action-details-row {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-bottom: 10px;
+}
+.theme-light .action-details-row {
+  color: #64748b;
+}
+.action-card-btns {
+  display: flex;
+  gap: 8px;
+}
+.btn-confirm-exec {
+  flex: 1;
+  padding: 8px;
+  background: #ef4444;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+}
+.btn-confirm-exec:hover {
+  background: #dc2626;
+}
+.btn-cancel-exec {
+  padding: 8px 14px;
+  background: transparent;
+  color: #94a3b8;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.action-done-banner {
+  width: 100%;
+  padding: 8px;
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid #10b981;
+  border-radius: 6px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+/* 4. Tracking Widget */
+.track-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  gap: 6px;
+}
+.carrier-tag {
+  background: #f97316;
+  color: #ffffff;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-weight: bold;
+  font-size: 11px;
+}
+.track-code-text {
+  font-family: monospace;
+  font-size: 12px;
+}
+.track-status-pill {
+  font-size: 11px;
+  color: #38bdf8;
+  font-weight: bold;
+}
+.track-info-summary {
+  font-size: 12px;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.18);
+  border-radius: 6px;
+  margin-bottom: 10px;
+}
+.theme-light .track-info-summary {
+  background: #f8fafc;
+}
+.track-timeline-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-left: 2px solid #334155;
+  padding-left: 10px;
+  margin-left: 4px;
+}
+.track-tl-node {
+  position: relative;
+  font-size: 11.5px;
+}
+.tl-bullet {
+  position: absolute;
+  left: -15px;
+  top: 3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #64748b;
+}
+.track-tl-node.is-done .tl-bullet {
+  background: #10b981;
+  box-shadow: 0 0 6px #10b981;
+}
+.tl-title-line {
+  font-weight: 600;
+}
+.tl-sub-line {
+  color: #94a3b8;
+  font-size: 10.5px;
+}
+.theme-light .tl-sub-line {
+  color: #64748b;
+}
+
+/* 5. Sparkline Chart Widget */
+.spark-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.sp-title {
+  font-weight: 600;
+  font-size: 12px;
+}
+.sp-total {
+  font-weight: bold;
+  font-size: 14px;
+  color: #10b981;
+}
+.spark-svg-container {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  padding: 6px 4px;
+}
+.theme-light .spark-svg-container {
+  background: #f8fafc;
+}
+.spark-svg {
+  width: 100%;
+  height: 72px;
+}
+.spark-bar {
+  fill: #38bdf8;
+  transition: all 0.2s;
+}
+.spark-bar:hover {
+  fill: #0284c7;
+}
+.spark-lbl {
+  font-size: 9px;
+  fill: #94a3b8;
+}
+.theme-light .spark-lbl {
+  fill: #64748b;
+}
+
+/* ================== VOICE MICROPHONE ================== */
+.btn-voice-mic {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid #475569;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: all 0.15s;
+  flex-shrink: 0;
+  margin-right: 6px;
+}
+.btn-voice-mic:hover {
+  color: #ffffff;
+  border-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.1);
+}
+.theme-light .btn-voice-mic {
+  border-color: #cbd5e1;
+  color: #475569;
+}
+.btn-voice-mic.is-listening {
+  background: #ef4444;
+  color: #ffffff;
+  border-color: #ef4444;
+  animation: pulse-ring 1.2s infinite;
+}
+.voice-wave-bars {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 14px;
+}
+.voice-wave-bars span {
+  width: 3px;
+  height: 100%;
+  background: #ffffff;
+  border-radius: 2px;
+  animation: wave-bar 0.8s ease-in-out infinite alternate;
+}
+.voice-wave-bars span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.voice-wave-bars span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+@keyframes wave-bar {
+  from { height: 4px; }
+  to { height: 14px; }
+}
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+  70% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+/* 6. Conversational POS - Order Draft Card Widget */
+.order-draft-widget {
+  border-left: 4px solid #10b981;
+  background: rgba(16, 185, 129, 0.05);
+}
+.theme-light .order-draft-widget {
+  background: #f0fdf4;
+}
+.draft-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+.draft-header-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 13px;
+  color: #10b981;
+}
+.draft-stock-status-badge {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.draft-stock-status-badge.is-in-stock {
+  background: rgba(16, 185, 129, 0.18);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+.draft-stock-status-badge.is-out-stock {
+  background: rgba(239, 68, 68, 0.18);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+.draft-customer-strip {
+  display: flex;
+  justify-content: space-between;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 6px 10px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  font-size: 11.5px;
+}
+.theme-light .draft-customer-strip {
+  background: #e2e8f0;
+}
+.cust-name-line {
+  font-size: 12px;
+}
+.cust-sub-line {
+  color: #94a3b8;
+  font-size: 10.5px;
+}
+.theme-light .cust-sub-line {
+  color: #64748b;
+}
+.draft-delivery-col {
+  text-align: right;
+}
+.delivery-pay-tag {
+  font-weight: 600;
+  color: #38bdf8;
+  font-size: 11px;
+}
+.delivery-addr-line {
+  color: #94a3b8;
+  font-size: 10.5px;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.draft-items-list {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  font-size: 11.5px;
+}
+.theme-light .draft-items-list {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+.draft-item-header {
+  display: grid;
+  grid-template-columns: 2fr 0.6fr 1.2fr 1.2fr;
+  font-weight: 600;
+  color: #94a3b8;
+  font-size: 10.5px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 4px;
+  margin-bottom: 4px;
+}
+.theme-light .draft-item-header {
+  color: #64748b;
+  border-bottom: 1px solid #e2e8f0;
+}
+.draft-item-row {
+  display: grid;
+  grid-template-columns: 2fr 0.6fr 1.2fr 1.2fr;
+  align-items: center;
+  padding: 3px 0;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.05);
+}
+.col-center {
+  text-align: center;
+}
+.col-right {
+  text-align: right;
+}
+.item-name-col {
+  display: flex;
+  flex-direction: column;
+}
+.item-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.item-sku {
+  font-size: 9.5px;
+  color: #94a3b8;
+}
+.item-stock-warn {
+  font-size: 9.5px;
+  color: #ef4444;
+  font-weight: bold;
+}
+.draft-finance-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11.5px;
+  padding: 4px 6px;
+  margin-bottom: 8px;
+}
+.finance-row {
+  display: flex;
+  justify-content: space-between;
+}
+.finance-row.total-row {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 5px;
+  margin-top: 3px;
+  font-size: 13px;
+  font-weight: bold;
+}
+.theme-light .finance-row.total-row {
+  border-top: 1px solid #cbd5e1;
+}
+.total-price-text {
+  color: #10b981;
+  font-size: 14px;
+}
+.draft-actions-wrap {
+  display: flex;
+  gap: 8px;
+}
+.btn-confirm-order-exec {
+  flex: 1;
+  padding: 8px 12px;
+  background: #10b981;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-confirm-order-exec:hover {
+  background: #059669;
+  transform: translateY(-1px);
+}
+.draft-done-banner {
+  width: 100%;
+  padding: 8px;
+  background: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+  border: 1px solid #10b981;
+  border-radius: 6px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 12px;
 }
 </style>

@@ -80,4 +80,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     @Query("SELECT o FROM Order o LEFT JOIN FETCH o.items WHERE o.createdAt >= :since AND o.status != :excludeStatus")
     List<Order> findRecentOrders(@Param("since") LocalDateTime since, @Param("excludeStatus") OrderStatus excludeStatus);
+
+    List<Order> findByCreatedAtBetweenOrderByCreatedAtDesc(LocalDateTime fromDate, LocalDateTime toDate);
+
+    List<Order> findAllByOrderByCreatedAtDesc();
 }

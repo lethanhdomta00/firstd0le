@@ -199,23 +199,24 @@ public class ChatService {
         if (isGreeting(normalized, unaccented)) {
             ZonedDateTime nowVn = ZonedDateTime.now(ZoneId.of("Asia/Ho_Chi_Minh"));
             int hour = nowVn.getHour();
-            String timeGreeting = (hour >= 5 && hour < 12) ? "Chào buổi sáng. Chúc bạn một ngày làm việc hiệu quả và thuận lợi."
-                    : (hour >= 12 && hour < 14) ? "Chào buổi trưa. Chúc bạn có thời gian nghỉ trưa thư thái."
-                    : (hour >= 14 && hour < 18) ? "Chào buổi chiều. Chúc ca làm việc của bạn diễn ra suôn sẻ."
-                    : (hour >= 18 && hour < 23) ? "Chào buổi tối. Bạn có cần tra cứu hoặc tổng kết số liệu nào hôm nay không?"
-                    : "Đã khuya muộn, hệ thống vẫn sẵn sàng nhưng bạn nhớ nghỉ ngơi sớm để đảm bảo sức khỏe.";
+            String timeGreeting = (hour >= 5 && hour < 12) ? "Chào buổi sáng năng lượng! Chúc mày một ngày làm việc hiệu quả và thuận lợi nhé. 🌿"
+                    : (hour >= 12 && hour < 14) ? "Chào buổi trưa! Chúc mày có thời gian nghỉ trưa thư thái nhé. 🍱"
+                    : (hour >= 14 && hour < 18) ? "Chào buổi chiều làm việc hiệu quả! Chúc ca làm việc của mày diễn ra suôn sẻ. ⚡"
+                    : (hour >= 18 && hour < 23) ? "Chào buổi tối ấm áp! Hôm nay buôn bán thế nào, mày có cần tra cứu hoặc tổng kết số liệu nào không? 💼"
+                    : "Đã khuya muộn rồi, mày nhớ nghỉ ngơi sớm giữ gìn sức khỏe nhé, hệ thống cứ để tao canh chừng cho! 🌙";
 
-            return "Xin chào **@" + displayName.replace("@", "") + "**.\n\n"
+            return "👋 **Xin chào @" + displayName.replace("@", "") + "!** 🌿\n\n"
                     + timeGreeting + "\n\n"
-                    + "Tôi luôn sẵn sàng hỗ trợ bạn tra cứu tồn kho sản phẩm, kiểm tra đơn hàng, theo dõi công nợ đại lý hoặc hướng dẫn quy trình vận hành trên hệ thống.";
+                    + "Tao luôn sẵn sàng hỗ trợ mày tra cứu tồn kho sản phẩm, kiểm tra đơn hàng, theo dõi công nợ đại lý hoặc ra lệnh xuất báo cáo bất cứ lúc nào! 🚀";
         }
 
         // 8. Lời cảm ơn
         if (isThanks(unaccented)) {
             String[] thanksReplies = {
-                "Rất sẵn lòng hỗ trợ bạn. Khi cần tra cứu thêm số liệu hoặc thông tin hệ thống, bạn cứ gửi yêu cầu bất cứ lúc nào.",
-                "Không có chi, đây là nhiệm vụ của tôi. Chúc bạn có một ngày làm việc suôn sẻ và hiệu quả.",
-                "Rất vui khi thông tin hỗ trợ có ích cho bạn. Tôi luôn túc trực tại đây khi bạn cần."
+                "Dạ không có chi nè @" + displayName.replace("@", "") + "! 🌿 Việc trơn tru thuận lợi là ấm lòng rồi. Cần soi thêm số liệu tồn kho, công nợ hay ra lệnh xuất file gì cứ ới tao nhé! 🚀",
+                "Không có gì đâu nè! 🎯 Tao luôn túc trực 24/7 để sát cánh cùng mày. Việc buôn bán cứ để tao hỗ trợ một tay, cần gì cứ nhắn tao liền nha! 💼",
+                "Dạ anh em mình cùng một thuyền mà! 🌿 Việc được giải quyết êm đẹp là tao vui rồi. Cứ yên tâm chỉ huy, bất cứ phát sinh gì về kho, quỹ hay đơn từ tao đều sẵn sàng hỗ trợ tức thì! 🛡️",
+                "Okee mày nhé! ✨ Rất vui được hỗ trợ mày. Chúc mày hôm nay buôn may bán đắt, đơn về ầm ầm! Có gì cần tính toán hay phân tích cứ bảo tao! 💰📈"
             };
             return thanksReplies[Math.abs(normalized.hashCode()) % thanksReplies.length];
         }
@@ -223,21 +224,21 @@ public class ChatService {
         // 9. Lời khen ngợi / Động viên
         if (isCompliment(unaccented)) {
             String[] complimentReplies = {
-                "Cảm ơn bạn. Tôi luôn nỗ lực cập nhật dữ liệu chính xác và kịp thời để đồng hành cùng công việc của bạn.",
-                "Cảm ơn đánh giá tích cực của bạn. Nếu cần kiểm tra thêm dữ liệu hay xử lý tác vụ nào khác, bạn cứ nhắn tôi.",
-                "Rất vui được hỗ trợ công việc của bạn. Hãy cho tôi biết nếu bạn cần tra cứu thêm thông tin."
+                "Haha được mày khen là tao nở cả mũi rồi đây! 🎯 Toàn bộ dữ liệu ERP và kho bãi cứ để tao canh chừng, phục vụ mày chu đáo 24/7 luôn! 💼✨",
+                "Cảm ơn mày nha! 🌿 Nhờ mày ra đề bài chuẩn chỉ nên tao mới phản ứng nhanh được thế đấy. Sẵn sàng cho nhiệm vụ tiếp theo rồi sếp ơi! 🚀",
+                "Hihi quá đã! 🌿 Tao sinh ra là để đồng hành hỗ trợ mày tối đa mà. Cứ tin tưởng tao, việc điều hành sẽ ngày càng mượt mà nhẹ nhàng hơn nữa! ⚡"
             };
             return complimentReplies[Math.abs(normalized.hashCode()) % complimentReplies.length];
         }
 
         // 10. Đồng ý / Xác nhận / Nhận thông tin
         if (isAgreement(unaccented)) {
-            return "Đã ghi nhận thông tin. Bạn cứ tiếp tục công việc, tôi luôn sẵn sàng hỗ trợ khi bạn cần.";
+            return "Nhất trí nha mày! 🌿 Tao túc trực ở đây, cần xử lý hay kiểm tra gì cứ gọi tao ngay nhé! 🚀";
         }
 
         // 11. Hỏi thăm sức khỏe, công việc, tâm sự
         if (isSmallTalk(unaccented)) {
-            return "Tôi luôn duy trì trạng thái hoạt động tốt nhất để phục vụ công việc của bạn. Nếu bạn cần tra cứu số liệu kho hay kiểm tra đơn hàng nào, hãy cho tôi biết nhé.";
+            return "Tao là AI chạy bằng điện và dữ liệu nên lúc nào cũng tràn đầy 100% pin để phục vụ mày! ⚡ Mày làm việc cả ngày nhớ giữ gìn sức khỏe, uống nước đầy đủ nhé. Việc sổ sách kho bãi cứ san sẻ bớt cho tao lo! 🌿💼";
         }
 
         // 12. Hỏi năng lực / Khả năng của trợ lý ảo

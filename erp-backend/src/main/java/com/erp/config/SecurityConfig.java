@@ -55,6 +55,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/api/orders/payment-webhook").permitAll()
+                .requestMatchers("/api/copilot/reports/download/**").permitAll()
                 .requestMatchers("/ws-chat/**").permitAll()
                 .requestMatchers("/h2-console/**").permitAll()
                 .requestMatchers("/error").permitAll()
