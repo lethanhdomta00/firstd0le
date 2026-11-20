@@ -191,8 +191,8 @@ public class ChatService {
 
         // 6. Thời tiết, nhiệt độ ("Thời tiết hôm nay", "Trời mưa không",...)
         if (isWeatherQuery(unaccented)) {
-            return "Tôi là Trợ lý số chuyên trách quản trị nội bộ ERP (quản lý kho hàng, đơn hàng, công nợ và nhân sự), hiện chưa kết nối với nguồn dữ liệu khí tượng bên ngoài.\n\n"
-                    + "Bạn có thể tra cứu nhanh ứng dụng thời tiết trên thiết bị cá nhân để chủ động công việc và di chuyển nhé.";
+            return "Tao là Trợ lý số chuyên trách quản trị nội bộ ERP (quản lý kho hàng, đơn hàng, công nợ và tài chính), hiện chưa kết nối với nguồn dữ liệu khí tượng bên ngoài.\n\n"
+                    + "Mày có thể tra cứu nhanh app thời tiết trên điện thoại để chủ động công việc và di chuyển nhé! 🌿";
         }
 
         // 7. Chào hỏi thân thiện theo thời gian trong ngày
@@ -243,35 +243,35 @@ public class ChatService {
 
         // 12. Hỏi năng lực / Khả năng của trợ lý ảo
         if (isCapabilityQuery(unaccented)) {
-            return "Tôi hỗ trợ bạn truy xuất dữ liệu thời gian thực trên toàn hệ thống ERP Cloud:\n\n"
-                    + "• **Tra cứu kho hàng:** Kiểm tra tồn kho khả dụng, giá niêm yết của sản phẩm (ví dụ: *'Doc Reader còn hàng không?'*).\n"
+            return "Tao hỗ trợ mày truy xuất dữ liệu thời gian thực trên toàn hệ thống ERP Cloud:\n\n"
+                    + "• **Tra cứu kho hàng:** Kiểm tra tồn kho khả dụng, giá niêm yết của sản phẩm (ví dụ: *'Polo đen còn hàng không mày?'*).\n"
                     + "• **Cảnh báo hàng hóa:** Danh sách các mặt hàng sắp hết hoặc cần nhập thêm.\n"
                     + "• **Công nợ & Đơn hàng:** Tra cứu tình trạng đơn hàng và dư nợ đại lý.\n"
                     + "• **Nhân sự & Phân quyền:** Tra cứu danh sách tài khoản, vai trò và trạng thái hoạt động.\n"
                     + "• **Thời gian & Lịch biểu:** Xem ngày giờ hệ thống và các sự kiện nội bộ.\n"
                     + "• **Tính toán số liệu:** Hỗ trợ tính nhanh tỷ lệ phần trăm, chiết khấu hoặc biểu thức số học.\n\n"
-                    + "Bạn có thể gửi câu hỏi hoặc yêu cầu tra cứu bất cứ lúc nào.";
+                    + "Mày cứ gửi câu hỏi hoặc ra lệnh bất cứ lúc nào nhé! 🚀";
         }
 
         // 13. Hỏi thăm danh tính / Tên tuổi Trợ lý ảo
         if (unaccented.contains("ban la ai") || unaccented.contains("ban ten gi") || unaccented.contains("ai tao ra ban") || unaccented.contains("gioi thieu")) {
-            return "Tôi là **ERP Copilot** - Trợ lý số hỗ trợ vận hành và quản trị dữ liệu nội bộ trong hệ thống ERP Cloud.\n\n"
-                    + "Tôi được kết nối trực tiếp với Cơ sở dữ liệu để giúp bạn tra cứu tồn kho, đơn hàng, công nợ và hướng dẫn quy trình làm việc một cách nhanh chóng, chính xác.";
+            return "Tao là **ERP Copilot** - Trợ lý số hỗ trợ vận hành và quản trị dữ liệu nội bộ trong hệ thống ERP Cloud của mày. 🌿\n\n"
+                    + "Tao được kết nối trực tiếp với Cơ sở dữ liệu để giúp mày tra cứu tồn kho, đơn hàng, công nợ và hướng dẫn quy trình làm việc một cách nhanh chóng, chính xác! 💼";
         }
 
         // 14. Tạm biệt
         if (isFarewell(unaccented)) {
-            return "Tạm biệt bạn. Chúc bạn một ngày làm việc thuận lợi và hiệu quả. Tôi luôn sẵn sàng khi bạn quay lại.";
+            return "Tạm biệt mày nha! Chúc mày có thời gian nghỉ ngơi thoải mái. Tao luôn túc trực 24/7 ở đây khi mày cần! 🌿✨";
         }
 
         // 15. Thả thính / Trêu đùa vui vẻ
         if (unaccented.contains("yeu ban") || unaccented.contains("thich ban") || unaccented.contains("xinh") || unaccented.contains("dep trai") || unaccented.contains("lay toi")) {
-            return "Cảm ơn bạn. Là một trợ lý số, mục tiêu hàng đầu của tôi là hỗ trợ bạn quản lý dữ liệu và xử lý công việc ERP một cách chính xác, nhanh chóng nhất. Hãy cho tôi biết nếu bạn cần tra cứu thông tin gì nhé.";
+            return "Haha cảm ơn mày nha! 🌿 Là trợ lý số kề vai sát cánh cùng mày, mục tiêu hàng đầu của tao là giúp mày quản lý dữ liệu và xử lý công việc ERP một cách chuẩn xác, nhanh chóng nhất. Cần tra cứu gì cứ ới tao nhé! 🚀";
         }
 
         // 16. Than thở / Mệt mỏi
         if (unaccented.contains("met") || unaccented.contains("ap luc") || unaccented.contains("chan") || unaccented.contains("stress") || unaccented.contains("nhieu viec")) {
-            return "Làm việc với số liệu sổ sách cả ngày dễ căng thẳng lắm á bạn ơi! 🥺 Bạn nhớ nghỉ tay uống ngụm nước, vươn vai thư giãn một chút nhé. Còn những việc tra cứu kho bãi hay thống kê cứ để mình lo đỡ cho bạn một tay nha!";
+            return "Làm việc với số liệu sổ sách cả ngày dễ căng thẳng lắm á mày ơi! 🥺 Mày nhớ nghỉ tay uống ngụm nước, vươn vai thư giãn một chút nhé. Còn những việc tra cứu kho bãi hay thống kê cứ để tao lo đỡ cho mày một tay nha! 🌿💼";
         }
 
         // 17. Nhóm câu hỏi HƯỚNG DẪN THAO TÁC / CÁCH LÀM (HOW-TO)

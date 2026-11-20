@@ -124,6 +124,13 @@
           </template>
         </el-menu-item>
 
+        <el-menu-item v-if="authStore.hasPermission('ANALYTICS_VIEW') || authStore.isAdmin || authStore.user?.role === 'ACCOUNTANT'" index="/finance">
+          <el-icon><Money /></el-icon>
+          <template #title>
+            <span class="menu-title-text">Tài chính & Sổ Quỹ</span>
+          </template>
+        </el-menu-item>
+
         <el-menu-item v-if="authStore.isAdmin" index="/settings">
           <el-icon><Setting /></el-icon>
           <template #title>
@@ -225,6 +232,10 @@
         <el-menu-item v-if="authStore.hasPermission('ANALYTICS_VIEW')" index="/analytics">
           <el-icon><DataAnalysis /></el-icon>
           <template #title>Báo cáo & Phân tích</template>
+        </el-menu-item>
+        <el-menu-item v-if="authStore.hasPermission('ANALYTICS_VIEW') || authStore.isAdmin || authStore.user?.role === 'ACCOUNTANT'" index="/finance">
+          <el-icon><Money /></el-icon>
+          <template #title>Tài chính & Sổ Quỹ</template>
         </el-menu-item>
         <el-menu-item v-if="authStore.isAdmin" index="/settings">
           <el-icon><Setting /></el-icon>
@@ -518,7 +529,8 @@ import {
   Cpu,
   ChatDotRound,
   Calendar,
-  Timer
+  Timer,
+  Money
 } from '@element-plus/icons-vue'
 
 const router = useRouter()

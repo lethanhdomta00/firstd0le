@@ -38,6 +38,12 @@ const routes = [
         meta: { permission: 'ANALYTICS_VIEW' }
       },
       {
+        path: 'finance',
+        name: 'Finance',
+        component: () => import('../views/Finance.vue'),
+        meta: { permission: 'ANALYTICS_VIEW' }
+      },
+      {
         path: 'users',
         name: 'Users',
         component: () => import('../views/Users.vue'),

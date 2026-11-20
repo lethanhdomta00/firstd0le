@@ -1,5 +1,9 @@
 package com.erp.config;
 
+import com.erp.finance.model.*;
+import com.erp.finance.repository.BankStatementItemRepository;
+import com.erp.finance.repository.FinanceVoucherRepository;
+import com.erp.finance.repository.TreasuryAccountRepository;
 import com.erp.model.Announcement;
 import com.erp.model.Role;
 import com.erp.model.User;
@@ -27,6 +31,9 @@ public class DataInitializer implements CommandLineRunner {
     private final ScheduledJobRepository scheduledJobRepository;
     private final PasswordEncoder passwordEncoder;
     private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+    private final TreasuryAccountRepository treasuryAccountRepository;
+    private final FinanceVoucherRepository financeVoucherRepository;
+    private final BankStatementItemRepository bankStatementItemRepository;
 
     @Override
     public void run(String... args) {
@@ -129,6 +136,9 @@ public class DataInitializer implements CommandLineRunner {
 
         // 5. Khởi tạo 3 Tác vụ Lập lịch Động (Dynamic Scheduler Jobs) mẫu chuẩn Doanh nghiệp
         initDefaultSchedulerJobs();
+
+        // 6. Khởi tạo Quỹ Tài khoản & Dữ liệu Tài chính Doanh nghiệp (Giai đoạn 2)
+        initDefaultTreasuryAndFinance();
     }
 
     private void initDefaultSchedulerJobs() {
@@ -175,6 +185,149 @@ public class DataInitializer implements CommandLineRunner {
                     .build();
             scheduledJobRepository.save(cleanupJob);
             log.info("Initialized default enterprise job: JOB_CLEANUP_TEMP");
+        }
+    }
+
+    private void initDefaultTreasuryAndFinance() {
+        if (treasuryAccountRepository.count() == 0) {
+            TreasuryAccount cashOffice = TreasuryAccount.builder()
+                    .accountCode("CASH_OFFICE")
+                    .accountName("Quỹ tiền mặt Văn phòng")
+                    .accountType(TreasuryAccountType.CASH)
+                    .currentBalance(new java.math.BigDecimal("45000000.00"))
+                    .active(true)
+                    .note("Tiền mặt chi tiêu tác nghiệp hàng ngày tại văn phòng")
+                    .build();
+
+            TreasuryAccount bankVcb = TreasuryAccount.builder()
+                    .accountCode("BANK_VCB")
+                    .accountName("Vietcombank - Tài khoản Chính")
+                    .accountType(TreasuryAccountType.BANK)
+                    .bankName("Vietcombank")
+                    .accountNumber("0071001234567")
+                    .accountHolder("CTY CP ERP CLOUD ENTERPRISE")
+                    .currentBalance(new java.math.BigDecimal("185000000.00"))
+                    .active(true)
+                    .note("Tài khoản nhận thanh toán doanh thu bán hàng & chi lương")
+                    .build();
+
+            TreasuryAccount bankMb = TreasuryAccount.builder()
+                    .accountCode("BANK_MB")
+                    .accountName("MB Bank - Tài khoản Thu hộ POS")
+                    .accountType(TreasuryAccountType.BANK)
+                    .bankName("MBBank")
+                    .accountNumber("0988777888")
+                    .accountHolder("CTY CP ERP CLOUD ENTERPRISE")
+                    .currentBalance(new java.math.BigDecimal("92500000.00"))
+                    .active(true)
+                    .note("Tài khoản đối soát QR code và máy POS bán lẻ")
+                    .build();
+
+            TreasuryAccount bankTcb = TreasuryAccount.builder()
+                    .accountCode("BANK_TCB")
+                    .accountName("Techcombank - Quỹ Dự phòng Đầu tư")
+                    .accountType(TreasuryAccountType.BANK)
+                    .bankName("Techcombank")
+                    .accountNumber("19036789999011")
+                    .accountHolder("CTY CP ERP CLOUD ENTERPRISE")
+                    .currentBalance(new java.math.BigDecimal("150000000.00"))
+                    .active(true)
+                    .note("Quỹ thặng dư dòng tiền dự phòng khẩn cấp")
+                    .build();
+
+            treasuryAccountRepository.saveAll(java.util.List.of(cashOffice, bankVcb, bankMb, bankTcb));
+            log.info("Initialized default 4 Treasury Accounts (Cash & Banks)");
+
+            // Khởi tạo một số phiếu chi mẫu
+            FinanceVoucher pv1 = FinanceVoucher.builder()
+                    .voucherCode("PV-20261118-001")
+                    .voucherType(VoucherType.PAYMENT)
+                    .costCenter(CostCenter.RENTAL)
+                    .amount(new java.math.BigDecimal("15000000.00"))
+                    .sourceAccount(bankVcb)
+                    .payeePayorName("Tòa nhà Landmark Central")
+                    .note("Thanh toán tiền thuê mặt bằng văn phòng tháng 11/2026")
+                    .status(VoucherStatus.APPROVED)
+                    .createdByUsername("admin")
+                    .approvedByUsername("admin")
+                    .approvedAt(java.time.LocalDateTime.now().minusDays(2))
+                    .build();
+
+            FinanceVoucher pv2 = FinanceVoucher.builder()
+                    .voucherCode("PV-20261119-002")
+                    .voucherType(VoucherType.PAYMENT)
+                    .costCenter(CostCenter.MARKETING)
+                    .amount(new java.math.BigDecimal("8500000.00"))
+                    .sourceAccount(bankVcb)
+                    .payeePayorName("Công ty TNHH Quảng cáo Google/Facebook")
+                    .note("Chi phí chạy quảng cáo chiến dịch Áo Polo Nam")
+                    .status(VoucherStatus.APPROVED)
+                    .createdByUsername("admin")
+                    .approvedByUsername("admin")
+                    .approvedAt(java.time.LocalDateTime.now().minusDays(1))
+                    .build();
+
+            FinanceVoucher pv3 = FinanceVoucher.builder()
+                    .voucherCode("PV-20261120-003")
+                    .voucherType(VoucherType.PAYMENT)
+                    .costCenter(CostCenter.UTILITIES)
+                    .amount(new java.math.BigDecimal("2800000.00"))
+                    .sourceAccount(cashOffice)
+                    .payeePayorName("Điện lực TP.HCM")
+                    .note("Tiền điện chiếu sáng và máy lạnh kho tháng 10")
+                    .status(VoucherStatus.APPROVED)
+                    .createdByUsername("admin")
+                    .approvedByUsername("admin")
+                    .approvedAt(java.time.LocalDateTime.now())
+                    .build();
+
+            financeVoucherRepository.saveAll(java.util.List.of(pv1, pv2, pv3));
+            log.info("Initialized default 3 Finance Expense Vouchers");
+        }
+
+        if (bankStatementItemRepository.count() == 0) {
+            BankStatementItem s1 = BankStatementItem.builder()
+                    .transactionCode("FT26324891001")
+                    .transactionDate(java.time.LocalDateTime.now().minusHours(3))
+                    .amount(new java.math.BigDecimal("598000.00"))
+                    .transactionType("CR")
+                    .description("NGUYEN THI LAN CHUYEN KHOAN DON HANG ORD-20261114-1001")
+                    .bankName("Vietcombank")
+                    .accountNumber("0071001234567")
+                    .matchedOrderCode("ORD-20261114-1001")
+                    .matchedCustomerName("Nguyễn Thị Lan")
+                    .status(ReconciliationStatus.MATCHED)
+                    .reconciliationNote("Khớp 100% mã đơn hàng ORD-20261114-1001")
+                    .build();
+
+            BankStatementItem s2 = BankStatementItem.builder()
+                    .transactionCode("FT26324891002")
+                    .transactionDate(java.time.LocalDateTime.now().minusHours(2))
+                    .amount(new java.math.BigDecimal("897000.00"))
+                    .transactionType("CR")
+                    .description("CONG TY TNHH MINH TUAN THANH TOAN TIEN HANG DON ORD-20261114-1002")
+                    .bankName("Vietcombank")
+                    .accountNumber("0071001234567")
+                    .matchedOrderCode("ORD-20261114-1002")
+                    .matchedCustomerName("Minh Tuấn")
+                    .status(ReconciliationStatus.MATCHED)
+                    .reconciliationNote("Khớp 100% mã đơn hàng ORD-20261114-1002")
+                    .build();
+
+            BankStatementItem s3 = BankStatementItem.builder()
+                    .transactionCode("FT26324891003")
+                    .transactionDate(java.time.LocalDateTime.now().minusHours(1))
+                    .amount(new java.math.BigDecimal("1200000.00"))
+                    .transactionType("CR")
+                    .description("KHACH LE CHUYEN KHOAN TIEN HANG KHONG GHI MA DON")
+                    .bankName("Vietcombank")
+                    .accountNumber("0071001234567")
+                    .status(ReconciliationStatus.UNMATCHED)
+                    .reconciliationNote("Chưa phát hiện mã đơn hàng trong nội dung giao dịch")
+                    .build();
+
+            bankStatementItemRepository.saveAll(java.util.List.of(s1, s2, s3));
+            log.info("Initialized default 3 Bank Statement items for smart reconciliation");
         }
     }
 }
