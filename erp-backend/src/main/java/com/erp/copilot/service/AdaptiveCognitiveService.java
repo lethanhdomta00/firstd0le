@@ -110,6 +110,14 @@ public class AdaptiveCognitiveService {
                 .build());
 
         // =========================================================================
+        // 0.8 ƯU TIÊN CAO: NHẬN DIỆN CÂU HỎI GIẢI THÍCH TÍNH NĂNG / HƯỚNG DẪN NGHIỆP VỤ (TẦNG 3 - ERP Q&A)
+        // Tránh để các từ khóa nhạy cảm ("công nợ", "tài chính") kích hoạt nhầm Action Tools
+        // =========================================================================
+        if (isExplanationOrHelpQuery(unaccented)) {
+            return handleErpHelpTier(prompt, unaccented, currentUsername, traces, startTime);
+        }
+
+        // =========================================================================
         // 1. NHẬN DIỆN Ý ĐỊNH LÊN ĐƠN HÀNG NHANH / CONVERSATIONAL POS (TẦNG 1)
         // =========================================================================
         if (containsAny(unaccented, "len don", "tao don", "dat hang", "ban cho", "tao order", "xuat ban", "dat cho")) {
@@ -557,13 +565,43 @@ public class AdaptiveCognitiveService {
     private CopilotResponseDto handleErpHelpTier(String prompt, String unaccented, String username, List<ThinkingStepDto> traces, long startTime) {
         traces.add(ThinkingStepDto.builder()
                 .step("ERP_QA")
-                .message("📚 Tra cứu Cẩm nang Vận hành Chuẩn mực ERP Cloud...")
+                .message("📚 Tra cứu Cẩm nang Vận hành & Kiến trúc Phân hệ ERP Cloud...")
                 .elapsedMs(System.currentTimeMillis() - startTime)
                 .build());
 
         StringBuilder sb = new StringBuilder();
 
-        if (containsAny(unaccented, "hoa don", "pdf", "in don")) {
+        // 1. GIẢI THÍCH TÍNH NĂNG TÀI CHÍNH & CÔNG NỢ (TREASURY, VOUCHERS, RECONCILIATION, P&L, AGING DEBT)
+        if (containsAny(unaccented, "tai chinh", "cong no", "so quy", "quy tien", "ngan hang", "sao ke", "doi soat", "p&l", "pnl", "lai lo", "dong tien", "tuoi no", "han muc")) {
+            sb.append("💼 **TỔNG QUAN & HƯỚNG DẪN TÍNH NĂNG TÀI CHÍNH & CÔNG NỢ (TREASURY & DEBT BI)** 🌿\n\n");
+            sb.append("Phân hệ **Tài chính & Quản trị Công nợ** của ERP Cloud được thiết kế theo chuẩn Enterprise với 5 trụ cột cốt lõi:\n\n");
+            
+            sb.append("1. 💰 **Quản lý Quỹ Đa Tài Khoản (Multi-Account Treasury)**:\n");
+            sb.append("   - Quản trị song song **Quỹ tiền mặt tại chỗ** (Cash on Hand) và các **Tài khoản Ngân hàng** (Vietcombank, MBBank, Techcombank...).\n");
+            sb.append("   - **Luân chuyển quỹ nội bộ (Internal Transfer)**: Điều chuyển tiền giữa các quỹ với cơ chế khóa dữ liệu `Isolation.REPEATABLE_READ` và `@Version` Optimistic Locking chống xung đột số dư.\n\n");
+
+            sb.append("2. 📝 **Hạch toán Thu - Chi Minh Bạch (Finance Vouchers)**:\n");
+            sb.append("   - Lập và phê duyệt **Phiếu Thu (Receipt)** & **Phiếu Chi (Payment)** theo 12 Trung tâm chi phí (**Cost Centers**: Mặt bằng, Lương, Marketing, Điện nước, Logistics, Mua hàng...).\n");
+            sb.append("   - Mọi khoản chi xuất quỹ đều được ghi nhận nhật ký hạch toán minh bạch chuẩn kiểm toán.\n\n");
+
+            sb.append("3. ⚡ **Tự Động Đối Soát Sao Kê Ngân Hàng (Smart Bank Reconciliation)**:\n");
+            sb.append("   - Nạp file sao kê ngân hàng (CSV / Text), thuật toán **AI Fuzzy Matching** tự động bóc tách mã đơn `ORD-...`, khớp khách hàng và số tiền.\n");
+            sb.append("   - **Đối soát 1-click**: Tự động chuyển đơn hàng sang trạng thái `PAID` (Đã thanh toán), tự động sinh Phiếu Thu và cộng tiền vào tài khoản ngân hàng.\n\n");
+
+            sb.append("4. 📊 **Báo Cáo Lãi Lỗ P&L BI & Dòng Tiền (Income Statement & Cash Runway)**:\n");
+            sb.append("   - Báo cáo kết quả kinh doanh đa kỳ: **Doanh thu thuần ➔ Giá vốn COGS ➔ Lợi nhuận gộp ➔ Phân rã 12 khoản mục chi phí OPEX ➔ Lợi nhuận ròng EBIT**.\n");
+            sb.append("   - **CFO Cash Runway Alert**: Phân tích tốc độ tiêu thụ tiền (Burn Rate) để tính toán chính xác số ngày an toàn dòng tiền (Runway Days) phòng ngừa rủi ro thanh khoản.\n\n");
+
+            sb.append("5. 🛡️ **Quản Trị Công Nợ Đại Lý & Thu Hồi Vốn (Aging Debt Report)**:\n");
+            sb.append("   - Quản lý hạn mức tín dụng (**Credit Limit**) từng đối tác; cảnh báo vượt hạn mức tự động.\n");
+            sb.append("   - Bảng phân tích **Tuổi nợ 4 cấp độ** (0-30 ngày, 31-60 ngày, 61-90 ngày, quá 90 ngày - nợ xấu).\n");
+            sb.append("   - Cơ chế tự động khóa quyền xuất hàng đối với khách hàng nợ quá hạn để bảo toàn dòng vốn.\n\n");
+
+            sb.append("🔒 **LƯU Ý VỀ PHÂN QUYỀN (RBAC)**:\n");
+            sb.append("- Thao tác **Phê duyệt xuất quỹ** và **Khóa công nợ** chỉ dành riêng cho tài khoản có vai trò **ADMIN (Quản trị viên)**, **MANAGER (Quản lý)** hoặc **ACCOUNTANT (Kế toán)**.\n");
+            sb.append("- Các tài khoản nhân viên khác (Sales, Kho, User thông thường) **chỉ có quyền XEM (Read-only)** để bảo vệ an toàn dòng tiền doanh nghiệp!");
+
+        } else if (containsAny(unaccented, "hoa don", "pdf", "in don")) {
             sb.append("📄 **QUY TRÌNH XUẤT HÓA ĐƠN ĐỎ PDF A4 CHUẨN KẾ TOÁN**:\n\n");
             sb.append("1. **Bước 1**: Vào menu **Bán hàng & Đơn hàng** (icon giỏ hàng).\n");
             sb.append("2. **Bước 2**: Nhấp vào mã đơn hàng cần in (vd: `ORD-20261118-001`) để mở Drawer chi tiết.\n");
@@ -577,15 +615,16 @@ public class AdaptiveCognitiveService {
             sb.append("4. Nếu muốn đổi đơn vị tính (Thùng / Lốc / Hộp), nhấp vào ô chọn Đơn vị tính ngay trên dòng sản phẩm.\n");
         } else {
             sb.append("📖 **HỆ THỐNG TRỢ GIÚP VẬN HÀNH ERP CLOUD**:\n\n");
-            sb.append("- Để **Xem báo cáo doanh số**: Bạn chỉ cần gõ *\"Doanh thu hôm nay\"* hoặc *\"Xuất file Excel doanh thu tuần này\"*.\n");
+            sb.append("- Để **Xem báo cáo doanh số**: Mày chỉ cần gõ *\"Doanh thu hôm nay\"* hoặc *\"Xuất file Excel doanh thu tuần này\"*.\n");
             sb.append("- Để **Kiểm tra kho**: Gõ *\"Kiểm tra tồn kho Áo Polo\"* hoặc *\"Quét các mặt hàng sắp hết\"*.\n");
-            sb.append("- Để **Quản lý công nợ**: Gõ *\"Khách hàng nào đang nợ nhiều nhất\"*.\n");
+            sb.append("- Để **Quản lý công nợ**: Gõ *\"Khách hàng nào đang nợ nhiều nhất\"* hoặc *\"Giải thích tính năng tài chính & công nợ\"*.\n");
+            sb.append("- Để **Soạn phiếu chi**: Gõ *\"Soạn phiếu chi tiền mặt bằng 5 triệu\"*.\n");
             sb.append("- Để **Tra cứu giao vận**: Gõ *\"Kiểm tra vận đơn ORD-...\"*.\n");
         }
 
         traces.add(ThinkingStepDto.builder()
                 .step("SYNTHESIZE")
-                .message("✨ Đã hiển thị chỉ dẫn thao tác chi tiết từng bước trực quan.")
+                .message("✨ Đã hoàn tất tra cứu tài liệu & xuất bản cẩm nang hướng dẫn nghiệp vụ.")
                 .elapsedMs(System.currentTimeMillis() - startTime)
                 .build());
 
@@ -594,6 +633,17 @@ public class AdaptiveCognitiveService {
                 .tier("TIER_3_ERP_QA")
                 .thinkingTrace(traces)
                 .build();
+    }
+
+    private boolean isExplanationOrHelpQuery(String unaccented) {
+        boolean hasExplainKeyword = containsAny(unaccented,
+                "giai thich", "tinh nang", "chuc nang", "co tac dung gi", "dung de lam gi",
+                "lam duoc gi", "la gi", "nhu the nao", "hoat dong nhu the nao", "tong quan",
+                "huong dan", "quy trinh", "cach su dung", "cach dung", "cach hoat dong",
+                "gioi thieu ve", "gioi thieu tinh nang", "co nhung gi", "co chuc nang gi"
+        );
+        boolean hasDirectAction = containsAny(unaccented, "len don", "tao don", "xuat file", "tai file", "soan phieu chi", "khoa no");
+        return hasExplainKeyword && !hasDirectAction;
     }
 
     // =========================================================================

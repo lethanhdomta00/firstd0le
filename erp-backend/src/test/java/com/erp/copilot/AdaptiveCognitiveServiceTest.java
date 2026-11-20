@@ -242,4 +242,19 @@ class AdaptiveCognitiveServiceTest {
         assertTrue(data.containsKey("totalAmount"));
         assertTrue(data.containsKey("items"));
     }
+
+    @Test
+    @DisplayName("Test câu hỏi giải thích tính năng: 'giải thích tính năng tài chính & công nợ' -> Trả về TIER_3_ERP_QA, KHÔNG nhầm sang tra cứu data nợ")
+    void testExplainFinanceAndDebtQuery() {
+        CopilotResponseDto response = cognitiveService.processPrompt("giải thích tính năng tài chính & công nợ", "admin");
+        assertNotNull(response);
+        assertEquals("TIER_3_ERP_QA", response.getTier());
+        assertTrue(response.getContent().contains("TÀI CHÍNH & CÔNG NỢ"));
+        assertTrue(response.getContent().contains("Quản lý Quỹ Đa Tài Khoản"));
+        assertTrue(response.getContent().contains("Smart Bank Reconciliation"));
+        assertTrue(response.getContent().contains("Báo Cáo Lãi Lỗ P&L BI"));
+        assertTrue(response.getContent().contains("Quản Trị Công Nợ Đại Lý"));
+        assertTrue(response.getContent().contains("PHÂN QUYỀN (RBAC)"));
+        assertFalse(response.getContent().contains("Không tìm thấy công nợ"), "Không được nhầm sang Action Tool tra cứu data nợ");
+    }
 }

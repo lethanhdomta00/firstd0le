@@ -94,6 +94,8 @@ public class FinanceAgentTool implements AgentTool {
         widgetData.put("createdBy", currentUsername);
         widgetData.put("confirmButtonText", "🔴 Phê Duyệt Xuất Quỹ Ngay");
         widgetData.put("cancelButtonText", "Hủy phiếu");
+        widgetData.put("requiredRoles", List.of("ADMIN", "MANAGER", "ACCOUNTANT"));
+        widgetData.put("permissionNote", "Chỉ Quản trị viên (ADMIN), Quản lý (MANAGER) hoặc Kế toán (ACCOUNTANT) mới có quyền phê duyệt xuất quỹ");
 
         UiWidgetDto widget = UiWidgetDto.builder()
                 .type("ACTION_CONFIRMATION_CARD")

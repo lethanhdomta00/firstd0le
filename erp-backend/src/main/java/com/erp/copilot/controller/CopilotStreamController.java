@@ -17,6 +17,7 @@ import com.erp.finance.repository.TreasuryAccountRepository;
 import com.erp.finance.service.FinanceVoucherService;
 import com.erp.model.ChatMessage;
 import com.erp.model.Customer;
+import com.erp.model.Role;
 import com.erp.model.User;
 import com.erp.repository.ChatMessageRepository;
 import com.erp.repository.CustomerRepository;
@@ -34,6 +35,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalTime;
@@ -235,6 +237,13 @@ public class CopilotStreamController {
         try {
             switch (actionType) {
                 case "HOLD_CREDIT" -> {
+                    User user = getCurrentUser();
+                    if (user == null || (user.getRole() != Role.ADMIN && user.getRole() != Role.MANAGER && user.getRole() != Role.ACCOUNTANT)) {
+                        result.put("success", false);
+                        result.put("message", "⛔ Bạn không có quyền khóa hạn mức công nợ khách hàng! Thao tác này yêu cầu vai trò ADMIN, MANAGER hoặc ACCOUNTANT. Tài khoản của bạn chỉ có quyền XEM.");
+                        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(result);
+                    }
+
                     String targetId = request.getTargetId();
                     Optional<Customer> custOpt = Optional.empty();
                     if (targetId != null && !targetId.isBlank()) {
@@ -256,6 +265,12 @@ public class CopilotStreamController {
                 }
                 case "APPROVE_EXPENSE" -> {
                     User user = getCurrentUser();
+                    if (user == null || (user.getRole() != Role.ADMIN && user.getRole() != Role.MANAGER && user.getRole() != Role.ACCOUNTANT)) {
+                        result.put("success", false);
+                        result.put("message", "⛔ Bạn không có quyền phê duyệt xuất quỹ! Thao tác này yêu cầu vai trò ADMIN, MANAGER hoặc ACCOUNTANT. Tài khoản của bạn chỉ có quyền XEM.");
+                        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(result);
+                    }
+
                     String currentUsername = user != null ? user.getUsername() : "admin";
                     Map<String, Object> payload = request.getPayload();
 
