@@ -323,6 +323,15 @@
                       <span v-if="msg.uiWidget.data?.amountFormatted"> • Số tiền: <strong>{{ msg.uiWidget.data?.amountFormatted }}</strong></span>
                       <span v-if="msg.uiWidget.data?.overdueDays"> • Trễ hạn: <strong class="text-danger">{{ msg.uiWidget.data?.overdueDays }} ngày</strong></span>
                     </div>
+
+                    <!-- Cảnh báo phân quyền nếu tài khoản không có thẩm quyền phê duyệt -->
+                    <div 
+                      v-if="isPrivilegedAction(msg.uiWidget.data?.actionType) && !canExecutePrivilegedAction" 
+                      class="action-permission-banner"
+                    >
+                      <span class="lock-icon">🔒</span>
+                      <span>Chế độ chỉ xem: Bạn cần vai trò <strong>ADMIN</strong>, <strong>MANAGER</strong> hoặc <strong>ACCOUNTANT</strong> để phê duyệt xuất quỹ này.</span>
+                    </div>
                   </div>
 
                   <div class="action-card-btns">
@@ -330,13 +339,27 @@
                       {{ executedActions[index]?.message }}
                     </div>
                     <template v-else>
+                      <!-- Nếu có thẩm quyền hoặc action không nhạy cảm: Nút duyệt hoạt động bình thường -->
                       <button 
+                        v-if="!isPrivilegedAction(msg.uiWidget.data?.actionType) || canExecutePrivilegedAction"
                         type="button" 
                         class="btn-confirm-exec" 
                         @click="confirmAction(msg.uiWidget.data, index)"
                       >
                         {{ msg.uiWidget.data?.confirmButtonText || '🔴 Xác nhận Thực Hiện' }}
                       </button>
+
+                      <!-- Nếu không có thẩm quyền: Nút duyệt bị disabled và hiển thị nhãn Chỉ xem -->
+                      <button 
+                        v-else
+                        type="button" 
+                        class="btn-confirm-exec is-disabled" 
+                        disabled
+                        title="Tài khoản của bạn chỉ có quyền XEM, không thể phê duyệt xuất quỹ"
+                      >
+                        🔒 Phê Duyệt (Chỉ ADMIN / Kế toán)
+                      </button>
+
                       <button 
                         type="button" 
                         class="btn-cancel-exec" 
@@ -656,6 +679,18 @@ const showTeaser = computed(() => {
   return !isTeaserHidden.value && !isOnChatPage.value && !isCollapsed.value
 })
 
+// Phân quyền thực thi các hành động nhạy cảm (APPROVE_EXPENSE, HOLD_CREDIT)
+// Chỉ ADMIN, MANAGER, ACCOUNTANT mới có quyền duyệt chi xuất quỹ hoặc khóa công nợ
+const isPrivilegedAction = (actionType) => {
+  return actionType === 'APPROVE_EXPENSE' || actionType === 'HOLD_CREDIT'
+}
+
+const canExecutePrivilegedAction = computed(() => {
+  if (!authStore.user) return false
+  const role = authStore.user.role
+  return role === 'ADMIN' || role === 'MANAGER' || role === 'ACCOUNTANT'
+})
+
 const toggleCollapse = (collapsed) => {
   isCollapsed.value = collapsed
   localStorage.setItem('erp_copilot_collapsed', collapsed ? 'true' : 'false')
@@ -918,6 +953,10 @@ const downloadReport = async (fileId, fileName) => {
 
 const confirmAction = async (widgetData, index) => {
   if (!widgetData) return
+  if (isPrivilegedAction(widgetData.actionType) && !canExecutePrivilegedAction.value) {
+    ElMessage.warning('Tài khoản của bạn chỉ có quyền XEM! Thao tác này yêu cầu vai trò ADMIN, MANAGER hoặc ACCOUNTANT.')
+    return
+  }
   try {
     const payload = {
       actionType: widgetData.actionType,
@@ -2393,10 +2432,29 @@ defineExpose({
 .action-details-row {
   font-size: 12px;
   color: #94a3b8;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 .theme-light .action-details-row {
   color: #64748b;
+}
+.action-permission-banner {
+  margin-top: 6px;
+  padding: 6px 10px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px dashed rgba(239, 68, 68, 0.35);
+  border-radius: 6px;
+  font-size: 11px;
+  color: #ef4444;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.4;
+  margin-bottom: 8px;
+}
+.theme-light .action-permission-banner {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #b91c1c;
 }
 .action-card-btns {
   display: flex;
@@ -2415,6 +2473,16 @@ defineExpose({
 }
 .btn-confirm-exec:hover {
   background: #dc2626;
+}
+.btn-confirm-exec.is-disabled {
+  opacity: 0.65;
+  cursor: not-allowed !important;
+  filter: grayscale(0.7);
+  background: #64748b !important;
+  color: #e2e8f0 !important;
+}
+.btn-confirm-exec.is-disabled:hover {
+  background: #64748b !important;
 }
 .btn-cancel-exec {
   padding: 8px 14px;
