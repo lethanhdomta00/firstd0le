@@ -55,7 +55,12 @@ public class RolePermissionService {
 
             // Module 6: Trò chuyện & AI Copilot
             Map.of("code", "CHAT_USE", "name", "Trò chuyện nội bộ công ty", "module", "Giao tiếp & AI Copilot"),
-            Map.of("code", "COPILOT_USE", "name", "Tương tác với trợ lý AI Copilot", "module", "Giao tiếp & AI Copilot")
+            Map.of("code", "COPILOT_USE", "name", "Tương tác với trợ lý AI Copilot", "module", "Giao tiếp & AI Copilot"),
+
+            // Module 7: Mua hàng & Nhà cung cấp SRM (Giai đoạn 3)
+            Map.of("code", "PROCUREMENT_VIEW", "name", "Xem phân hệ mua hàng & NCC", "module", "Mua hàng & NCC (SRM)"),
+            Map.of("code", "PROCUREMENT_MANAGE", "name", "Quản lý NCC & Duyệt đơn PO", "module", "Mua hàng & NCC (SRM)"),
+            Map.of("code", "PROCUREMENT_RECEIVE", "name", "Nhập kho kiểm nhận GRN & Giá vốn", "module", "Mua hàng & NCC (SRM)")
     );
 
     @PostConstruct
@@ -187,15 +192,18 @@ public class RolePermissionService {
             case MANAGER -> set.addAll(List.of(
                     "USER_VIEW", "PRODUCT_VIEW", "PRODUCT_CREATE", "PRODUCT_EDIT", "PRODUCT_STOCK",
                     "ORDER_VIEW", "ORDER_CREATE", "ORDER_STATUS", "ORDER_PAY", "ORDER_EXPORT", "ORDER_CANCEL",
-                    "ANALYTICS_VIEW", "ANALYTICS_EXPORT", "JOB_VIEW", "CHAT_USE", "COPILOT_USE"
+                    "ANALYTICS_VIEW", "ANALYTICS_EXPORT", "JOB_VIEW", "CHAT_USE", "COPILOT_USE",
+                    "PROCUREMENT_VIEW", "PROCUREMENT_MANAGE", "PROCUREMENT_RECEIVE"
             ));
             case ACCOUNTANT -> set.addAll(List.of(
                     "ORDER_VIEW", "ORDER_PAY", "ORDER_EXPORT",
-                    "ANALYTICS_VIEW", "ANALYTICS_EXPORT", "CHAT_USE", "COPILOT_USE"
+                    "ANALYTICS_VIEW", "ANALYTICS_EXPORT", "CHAT_USE", "COPILOT_USE",
+                    "PROCUREMENT_VIEW", "PROCUREMENT_MANAGE"
             ));
             case WAREHOUSE -> set.addAll(List.of(
                     "PRODUCT_VIEW", "PRODUCT_CREATE", "PRODUCT_EDIT", "PRODUCT_STOCK",
-                    "ORDER_VIEW", "CHAT_USE", "COPILOT_USE"
+                    "ORDER_VIEW", "CHAT_USE", "COPILOT_USE",
+                    "PROCUREMENT_VIEW", "PROCUREMENT_RECEIVE"
             ));
             case SALES -> set.addAll(List.of(
                     "PRODUCT_VIEW", "ORDER_VIEW", "ORDER_CREATE", "ORDER_STATUS", "ORDER_EXPORT",

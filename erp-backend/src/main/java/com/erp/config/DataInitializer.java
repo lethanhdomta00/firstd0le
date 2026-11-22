@@ -12,6 +12,10 @@ import com.erp.repository.UserRepository;
 import com.erp.scheduler.model.JobStatus;
 import com.erp.scheduler.model.ScheduledJob;
 import com.erp.scheduler.repository.ScheduledJobRepository;
+import com.erp.procurement.model.*;
+import com.erp.procurement.repository.PurchaseOrderRepository;
+import com.erp.procurement.repository.SupplierRepository;
+import com.erp.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -34,6 +38,9 @@ public class DataInitializer implements CommandLineRunner {
     private final TreasuryAccountRepository treasuryAccountRepository;
     private final FinanceVoucherRepository financeVoucherRepository;
     private final BankStatementItemRepository bankStatementItemRepository;
+    private final SupplierRepository supplierRepository;
+    private final PurchaseOrderRepository purchaseOrderRepository;
+    private final ProductRepository productRepository;
 
     @Override
     public void run(String... args) {
@@ -328,6 +335,113 @@ public class DataInitializer implements CommandLineRunner {
 
             bankStatementItemRepository.saveAll(java.util.List.of(s1, s2, s3));
             log.info("Initialized default 3 Bank Statement items for smart reconciliation");
+        }
+
+        // 7. Khởi tạo Phân hệ Mua hàng & SRM (Giai đoạn 3)
+        if (supplierRepository.count() == 0) {
+            Supplier sup1 = Supplier.builder()
+                    .code("NCC-TANBINH")
+                    .name("Xưởng May Dệt Kim Tân Bình")
+                    .contactPerson("Anh Hoàng Minh (Chủ xưởng)")
+                    .phone("0912345678")
+                    .email("detkimtanbinh@gmail.com")
+                    .address("Lô C4, KCN Tân Bình, P. Tây Thạnh, Q. Tân Phú, TP.HCM")
+                    .taxCode("0312456789")
+                    .creditLimit(new java.math.BigDecimal("500000000.00"))
+                    .currentDebt(new java.math.BigDecimal("65000000.00"))
+                    .paymentTermsDays(30)
+                    .status("ACTIVE")
+                    .notes("Đối tác cung ứng vải dệt kim cotton & may gia công áo Polo xuất khẩu")
+                    .build();
+
+            Supplier sup2 = Supplier.builder()
+                    .code("NCC-SAIGON-FABRIC")
+                    .name("Tổng Kho Vải & Phụ Liệu Sài Gòn")
+                    .contactPerson("Chị Thu Trang")
+                    .phone("0988776655")
+                    .email("saigonfabric@vnn.vn")
+                    .address("45 Đường số 7, Cư xá Bình Thới, P.8, Q.11, TP.HCM")
+                    .taxCode("0309876543")
+                    .creditLimit(new java.math.BigDecimal("300000000.00"))
+                    .currentDebt(new java.math.BigDecimal("32500000.00"))
+                    .paymentTermsDays(45)
+                    .status("ACTIVE")
+                    .notes("Nhà cung cấp vải kaki, đũi và phụ liệu may mặc cao cấp")
+                    .build();
+
+            Supplier sup3 = Supplier.builder()
+                    .code("NCC-HOANGGIA")
+                    .name("Xưởng Phụ Kiện & Cúc Nút Hoàng Gia")
+                    .contactPerson("Anh Quốc Bảo")
+                    .phone("0903332211")
+                    .email("phukienhoanggia@gmail.com")
+                    .address("128 Hùng Vương, P.2, Q.5, TP.HCM")
+                    .taxCode("0315554433")
+                    .creditLimit(new java.math.BigDecimal("100000000.00"))
+                    .currentDebt(new java.math.BigDecimal("8500000.00"))
+                    .paymentTermsDays(15)
+                    .status("ACTIVE")
+                    .notes("Chuyên cúc áo dập nổi logo, khóa kéo YKK & nhãn mác dệt")
+                    .build();
+
+            var savedSups = supplierRepository.saveAll(java.util.List.of(sup1, sup2, sup3));
+            log.info("Initialized default 3 Suppliers for Procurement & SRM");
+
+            // Tạo 1 đơn PO mẫu đã APPROVED để test luồng Nhập kho GRN & Giá vốn bình quân
+            var products = productRepository.findAll();
+            if (!products.isEmpty() && !savedSups.isEmpty()) {
+                var p1 = products.get(0);
+                var p2 = products.size() > 1 ? products.get(1) : products.get(0);
+                Supplier primarySup = savedSups.get(0);
+
+                PurchaseOrder po1 = PurchaseOrder.builder()
+                        .poCode("PO-20261122-001")
+                        .supplier(primarySup)
+                        .supplierName(primarySup.getName())
+                        .status(PurchaseOrderStatus.APPROVED)
+                        .orderDate(java.time.LocalDate.now().minusDays(2))
+                        .expectedDeliveryDate(java.time.LocalDate.now().plusDays(3))
+                        .discountAmount(new java.math.BigDecimal("500000.00"))
+                        .taxAmount(new java.math.BigDecimal("1200000.00"))
+                        .notes("Đơn hàng đặt lô áo chuẩn bị mở bán đợt lễ cuối năm")
+                        .creatorUsername("admin")
+                        .approverUsername("admin")
+                        .approvedAt(java.time.LocalDateTime.now().minusDays(1))
+                        .items(new java.util.ArrayList<>())
+                        .build();
+
+                PurchaseOrderItem poi1 = PurchaseOrderItem.builder()
+                        .purchaseOrder(po1)
+                        .productId(p1.getId())
+                        .productSku(p1.getSku())
+                        .productName(p1.getName())
+                        .unitName(p1.getBaseUnit() != null ? p1.getBaseUnit() : "Cái")
+                        .orderedQuantity(100)
+                        .receivedQuantity(0)
+                        .unitPrice(new java.math.BigDecimal("95000.00"))
+                        .build();
+                poi1.calculateSubtotal();
+                po1.getItems().add(poi1);
+
+                if (!p1.getId().equals(p2.getId())) {
+                    PurchaseOrderItem poi2 = PurchaseOrderItem.builder()
+                            .purchaseOrder(po1)
+                            .productId(p2.getId())
+                            .productSku(p2.getSku())
+                            .productName(p2.getName())
+                            .unitName(p2.getBaseUnit() != null ? p2.getBaseUnit() : "Cái")
+                            .orderedQuantity(50)
+                            .receivedQuantity(0)
+                            .unitPrice(new java.math.BigDecimal("140000.00"))
+                            .build();
+                    poi2.calculateSubtotal();
+                    po1.getItems().add(poi2);
+                }
+
+                po1.recalculateTotals();
+                purchaseOrderRepository.save(po1);
+                log.info("Initialized default Purchase Order PO-20261122-001 (APPROVED)");
+            }
         }
     }
 }

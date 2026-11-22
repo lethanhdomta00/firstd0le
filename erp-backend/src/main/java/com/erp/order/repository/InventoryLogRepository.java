@@ -30,4 +30,6 @@ public interface InventoryLogRepository extends JpaRepository<InventoryLog, Long
     );
 
     List<InventoryLog> findTop200ByOrderByCreatedAtDesc();
+
+    List<InventoryLog> findByProductIdOrderByCreatedAtDesc(Long productId);
 }

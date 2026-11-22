@@ -44,6 +44,12 @@ const routes = [
         meta: { permission: 'ANALYTICS_VIEW' }
       },
       {
+        path: 'procurement',
+        name: 'Procurement',
+        component: () => import('../views/Procurement.vue'),
+        meta: { permission: 'PROCUREMENT_VIEW' }
+      },
+      {
         path: 'users',
         name: 'Users',
         component: () => import('../views/Users.vue'),

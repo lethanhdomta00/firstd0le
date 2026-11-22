@@ -131,6 +131,13 @@
           </template>
         </el-menu-item>
 
+        <el-menu-item v-if="authStore.hasPermission('PROCUREMENT_VIEW') || authStore.isAdmin || authStore.user?.role === 'WAREHOUSE' || authStore.user?.role === 'ACCOUNTANT'" index="/procurement">
+          <el-icon><Van /></el-icon>
+          <template #title>
+            <span class="menu-title-text">Mua hàng & SRM</span>
+          </template>
+        </el-menu-item>
+
         <el-menu-item v-if="authStore.isAdmin" index="/settings">
           <el-icon><Setting /></el-icon>
           <template #title>
@@ -236,6 +243,10 @@
         <el-menu-item v-if="authStore.hasPermission('ANALYTICS_VIEW') || authStore.isAdmin || authStore.user?.role === 'ACCOUNTANT'" index="/finance">
           <el-icon><Money /></el-icon>
           <template #title>Tài chính & Sổ Quỹ</template>
+        </el-menu-item>
+        <el-menu-item v-if="authStore.hasPermission('PROCUREMENT_VIEW') || authStore.isAdmin || authStore.user?.role === 'WAREHOUSE' || authStore.user?.role === 'ACCOUNTANT'" index="/procurement">
+          <el-icon><Van /></el-icon>
+          <template #title>Mua hàng & SRM</template>
         </el-menu-item>
         <el-menu-item v-if="authStore.isAdmin" index="/settings">
           <el-icon><Setting /></el-icon>
@@ -530,7 +541,8 @@ import {
   ChatDotRound,
   Calendar,
   Timer,
-  Money
+  Money,
+  Van
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
