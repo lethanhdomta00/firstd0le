@@ -15,6 +15,10 @@ import com.erp.scheduler.repository.ScheduledJobRepository;
 import com.erp.procurement.model.*;
 import com.erp.procurement.repository.PurchaseOrderRepository;
 import com.erp.procurement.repository.SupplierRepository;
+import com.erp.promotion.model.*;
+import com.erp.promotion.repository.PromotionVoucherRepository;
+import com.erp.promotion.repository.TieredPriceRuleRepository;
+import com.erp.repository.CustomerRepository;
 import com.erp.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,6 +45,9 @@ public class DataInitializer implements CommandLineRunner {
     private final SupplierRepository supplierRepository;
     private final PurchaseOrderRepository purchaseOrderRepository;
     private final ProductRepository productRepository;
+    private final PromotionVoucherRepository promotionVoucherRepository;
+    private final TieredPriceRuleRepository tieredPriceRuleRepository;
+    private final CustomerRepository customerRepository;
 
     @Override
     public void run(String... args) {
@@ -146,6 +153,9 @@ public class DataInitializer implements CommandLineRunner {
 
         // 6. Khởi tạo Quỹ Tài khoản & Dữ liệu Tài chính Doanh nghiệp (Giai đoạn 2)
         initDefaultTreasuryAndFinance();
+
+        // 7. Khởi tạo Động cơ Khuyến mại, Voucher & Loyalty (Giai đoạn 4)
+        initPromotionsAndLoyaltyData();
     }
 
     private void initDefaultSchedulerJobs() {
@@ -441,6 +451,103 @@ public class DataInitializer implements CommandLineRunner {
                 po1.recalculateTotals();
                 purchaseOrderRepository.save(po1);
                 log.info("Initialized default Purchase Order PO-20261122-001 (APPROVED)");
+            }
+        }
+    }
+
+    private void initPromotionsAndLoyaltyData() {
+        if (promotionVoucherRepository.count() == 0) {
+            PromotionVoucher v1 = new PromotionVoucher();
+            v1.setCode("VIP10");
+            v1.setName("Tri Ân Khách VIP - Giảm 10%");
+            v1.setDescription("Giảm 10% tối đa 100.000 VNĐ cho đơn hàng từ 200.000 VNĐ");
+            v1.setDiscountType(DiscountType.PERCENTAGE);
+            v1.setDiscountValue(new java.math.BigDecimal("10.00"));
+            v1.setMaxDiscountAmount(new java.math.BigDecimal("100000.00"));
+            v1.setMinOrderValue(new java.math.BigDecimal("200000.00"));
+            v1.setStartDate(java.time.LocalDateTime.now().minusDays(5));
+            v1.setEndDate(java.time.LocalDateTime.now().plusMonths(3));
+            v1.setMaxUsage(200);
+            v1.setUsedCount(0);
+            v1.setMaxUsagePerCustomer(2);
+            v1.setActive(true);
+
+            PromotionVoucher v2 = new PromotionVoucher();
+            v2.setCode("GIAM50K");
+            v2.setName("Mã Ưu Đãi Mua Sắm - Giảm 50.000đ");
+            v2.setDescription("Giảm 50.000 VNĐ cố định cho đơn hàng từ 350.000 VNĐ");
+            v2.setDiscountType(DiscountType.FIXED_AMOUNT);
+            v2.setDiscountValue(new java.math.BigDecimal("50000.00"));
+            v2.setMinOrderValue(new java.math.BigDecimal("350000.00"));
+            v2.setStartDate(java.time.LocalDateTime.now().minusDays(1));
+            v2.setEndDate(java.time.LocalDateTime.now().plusMonths(1));
+            v2.setMaxUsage(100);
+            v2.setUsedCount(0);
+            v2.setMaxUsagePerCustomer(1);
+            v2.setActive(true);
+
+            PromotionVoucher v3 = new PromotionVoucher();
+            v3.setCode("FREESHIP");
+            v3.setName("Hỗ Trợ Phí Vận Chuyển - Giảm 30.000đ");
+            v3.setDescription("Giảm 30.000 VNĐ cho mọi đơn hàng từ 150.000 VNĐ");
+            v3.setDiscountType(DiscountType.FIXED_AMOUNT);
+            v3.setDiscountValue(new java.math.BigDecimal("30000.00"));
+            v3.setMinOrderValue(new java.math.BigDecimal("150000.00"));
+            v3.setStartDate(java.time.LocalDateTime.now().minusDays(10));
+            v3.setEndDate(java.time.LocalDateTime.now().plusMonths(6));
+            v3.setMaxUsage(500);
+            v3.setUsedCount(0);
+            v3.setMaxUsagePerCustomer(5);
+            v3.setActive(true);
+
+            promotionVoucherRepository.saveAll(java.util.List.of(v1, v2, v3));
+            log.info("Initialized default 3 Promotion Vouchers: VIP10, GIAM50K, FREESHIP");
+        }
+
+        if (tieredPriceRuleRepository.count() == 0) {
+            TieredPriceRule rule1 = new TieredPriceRule();
+            rule1.setTierName("Sỉ Bậc 1 (Mua từ 10 - 49 cái)");
+            rule1.setMinQuantity(10);
+            rule1.setMaxQuantity(49);
+            rule1.setPricingType(PricingType.PERCENT_DISCOUNT);
+            rule1.setDiscountPercent(new java.math.BigDecimal("10.00"));
+            rule1.setActive(true);
+
+            TieredPriceRule rule2 = new TieredPriceRule();
+            rule2.setTierName("Sỉ Xuất Xưởng (Mua từ 50 cái trở lên)");
+            rule2.setMinQuantity(50);
+            rule2.setMaxQuantity(null);
+            rule2.setPricingType(PricingType.PERCENT_DISCOUNT);
+            rule2.setDiscountPercent(new java.math.BigDecimal("20.00"));
+            rule2.setActive(true);
+
+            tieredPriceRuleRepository.saveAll(java.util.List.of(rule1, rule2));
+            log.info("Initialized default 2 Tiered Price Rules for Wholesale Pricing");
+        }
+
+        // Cập nhật điểm Loyalty mẫu cho khách hàng có sẵn
+        var customers = customerRepository.findAll();
+        if (!customers.isEmpty()) {
+            boolean updated = false;
+            for (int i = 0; i < customers.size(); i++) {
+                var c = customers.get(i);
+                if (c.getLoyaltyPoints() == null || c.getLoyaltyPoints() == 0) {
+                    if (i == 0) {
+                        c.setLoyaltyPoints(120);
+                        c.setTotalSpent(new java.math.BigDecimal("25000000.00"));
+                        c.setMemberTier(MemberTier.GOLD);
+                        updated = true;
+                    } else if (i == 1) {
+                        c.setLoyaltyPoints(60);
+                        c.setTotalSpent(new java.math.BigDecimal("8500000.00"));
+                        c.setMemberTier(MemberTier.SILVER);
+                        updated = true;
+                    }
+                }
+            }
+            if (updated) {
+                customerRepository.saveAll(customers);
+                log.info("Initialized sample loyalty points and member tiers for existing customers");
             }
         }
     }

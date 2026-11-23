@@ -264,8 +264,18 @@
             <div class="banner-icon">💡</div>
             <div class="banner-body">
               <div class="banner-title">Thuật toán Giá vốn Bình quân Gia quyền (Moving Weighted Average Cost)</div>
-              <div class="banner-formula">
-                $$\text{Giá vốn mới} = \frac{(\text{Tồn kho cũ} \times \text{Giá vốn cũ}) + (\text{Số lượng nhập mới} \times \text{Đơn giá nhập mới})}{\text{Tồn kho cũ} + \text{Số lượng nhập mới}}$$
+              <div class="banner-formula-box">
+                <span class="formula-label">Giá vốn mới</span>
+                <span class="formula-equals">=</span>
+                <div class="math-fraction">
+                  <div class="fraction-numerator">
+                    (Tồn kho cũ &times; Giá vốn cũ) + (SL nhập mới &times; Đơn giá nhập mới)
+                  </div>
+                  <div class="fraction-line"></div>
+                  <div class="fraction-denominator">
+                    Tồn kho cũ + SL nhập mới
+                  </div>
+                </div>
               </div>
               <div class="banner-desc">
                 Hệ thống tự động cập nhật lại trường <code>moving_avg_cost</code> và <code>physical_stock</code> trên bảng sản phẩm ngay khi thủ kho bấm xác nhận kiểm nhận.
@@ -1077,7 +1087,7 @@ const loadPurchaseOrders = async () => {
       keyword: poFilter.keyword || undefined,
       status: poFilter.status || undefined
     }
-    const res = await api.get('/api/procurement/purchase-orders', { params })
+    const res = await api.get('/procurement/purchase-orders', { params })
     if (res.data) {
       purchaseOrders.value = res.data.content || []
       poPagination.total = res.data.totalElements || 0
@@ -1107,7 +1117,7 @@ const loadReceiptNotes = async () => {
       page: grnPagination.page - 1,
       size: grnPagination.size
     }
-    const res = await api.get('/api/procurement/goods-receipts', { params })
+    const res = await api.get('/procurement/goods-receipts', { params })
     if (res.data) {
       receiptNotes.value = res.data.content || []
       grnPagination.total = res.data.totalElements || 0
@@ -1148,7 +1158,7 @@ const loadSuppliers = async () => {
       keyword: supFilter.keyword || undefined,
       status: supFilter.status || undefined
     }
-    const res = await api.get('/api/procurement/suppliers', { params })
+    const res = await api.get('/procurement/suppliers', { params })
     if (res.data) {
       suppliers.value = res.data.content || []
       supPagination.total = res.data.totalElements || 0
@@ -1162,7 +1172,7 @@ const loadSuppliers = async () => {
 
 const loadActiveSuppliers = async () => {
   try {
-    const res = await api.get('/api/procurement/suppliers/active')
+    const res = await api.get('/procurement/suppliers/active')
     activeSuppliers.value = res.data || []
   } catch (e) {
     console.error('Error loadActiveSuppliers:', e)
@@ -1171,7 +1181,7 @@ const loadActiveSuppliers = async () => {
 
 const loadOverview = async () => {
   try {
-    const res = await api.get('/api/procurement/overview')
+    const res = await api.get('/procurement/overview')
     overview.value = res.data
   } catch (e) {
     console.error('Error loadOverview:', e)
@@ -1182,7 +1192,7 @@ const loadOverview = async () => {
 const treasuryAccounts = ref([])
 const loadTreasuryAccounts = async () => {
   try {
-    const res = await api.get('/api/finance/treasury-accounts')
+    const res = await api.get('/finance/accounts')
     treasuryAccounts.value = res.data || []
   } catch (e) {
     console.error('Error loadTreasuryAccounts:', e)
@@ -1193,7 +1203,7 @@ const loadTreasuryAccounts = async () => {
 const allProducts = ref([])
 const loadProducts = async () => {
   try {
-    const res = await api.get('/api/products', { params: { size: 100 } })
+    const res = await api.get('/products', { params: { size: 100 } })
     allProducts.value = res.data?.content || []
   } catch (e) {
     console.error('Error loadProducts:', e)
@@ -1228,7 +1238,13 @@ const poFinalTotal = computed(() => {
   return Math.max(0, sub - disc + tax)
 })
 
-const openCreatePoModal = () => {
+const openCreatePoModal = async () => {
+  if (activeSuppliers.value.length === 0) {
+    await loadActiveSuppliers()
+  }
+  if (allProducts.value.length === 0) {
+    await loadProducts()
+  }
   poForm.supplierId = activeSuppliers.value[0]?.id || null
   poForm.orderDate = new Date().toISOString().split('T')[0]
   poForm.expectedDeliveryDate = null
@@ -1288,7 +1304,7 @@ const submitCreatePo = async () => {
         unitPrice: i.unitPrice
       }))
     }
-    await api.post('/api/procurement/purchase-orders', payload)
+    await api.post('/procurement/purchase-orders', payload)
     ElMessage.success('Tạo đơn đặt mua hàng PO thành công!')
     showCreatePoModal.value = false
     loadPurchaseOrders()
@@ -1306,7 +1322,7 @@ const submitPo = async (po) => {
       confirmButtonText: 'Gửi duyệt',
       cancelButtonText: 'Hủy'
     })
-    await api.put(`/api/procurement/purchase-orders/${po.id}/submit`)
+    await api.put(`/procurement/purchase-orders/${po.id}/submit`)
     ElMessage.success('Đã gửi phê duyệt đơn PO thành công!')
     loadPurchaseOrders()
     loadOverview()
@@ -1322,7 +1338,7 @@ const approvePo = async (po) => {
       confirmButtonClass: 'el-button--success',
       cancelButtonText: 'Đóng'
     })
-    await api.put(`/api/procurement/purchase-orders/${po.id}/approve`)
+    await api.put(`/procurement/purchase-orders/${po.id}/approve`)
     ElMessage.success('Đã phê duyệt đơn đặt hàng PO thành công!')
     loadPurchaseOrders()
     loadOverview()
@@ -1338,7 +1354,7 @@ const cancelPo = async (po) => {
       cancelButtonText: 'Đóng',
       inputPlaceholder: 'Lý do hủy đơn...'
     })
-    await api.put(`/api/procurement/purchase-orders/${po.id}/cancel`, { reason })
+    await api.put(`/procurement/purchase-orders/${po.id}/cancel`, { reason })
     ElMessage.success('Đã hủy đơn đặt hàng PO thành công!')
     loadPurchaseOrders()
     loadOverview()
@@ -1362,7 +1378,7 @@ const receiptForm = reactive({
 
 const openGoodsReceiptForPo = async (po) => {
   try {
-    const res = await api.get(`/api/procurement/purchase-orders/${po.id}`)
+    const res = await api.get(`/procurement/purchase-orders/${po.id}`)
     selectedPoForReceipt.value = res.data
     receiptForm.purchaseOrderId = po.id
     receiptForm.warehouseLocation = 'Kho Chính Trung Tâm'
@@ -1410,7 +1426,7 @@ const updateCostSimulation = async (item) => {
     return
   }
   try {
-    const res = await api.post('/api/procurement/goods-receipts/simulate-cost', null, {
+    const res = await api.post('/procurement/goods-receipts/simulate-cost', null, {
       params: {
         productId: item.productId,
         quantityReceived: item.quantityReceived,
@@ -1442,12 +1458,12 @@ const submitGoodsReceipt = async () => {
         importUnitPrice: i.importUnitPrice
       }))
     }
-    const res = await api.post('/api/procurement/goods-receipts', payload)
+    const res = await api.post('/procurement/goods-receipts', payload)
     ElMessage.success(`Lập phiếu nhập kho ${res.data.grnCode} & cập nhật giá vốn thành công!`)
     showReceiptModal.value = false
     loadPurchaseOrders()
-    loadReceiptNotes()
-    loadSuppliers()
+    if (receiptNotes.value.length > 0) loadReceiptNotes()
+    if (suppliers.value.length > 0) loadSuppliers()
     loadOverview()
   } catch (err) {
     ElMessage.error(err.response?.data?.message || 'Lỗi khi lập phiếu nhập kho!')
@@ -1464,7 +1480,7 @@ const activePoDetail = ref(null)
 
 const viewPoDetail = async (po) => {
   try {
-    const res = await api.get(`/api/procurement/purchase-orders/${po.id}`)
+    const res = await api.get(`/procurement/purchase-orders/${po.id}`)
     activePoDetail.value = res.data
     showPoDetailModal.value = true
   } catch (err) {
@@ -1474,7 +1490,7 @@ const viewPoDetail = async (po) => {
 
 const viewGrnDetail = async (grn) => {
   try {
-    const res = await api.get(`/api/procurement/goods-receipts/${grn.id}`)
+    const res = await api.get(`/procurement/goods-receipts/${grn.id}`)
     ElMessageBox.alert(
       `<div style="text-align: left; font-size: 13px;">
         <p><strong>Mã Phiếu:</strong> ${res.data.grnCode}</p>
@@ -1549,10 +1565,10 @@ const submitSupplierForm = async () => {
   submittingSup.value = true
   try {
     if (editingSupId.value) {
-      await api.put(`/api/procurement/suppliers/${editingSupId.value}`, supForm)
+      await api.put(`/procurement/suppliers/${editingSupId.value}`, supForm)
       ElMessage.success('Cập nhật nhà cung cấp thành công!')
     } else {
-      await api.post('/api/procurement/suppliers', supForm)
+      await api.post('/procurement/suppliers', supForm)
       ElMessage.success('Thêm mới nhà cung cấp thành công!')
     }
     showSupplierModal.value = false
@@ -1573,7 +1589,7 @@ const deleteSupplier = async (sup) => {
       confirmButtonText: 'Xóa ngay',
       cancelButtonText: 'Hủy'
     })
-    await api.delete(`/api/procurement/suppliers/${sup.id}`)
+    await api.delete(`/procurement/suppliers/${sup.id}`)
     ElMessage.success('Đã xóa nhà cung cấp thành công!')
     loadSuppliers()
     loadActiveSuppliers()
@@ -1596,7 +1612,10 @@ const payDebtForm = reactive({
   notes: ''
 })
 
-const openPayDebtModal = (sup) => {
+const openPayDebtModal = async (sup) => {
+  if (treasuryAccounts.value.length === 0) {
+    await loadTreasuryAccounts()
+  }
   targetSupplierForPay.value = sup
   payDebtForm.supplierId = sup.id
   payDebtForm.amount = Number(sup.currentDebt) || 0
@@ -1617,11 +1636,10 @@ const submitPaySupplierDebt = async () => {
 
   submittingPay.value = true
   try {
-    const res = await api.post('/api/procurement/payments/pay-debt', payDebtForm)
+    const res = await api.post('/procurement/payments/pay-debt', payDebtForm)
     ElMessage.success(`Thanh toán thành công! Đã tạo Phiếu Chi ${res.data.voucherCode} và trừ tiền quỹ.`)
     showPayDebtModal.value = false
     loadSuppliers()
-    loadTreasuryAccounts()
     loadPurchaseOrders()
     loadOverview()
   } catch (err) {
@@ -1631,35 +1649,34 @@ const submitPaySupplierDebt = async () => {
   }
 }
 
+// =============================================================================
+// 11. LAZY LOADING THEO TAB (Chỉ tải dữ liệu khi tab được click)
+// =============================================================================
 const handleTabClick = (tab) => {
-  if (tab.paneName === 'orders') loadPurchaseOrders()
-  else if (tab.paneName === 'receipts') loadReceiptNotes()
-  else if (tab.paneName === 'suppliers') loadSuppliers()
-  else if (tab.paneName === 'debt') loadSuppliers()
+  if (tab.paneName === 'orders') {
+    if (purchaseOrders.value.length === 0) loadPurchaseOrders()
+  } else if (tab.paneName === 'receipts') {
+    if (receiptNotes.value.length === 0) loadReceiptNotes()
+  } else if (tab.paneName === 'suppliers' || tab.paneName === 'debt') {
+    if (suppliers.value.length === 0) loadSuppliers()
+  }
 }
 
 const refreshAllData = () => {
   loadOverview()
-  loadPurchaseOrders()
-  loadReceiptNotes()
-  loadSuppliers()
-  loadActiveSuppliers()
-  loadTreasuryAccounts()
-  loadProducts()
+  if (activeTab.value === 'orders') loadPurchaseOrders()
+  else if (activeTab.value === 'receipts') loadReceiptNotes()
+  else if (activeTab.value === 'suppliers' || activeTab.value === 'debt') loadSuppliers()
   ElMessage.success('Đã làm mới dữ liệu Mua hàng & SRM!')
 }
 
 // =============================================================================
-// 11. LIFECYCLE
+// 12. LIFECYCLE (On-demand Lazy Loading - Loại bỏ Waterfall)
 // =============================================================================
 onMounted(() => {
+  // Chỉ gọi đúng 2 API thiết yếu cho màn hình khởi đầu
   loadOverview()
   loadPurchaseOrders()
-  loadReceiptNotes()
-  loadSuppliers()
-  loadActiveSuppliers()
-  loadTreasuryAccounts()
-  loadProducts()
 })
 </script>
 
@@ -1897,20 +1914,79 @@ onMounted(() => {
   color: #6ee7b7;
 }
 
-.banner-formula {
-  font-family: monospace;
-  background: rgba(255, 255, 255, 0.7);
-  padding: 6px 12px;
-  border-radius: 6px;
-  display: inline-block;
-  margin: 4px 0;
-  font-size: 13px;
-  color: #047857;
+.banner-formula-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  padding: 6px 14px;
+  border-radius: 8px;
+  margin: 6px 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  max-width: 100%;
+  overflow-x: auto;
 }
 
-.theme-dark .banner-formula {
-  background: rgba(0, 0, 0, 0.3);
+.theme-dark .banner-formula-box {
+  background: rgba(6, 78, 59, 0.3);
+  border-color: rgba(52, 211, 153, 0.25);
+}
+
+.formula-label {
+  font-weight: 700;
+  color: #065f46;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.theme-dark .formula-label {
+  color: #6ee7b7;
+}
+
+.formula-equals {
+  font-weight: bold;
+  color: #059669;
+  font-size: 15px;
+}
+
+.math-fraction {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  vertical-align: middle;
+  font-size: 12px;
+  color: #047857;
+  font-family: inherit;
+}
+
+.theme-dark .math-fraction {
   color: #a7f3d0;
+}
+
+.fraction-numerator {
+  padding: 1px 6px 3px;
+  font-weight: 500;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.fraction-line {
+  width: 100%;
+  height: 1.5px;
+  background-color: #059669;
+  border-radius: 1px;
+}
+
+.theme-dark .fraction-line {
+  background-color: #34d399;
+}
+
+.fraction-denominator {
+  padding: 3px 6px 1px;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .banner-desc {

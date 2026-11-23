@@ -1,5 +1,6 @@
 package com.erp.model;
 
+import com.erp.promotion.model.MemberTier;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.math.BigDecimal;
@@ -9,7 +10,8 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "customers", indexes = {
     @Index(name = "idx_customers_phone", columnList = "phone"),
-    @Index(name = "idx_customers_name", columnList = "name")
+    @Index(name = "idx_customers_name", columnList = "name"),
+    @Index(name = "idx_customers_member_tier", columnList = "member_tier")
 })
 public class Customer {
 
@@ -57,6 +59,27 @@ public class Customer {
     @Column(name = "is_credit_locked")
     private boolean creditLocked = false;
 
+    /**
+     * Điểm thưởng tích lũy hội viên (Loyalty Points)
+     * Quy ước: 1 điểm = 1.000 VNĐ khi khấu trừ vào đơn hàng
+     */
+    @Column(name = "loyalty_points", nullable = false)
+    private Integer loyaltyPoints = 0;
+
+    /**
+     * Tổng chi tiêu trọn đời của khách hàng (Lifetime Total Spent)
+     * Dùng để tự động xét thăng hạng thành viên
+     */
+    @Column(name = "total_spent", precision = 18, scale = 2)
+    private BigDecimal totalSpent = BigDecimal.ZERO;
+
+    /**
+     * Hạng hội viên: BRONZE (Đồng), SILVER (Bạc), GOLD (Vàng), DIAMOND (Kim Cương)
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "member_tier", nullable = false, length = 30)
+    private MemberTier memberTier = MemberTier.BRONZE;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -70,11 +93,15 @@ public class Customer {
         if (this.creditLimit == null) this.creditLimit = new BigDecimal("50000000.00");
         if (this.currentDebt == null) this.currentDebt = BigDecimal.ZERO;
         if (this.priceTier == null) this.priceTier = "RETAIL";
+        if (this.loyaltyPoints == null) this.loyaltyPoints = 0;
+        if (this.totalSpent == null) this.totalSpent = BigDecimal.ZERO;
+        if (this.memberTier == null) this.memberTier = MemberTier.BRONZE;
     }
 
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();
+        if (this.memberTier == null) this.memberTier = MemberTier.BRONZE;
     }
 
     /**
@@ -87,5 +114,15 @@ public class Customer {
         BigDecimal debt = (this.currentDebt != null) ? this.currentDebt : BigDecimal.ZERO;
         BigDecimal limit = (this.creditLimit != null) ? this.creditLimit : BigDecimal.ZERO;
         return debt.add(additionalAmount).compareTo(limit) > 0;
+    }
+
+    /**
+     * Cộng thêm chi tiêu và tự động cập nhật hạng hội viên
+     */
+    public void addSpentAndEvaluateTier(BigDecimal amount) {
+        if (amount != null && amount.compareTo(BigDecimal.ZERO) > 0) {
+            this.totalSpent = (this.totalSpent != null ? this.totalSpent : BigDecimal.ZERO).add(amount);
+            this.memberTier = MemberTier.determineTier(this.totalSpent);
+        }
     }
 }

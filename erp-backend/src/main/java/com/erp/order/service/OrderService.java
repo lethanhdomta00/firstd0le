@@ -6,6 +6,8 @@ import com.erp.order.dto.*;
 import com.erp.order.model.*;
 import com.erp.order.repository.InventoryLogRepository;
 import com.erp.order.repository.OrderRepository;
+import com.erp.promotion.service.LoyaltyService;
+import com.erp.promotion.service.PromotionVoucherService;
 import com.erp.repository.CustomerRepository;
 import com.erp.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +36,8 @@ public class OrderService {
     private final InventoryLogRepository inventoryLogRepository;
     private final ProductRepository productRepository;
     private final CustomerRepository customerRepository;
+    private final PromotionVoucherService voucherService;
+    private final LoyaltyService loyaltyService;
 
     private static final DateTimeFormatter DATE_CODE_FMT = DateTimeFormatter.ofPattern("yyyyMMdd");
 
@@ -142,10 +146,28 @@ public class OrderService {
         List<OrderItemRequest> consolidatedItems = consolidateItemRequests(request.getItems());
         applyItemsAndReserveStock(order, consolidatedItems, username, "Tạo đơn hàng mới (Giữ chỗ)");
 
+        // Áp dụng Voucher khuyến mại & Điểm thưởng Loyalty
+        applyPromotionsAndLoyalty(order, request);
+
         // Kiểm tra Hạn mức nợ của Khách hàng (Credit Gatekeeper)
         checkAndApplyCustomerCreditLimit(order);
 
         Order saved = orderRepository.save(order);
+
+        // Ghi nhận lịch sử sử dụng voucher sau khi Order đã được lưu thành công
+        if (saved.getVoucherCode() != null && saved.getVoucherDiscount() != null 
+                && saved.getVoucherDiscount().compareTo(BigDecimal.ZERO) > 0) {
+            Long customerId = findCustomerId(saved.getCustomerPhone());
+            voucherService.recordVoucherUsage(
+                    saved.getVoucherCode(),
+                    saved.getId(),
+                    saved.getOrderCode(),
+                    customerId,
+                    saved.getCustomerPhone(),
+                    saved.getSubtotal(),
+                    saved.getVoucherDiscount());
+        }
+
         return toOrderDto(saved);
     }
 
@@ -227,6 +249,12 @@ public class OrderService {
                 order.setConfirmedAt(now);
             }
             order.setCompletedAt(now);
+
+            // Tích điểm hội viên & tự động thăng hạng khách hàng
+            Long customerId = findCustomerId(order.getCustomerPhone());
+            if (customerId != null) {
+                loyaltyService.awardPointsForCompletedOrder(customerId, order.getId(), order.getOrderCode(), order.getTotalAmount());
+            }
         } else if (newStatus == OrderStatus.CANCELLED) {
             order.setCancelledAt(now);
             // Xử lý hoàn kho tùy thuộc vào trạng thái trước khi hủy
@@ -235,6 +263,15 @@ public class OrderService {
 
             if (order.getPaymentStatus() == PaymentStatus.PAID) {
                 order.setPaymentStatus(PaymentStatus.REFUNDED);
+            }
+
+            // Hoàn lại điểm tích lũy & lượt dùng voucher khi đơn hàng bị hủy
+            Long customerId = findCustomerId(order.getCustomerPhone());
+            if (order.getLoyaltyPointsUsed() != null && order.getLoyaltyPointsUsed() > 0 && customerId != null) {
+                loyaltyService.refundPointsForCancelledOrder(order.getId(), order.getOrderCode(), customerId, order.getLoyaltyPointsUsed());
+            }
+            if (order.getVoucherCode() != null) {
+                voucherService.revertVoucherUsage(order.getId());
             }
         }
 
@@ -741,6 +778,80 @@ public class OrderService {
         order.setPaymentStatus(request.getPaymentStatus() != null ? request.getPaymentStatus() : PaymentStatus.UNPAID);
         order.setDiscountAmount(sanitizeNonNegative(request.getDiscountAmount()));
         order.setTaxRate(sanitizeTaxRate(request.getTaxRate()));
+        order.setVoucherCode(trimOrNull(request.getVoucherCode()));
+    }
+
+    private Long findCustomerId(String phone) {
+        if (phone == null || phone.trim().isEmpty()) return null;
+        return customerRepository.findByPhone(phone.trim())
+                .map(Customer::getId)
+                .orElse(null);
+    }
+
+    private void applyPromotionsAndLoyalty(Order order, CreateOrderRequest request) {
+        Long customerId = findCustomerId(order.getCustomerPhone());
+
+        // 1. Áp dụng Voucher khuyến mại
+        if (request.getVoucherCode() != null && !request.getVoucherCode().trim().isEmpty()) {
+            var vRes = voucherService.validateVoucher(request.getVoucherCode(), customerId, order.getSubtotal());
+            if (vRes.isValid()) {
+                order.setVoucherCode(vRes.getCode());
+                order.setVoucherDiscount(vRes.getDiscountAmount());
+            } else {
+                log.warn("Mã voucher '{}' không hợp lệ cho đơn {}: {}", request.getVoucherCode(), order.getOrderCode(), vRes.getMessage());
+                order.setVoucherDiscount(BigDecimal.ZERO);
+            }
+        } else {
+            order.setVoucherDiscount(BigDecimal.ZERO);
+        }
+
+        // 2. Áp dụng Điểm thưởng Loyalty
+        if (request.getLoyaltyPointsToRedeem() != null && request.getLoyaltyPointsToRedeem() > 0 && customerId != null) {
+            BigDecimal subtotalAfterVoucher = order.getSubtotal()
+                    .subtract(order.getDiscountAmount())
+                    .subtract(order.getVoucherDiscount() != null ? order.getVoucherDiscount() : BigDecimal.ZERO)
+                    .max(BigDecimal.ZERO);
+
+            BigDecimal loyaltyDiscount = loyaltyService.redeemPoints(
+                    customerId,
+                    order.getId(),
+                    order.getOrderCode(),
+                    request.getLoyaltyPointsToRedeem(),
+                    subtotalAfterVoucher);
+
+            order.setLoyaltyPointsUsed(request.getLoyaltyPointsToRedeem());
+            order.setLoyaltyDiscount(loyaltyDiscount);
+        } else {
+            order.setLoyaltyPointsUsed(0);
+            order.setLoyaltyDiscount(BigDecimal.ZERO);
+        }
+
+        // 3. Tính toán lại toàn bộ tài chính đơn hàng
+        BigDecimal totalDiscount = order.getDiscountAmount()
+                .add(order.getVoucherDiscount() != null ? order.getVoucherDiscount() : BigDecimal.ZERO)
+                .add(order.getLoyaltyDiscount() != null ? order.getLoyaltyDiscount() : BigDecimal.ZERO);
+
+        if (totalDiscount.compareTo(order.getSubtotal()) > 0) {
+            totalDiscount = order.getSubtotal();
+        }
+
+        BigDecimal taxableAmount = order.getSubtotal().subtract(totalDiscount);
+        BigDecimal taxAmount = taxableAmount
+                .multiply(order.getTaxRate())
+                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+        BigDecimal totalAmount = taxableAmount.add(taxAmount).setScale(2, RoundingMode.HALF_UP);
+
+        order.setTaxAmount(taxAmount);
+        order.setTotalAmount(totalAmount);
+        order.setGrossProfit(totalAmount.subtract(order.getTotalCostAmount()).setScale(2, RoundingMode.HALF_UP));
+
+        // 4. Ước tính điểm tích lũy sẽ được nhận khi hoàn thành
+        if (customerId != null) {
+            customerRepository.findById(customerId).ifPresent(c -> {
+                int earned = loyaltyService.calculatePointsEarned(c, totalAmount);
+                order.setLoyaltyPointsEarned(earned);
+            });
+        }
     }
 
     private Map<Long, Integer> mergeItemQuantities(List<OrderItemRequest> itemRequests) {
@@ -859,6 +970,11 @@ public class OrderService {
                 .priceTier(order.getPriceTier())
                 .subtotal(order.getSubtotal())
                 .discountAmount(order.getDiscountAmount())
+                .voucherCode(order.getVoucherCode())
+                .voucherDiscount(order.getVoucherDiscount() != null ? order.getVoucherDiscount() : BigDecimal.ZERO)
+                .loyaltyPointsUsed(order.getLoyaltyPointsUsed() != null ? order.getLoyaltyPointsUsed() : 0)
+                .loyaltyDiscount(order.getLoyaltyDiscount() != null ? order.getLoyaltyDiscount() : BigDecimal.ZERO)
+                .loyaltyPointsEarned(order.getLoyaltyPointsEarned() != null ? order.getLoyaltyPointsEarned() : 0)
                 .taxRate(order.getTaxRate())
                 .taxAmount(order.getTaxAmount())
                 .totalAmount(order.getTotalAmount())

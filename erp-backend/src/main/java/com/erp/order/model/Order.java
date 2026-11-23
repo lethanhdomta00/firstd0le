@@ -73,6 +73,36 @@ public class Order {
     @Column(name = "discount_amount", nullable = false, precision = 18, scale = 2)
     private BigDecimal discountAmount = BigDecimal.ZERO;
 
+    /**
+     * Mã Voucher khuyến mại áp dụng cho đơn
+     */
+    @Column(name = "voucher_code", length = 50)
+    private String voucherCode;
+
+    /**
+     * Tiền giảm trừ từ mã Voucher
+     */
+    @Column(name = "voucher_discount", precision = 18, scale = 2)
+    private BigDecimal voucherDiscount = BigDecimal.ZERO;
+
+    /**
+     * Số điểm tích lũy thành viên đã dùng để giảm trừ cho đơn
+     */
+    @Column(name = "loyalty_points_used")
+    private Integer loyaltyPointsUsed = 0;
+
+    /**
+     * Tiền giảm trừ từ điểm tích lũy thành viên (1 điểm = 1.000 VNĐ)
+     */
+    @Column(name = "loyalty_discount", precision = 18, scale = 2)
+    private BigDecimal loyaltyDiscount = BigDecimal.ZERO;
+
+    /**
+     * Số điểm tích lũy được thưởng khi hoàn thành đơn này
+     */
+    @Column(name = "loyalty_points_earned")
+    private Integer loyaltyPointsEarned = 0;
+
     @Column(name = "tax_rate", nullable = false, precision = 5, scale = 2)
     private BigDecimal taxRate = BigDecimal.ZERO;
 

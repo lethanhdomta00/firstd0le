@@ -24,6 +24,8 @@ public class CreateOrderRequest {
     private PaymentStatus paymentStatus = PaymentStatus.UNPAID;
 
     private BigDecimal discountAmount = BigDecimal.ZERO;
+    private String voucherCode;
+    private Integer loyaltyPointsToRedeem = 0;
     private BigDecimal taxRate = BigDecimal.ZERO;
 
     @NotEmpty(message = "Đơn hàng phải có ít nhất 1 sản phẩm")

@@ -29,6 +29,11 @@ public class OrderDto {
     private String priceTier;
     private BigDecimal subtotal;
     private BigDecimal discountAmount;
+    private String voucherCode;
+    private BigDecimal voucherDiscount;
+    private Integer loyaltyPointsUsed;
+    private BigDecimal loyaltyDiscount;
+    private Integer loyaltyPointsEarned;
     private BigDecimal taxRate;
     private BigDecimal taxAmount;
     private BigDecimal totalAmount;

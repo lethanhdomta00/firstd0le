@@ -1334,6 +1334,45 @@
                 />
               </div>
               <div class="field-group">
+                <label class="field-label">Mã Voucher / Coupon</label>
+                <div style="display: flex; gap: 6px;">
+                  <input
+                    v-model="orderForm.voucherCode"
+                    type="text"
+                    placeholder="vd: VIP10, GIAM50K..."
+                    class="erp-input"
+                    style="text-transform: uppercase"
+                  />
+                  <el-button 
+                    type="primary" 
+                    plain 
+                    size="small" 
+                    :loading="validatingVoucher" 
+                    @click="applyVoucherToOrder"
+                  >
+                    Áp dụng
+                  </el-button>
+                </div>
+                <div v-if="orderForm.voucherDiscount > 0" class="text-xs text-emerald font-semibold mt-1">
+                  ✓ Đã giảm: -{{ formatCurrency(orderForm.voucherDiscount) }}
+                </div>
+              </div>
+              <div class="field-group">
+                <label class="field-label">Dùng Điểm Thưởng (1đ = 1.000đ)</label>
+                <input
+                  v-model.number="orderForm.loyaltyPointsToRedeem"
+                  type="number"
+                  min="0"
+                  step="1"
+                  class="erp-input"
+                  placeholder="Nhập số điểm muốn đổi..."
+                  @input="onLoyaltyPointsChange"
+                />
+                <div v-if="orderForm.loyaltyDiscount > 0" class="text-xs text-amber-dark font-semibold mt-1">
+                  ✓ Khấu trừ: -{{ formatCurrency(orderForm.loyaltyDiscount) }}
+                </div>
+              </div>
+              <div class="field-group">
                 <label class="field-label">Thuế VAT (%)</label>
                 <el-select v-model="orderForm.taxRate" style="width: 100%">
                   <el-option label="0% (Không chịu thuế)" :value="0" />
@@ -1357,9 +1396,17 @@
                 <span>Tạm tính:</span>
                 <strong>{{ formatCurrency(formSubtotal) }}</strong>
               </div>
-              <div class="total-line">
-                <span>Giảm giá:</span>
-                <span class="text-red">− {{ formatCurrency(effectiveDiscount) }}</span>
+              <div class="total-line" v-if="orderForm.discountAmount > 0">
+                <span>Giảm trực tiếp:</span>
+                <span class="text-red">− {{ formatCurrency(orderForm.discountAmount) }}</span>
+              </div>
+              <div class="total-line" v-if="orderForm.voucherDiscount > 0">
+                <span>Mã Voucher ({{ orderForm.voucherCode }}):</span>
+                <span class="text-emerald">− {{ formatCurrency(orderForm.voucherDiscount) }}</span>
+              </div>
+              <div class="total-line" v-if="orderForm.loyaltyDiscount > 0">
+                <span>Điểm thưởng ({{ orderForm.loyaltyPointsToRedeem }}đ):</span>
+                <span class="text-amber-dark">− {{ formatCurrency(orderForm.loyaltyDiscount) }}</span>
               </div>
               <div class="total-line">
                 <span>Thuế VAT ({{ orderForm.taxRate ?? 0 }}%):</span>
@@ -2329,9 +2376,45 @@ const orderForm = reactive({
   paymentMethod: 'CASH',
   paymentStatus: 'UNPAID',
   discountAmount: 0,
+  voucherCode: '',
+  voucherDiscount: 0,
+  loyaltyPointsToRedeem: 0,
+  loyaltyDiscount: 0,
   taxRate: 8,
   items: []
 })
+
+const validatingVoucher = ref(false)
+const applyVoucherToOrder = async () => {
+  if (!orderForm.voucherCode || !orderForm.voucherCode.trim()) {
+    orderForm.voucherDiscount = 0
+    return
+  }
+  validatingVoucher.value = true
+  try {
+    const res = await api.post('/promotions/vouchers/validate', {
+      code: orderForm.voucherCode.trim(),
+      orderSubtotal: formSubtotal.value
+    })
+    if (res.data.valid) {
+      orderForm.voucherDiscount = Number(res.data.discountAmount) || 0
+      ElMessage.success(`Áp dụng voucher ${res.data.code}: -${formatCurrency(orderForm.voucherDiscount)}`)
+    } else {
+      orderForm.voucherDiscount = 0
+      ElMessage.warning(res.data.message || 'Mã voucher không hợp lệ!')
+    }
+  } catch (e) {
+    orderForm.voucherDiscount = 0
+    ElMessage.error('Lỗi khi kiểm tra mã voucher!')
+  } finally {
+    validatingVoucher.value = false
+  }
+}
+
+const onLoyaltyPointsChange = () => {
+  const pts = Math.max(0, Number(orderForm.loyaltyPointsToRedeem ?? 0))
+  orderForm.loyaltyDiscount = pts * 1000
+}
 
 // Detail modal state
 const detailModalVisible = ref(false)
@@ -2447,8 +2530,10 @@ const formSubtotal = computed(() => {
 })
 
 const effectiveDiscount = computed(() => {
-  const raw = Math.max(0, Number(orderForm.discountAmount ?? 0))
-  return Math.min(raw, formSubtotal.value)
+  const direct = Math.max(0, Number(orderForm.discountAmount ?? 0))
+  const voucher = Math.max(0, Number(orderForm.voucherDiscount ?? 0))
+  const loyalty = Math.max(0, Number(orderForm.loyaltyDiscount ?? 0))
+  return Math.min(direct + voucher + loyalty, formSubtotal.value)
 })
 
 const formTaxAmount = computed(() => {
@@ -2716,6 +2801,10 @@ async function openOrderModal(existingOrder = null) {
     orderForm.paymentMethod = existingOrder.paymentMethod || 'CASH'
     orderForm.paymentStatus = existingOrder.paymentStatus || 'UNPAID'
     orderForm.discountAmount = Number(existingOrder.discountAmount ?? 0)
+    orderForm.voucherCode = existingOrder.voucherCode || ''
+    orderForm.voucherDiscount = Number(existingOrder.voucherDiscount ?? 0)
+    orderForm.loyaltyPointsToRedeem = Number(existingOrder.loyaltyPointsUsed ?? 0)
+    orderForm.loyaltyDiscount = Number(existingOrder.loyaltyDiscount ?? 0)
     orderForm.taxRate = Number(existingOrder.taxRate ?? 0)
     orderForm.items = (existingOrder.items || []).map((item) => {
       const catalogProd = availableProducts.value.find((p) => p.id === item.productId)
@@ -2745,6 +2834,10 @@ async function openOrderModal(existingOrder = null) {
     orderForm.paymentMethod = 'BANK_TRANSFER'
     orderForm.paymentStatus = 'UNPAID'
     orderForm.discountAmount = 0
+    orderForm.voucherCode = ''
+    orderForm.voucherDiscount = 0
+    orderForm.loyaltyPointsToRedeem = 0
+    orderForm.loyaltyDiscount = 0
     orderForm.taxRate = 8
     orderForm.items = []
   }
@@ -2933,6 +3026,8 @@ async function submitOrderForm() {
       paymentMethod: orderForm.paymentMethod,
       paymentStatus: orderForm.paymentStatus,
       discountAmount: Number(orderForm.discountAmount ?? 0),
+      voucherCode: orderForm.voucherCode?.trim() || null,
+      loyaltyPointsToRedeem: Number(orderForm.loyaltyPointsToRedeem ?? 0),
       taxRate: Number(orderForm.taxRate ?? 0),
       items: orderForm.items.map((i) => ({
         productId: i.productId,

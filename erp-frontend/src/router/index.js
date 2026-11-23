@@ -50,6 +50,12 @@ const routes = [
         meta: { permission: 'PROCUREMENT_VIEW' }
       },
       {
+        path: 'promotions',
+        name: 'Promotions',
+        component: () => import('../views/Promotions.vue'),
+        meta: { permission: 'ORDER_VIEW' }
+      },
+      {
         path: 'users',
         name: 'Users',
         component: () => import('../views/Users.vue'),
