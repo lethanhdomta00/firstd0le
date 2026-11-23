@@ -729,6 +729,9 @@ const quickPrompts = [
   '🛒 Lên đơn cho chị Lan: 2 áo Polo đen, chuyển khoản',
   '📊 Xuất file Excel doanh thu tuần này',
   '🚨 Quét các mặt hàng có nguy cơ cạn kho AI',
+  '🏭 Có đơn đặt mua PO nào đang chờ duyệt không?',
+  '🎟️ Hệ thống có voucher nào đang kích hoạt không?',
+  '👑 Tra cứu điểm tích lũy của anh Nam',
   '💰 Hôm nay ấm no không mày?',
   '🛡️ Khách nào nợ dai nhất?',
   '📦 Kho còn cái áo Polo đen không?'

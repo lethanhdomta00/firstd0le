@@ -74,13 +74,15 @@ class AdaptiveCognitiveServiceTest {
     @DisplayName("Kiểm tra Tool Registry đã nạp đủ các Tools nghiệp vụ cốt lõi")
     void testToolRegistryInitialized() {
         assertNotNull(toolRegistry);
-        assertTrue(toolRegistry.getAllTools().size() >= 6, "Phải có tối thiểu 6 tools được đăng ký");
+        assertTrue(toolRegistry.getAllTools().size() >= 8, "Phải có tối thiểu 8 tools được đăng ký");
         assertTrue(toolRegistry.getTool("checkProductStock").isPresent());
         assertTrue(toolRegistry.getTool("getSalesPerformance").isPresent());
         assertTrue(toolRegistry.getTool("getCustomerDebtSummary").isPresent());
         assertTrue(toolRegistry.getTool("generateExportReport").isPresent());
         assertTrue(toolRegistry.getTool("trackShipmentOrder").isPresent());
         assertTrue(toolRegistry.getTool("draftExpenseVoucher").isPresent());
+        assertTrue(toolRegistry.getTool("queryProcurementAndSuppliers").isPresent());
+        assertTrue(toolRegistry.getTool("queryPromotionsAndLoyalty").isPresent());
     }
 
     @Test
@@ -256,5 +258,49 @@ class AdaptiveCognitiveServiceTest {
         assertTrue(response.getContent().contains("Quản Trị Công Nợ Đại Lý"));
         assertTrue(response.getContent().contains("PHÂN QUYỀN (RBAC)"));
         assertFalse(response.getContent().contains("Không tìm thấy công nợ"), "Không được nhầm sang Action Tool tra cứu data nợ");
+    }
+
+    @Test
+    @DisplayName("Test tra cứu Mua hàng: 'Có đơn mua PO nào đang chờ duyệt không?' -> Kích hoạt queryProcurementAndSuppliers")
+    void testProcurementIntentPendingPo() {
+        CopilotResponseDto response = cognitiveService.processPrompt("Có đơn đặt mua PO nào đang chờ duyệt không?", "admin");
+        assertNotNull(response);
+        assertEquals("TIER_1_ACTION", response.getTier());
+        assertNotNull(response.getContent());
+        assertTrue(response.getContent().contains("ĐƠN ĐẶT MUA") || response.getContent().contains("không có đơn"));
+    }
+
+    @Test
+    @DisplayName("Test tra cứu Khuyến mại: 'Hệ thống có voucher nào đang kích hoạt không?' -> Kích hoạt queryPromotionsAndLoyalty")
+    void testPromotionIntentVouchers() {
+        CopilotResponseDto response = cognitiveService.processPrompt("Hệ thống có voucher nào đang kích hoạt không?", "admin");
+        assertNotNull(response);
+        assertEquals("TIER_1_ACTION", response.getTier());
+        assertNotNull(response.getContent());
+        assertTrue(response.getContent().contains("MÃ VOUCHER") || response.getContent().contains("Voucher"));
+    }
+
+    @Test
+    @DisplayName("Test câu hỏi giải thích quy trình Mua hàng & MAC: 'giải thích quy trình mua hàng và tính giá vốn bình quân gia quyền'")
+    void testExplainProcurementAndMacQuery() {
+        CopilotResponseDto response = cognitiveService.processPrompt("giải thích quy trình mua hàng và tính giá vốn bình quân gia quyền", "admin");
+        assertNotNull(response);
+        assertEquals("TIER_3_ERP_QA", response.getTier());
+        assertTrue(response.getContent().contains("MUA HÀNG, SRM & GIÁ VỐN BÌNH QUÂN GIA QUYỀN"));
+        assertTrue(response.getContent().contains("Purchase Order - PO"));
+        assertTrue(response.getContent().contains("Goods Receipt Note - GRN"));
+        assertTrue(response.getContent().contains("Giá vốn mới ="));
+    }
+
+    @Test
+    @DisplayName("Test câu hỏi giải thích Khuyến mại & Loyalty: 'giới thiệu tính năng khuyến mại và tích điểm hội viên'")
+    void testExplainPromotionsAndLoyaltyQuery() {
+        CopilotResponseDto response = cognitiveService.processPrompt("giới thiệu tính năng khuyến mại và tích điểm hội viên", "admin");
+        assertNotNull(response);
+        assertEquals("TIER_3_ERP_QA", response.getTier());
+        assertTrue(response.getContent().contains("ĐỘNG CƠ KHUYẾN MẠI, VOUCHER & TÍCH ĐIỂM HỘI VIÊN"));
+        assertTrue(response.getContent().contains("Mã Giảm Giá & Voucher Đa Năng"));
+        assertTrue(response.getContent().contains("Bảng Giá Sỉ"));
+        assertTrue(response.getContent().contains("Kim Cương (Diamond)"));
     }
 }

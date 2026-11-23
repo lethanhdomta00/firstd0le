@@ -175,6 +175,20 @@ public class AdaptiveCognitiveService {
         }
 
         // =========================================================================
+        // 8.1 NHẬN DIỆN Ý ĐỊNH MUA HÀNG, ĐƠN PO & NHÀ CUNG CẤP SRM (TẦNG 1)
+        // =========================================================================
+        if (containsAny(unaccented, "mua hang", "nha cung cap", "ncc", "don po", "nhap kho grn", "gia von mac", "po cho duyet", "dat mua")) {
+            return handleProcurementIntent(prompt, unaccented, currentUsername, traces, startTime);
+        }
+
+        // =========================================================================
+        // 8.2 NHẬN DIỆN Ý ĐỊNH KHUYẾN MẠI, VOUCHER & TÍCH ĐIỂM LOYALTY (TẦNG 1)
+        // =========================================================================
+        if (containsAny(unaccented, "voucher", "ma giam gia", "coupon", "khuyen mai", "tich diem", "diem thuong", "hang hoi vien", "the thanh vien", "doi diem", "diem tich luy")) {
+            return handlePromotionIntent(prompt, unaccented, currentUsername, traces, startTime);
+        }
+
+        // =========================================================================
         // 9. TẦNG 2: TƯ VẤN CHIẾN LƯỢC KINH DOANH & ĐỊNH LƯỢNG NHẬP HÀNG (TẦNG 2)
         // =========================================================================
         if (containsAny(unaccented, "tu van", "co nen nhap", "tinh nhap", "nen nhap them", "loi khuyen", "dong von", "chien luoc")) {
@@ -523,6 +537,78 @@ public class AdaptiveCognitiveService {
                 .build();
     }
 
+    private CopilotResponseDto handleProcurementIntent(String prompt, String unaccented, String username, List<ThinkingStepDto> traces, long startTime) {
+        String queryType = "OVERVIEW";
+        if (containsAny(unaccented, "cho duyet", "chua duyet", "can duyet")) {
+            queryType = "PENDING_PO";
+        } else if (containsAny(unaccented, "cong no", "no ncc", "phai tra", "ap")) {
+            queryType = "SUPPLIERS";
+        }
+
+        traces.add(ThinkingStepDto.builder()
+                .step("TOOL_CALLING")
+                .message("🏭 Kích hoạt Tool: queryProcurementAndSuppliers(queryType='" + queryType + "')...")
+                .elapsedMs(System.currentTimeMillis() - startTime)
+                .build());
+
+        AgentTool tool = toolRegistry.getTool("queryProcurementAndSuppliers")
+                .orElseThrow(() -> new IllegalStateException("Tool queryProcurementAndSuppliers chưa được đăng ký!"));
+
+        ToolExecutionResult result = tool.execute(Map.of("queryType", queryType), username);
+
+        traces.add(ThinkingStepDto.builder()
+                .step("SYNTHESIZE")
+                .message("✨ Đã tổng hợp dữ liệu Phân hệ Mua hàng & SRM (PO, GRN & Công nợ NCC).")
+                .elapsedMs(System.currentTimeMillis() - startTime)
+                .build());
+
+        return CopilotResponseDto.builder()
+                .content(result.getMessage())
+                .tier("TIER_1_ACTION")
+                .thinkingTrace(traces)
+                .uiWidget(result.getUiWidget())
+                .toolResult(result)
+                .build();
+    }
+
+    private CopilotResponseDto handlePromotionIntent(String prompt, String unaccented, String username, List<ThinkingStepDto> traces, long startTime) {
+        String queryType = "VOUCHERS";
+        String keyword = "";
+        if (containsAny(unaccented, "diem", "hoi vien", "hang the", "thanh vien", "tich luy")) {
+            queryType = "CUSTOMER_LOYALTY";
+            keyword = extractCustomerKeyword(prompt);
+        }
+
+        traces.add(ThinkingStepDto.builder()
+                .step("TOOL_CALLING")
+                .message("🎟️ Kích hoạt Tool: queryPromotionsAndLoyalty(queryType='" + queryType + "', keyword='" + keyword + "')...")
+                .elapsedMs(System.currentTimeMillis() - startTime)
+                .build());
+
+        AgentTool tool = toolRegistry.getTool("queryPromotionsAndLoyalty")
+                .orElseThrow(() -> new IllegalStateException("Tool queryPromotionsAndLoyalty chưa được đăng ký!"));
+
+        Map<String, Object> args = new HashMap<>();
+        args.put("queryType", queryType);
+        args.put("keyword", keyword);
+
+        ToolExecutionResult result = tool.execute(args, username);
+
+        traces.add(ThinkingStepDto.builder()
+                .step("SYNTHESIZE")
+                .message("✨ Đã truy xuất dữ liệu Động cơ Khuyến Mại, Voucher & Điểm Thưởng Hội Viên.")
+                .elapsedMs(System.currentTimeMillis() - startTime)
+                .build());
+
+        return CopilotResponseDto.builder()
+                .content(result.getMessage())
+                .tier("TIER_1_ACTION")
+                .thinkingTrace(traces)
+                .uiWidget(result.getUiWidget())
+                .toolResult(result)
+                .build();
+    }
+
     private CopilotResponseDto handleAdvisoryTier(String prompt, String unaccented, String username, List<ThinkingStepDto> traces, long startTime) {
         traces.add(ThinkingStepDto.builder()
                 .step("ADVISORY_ANALYSIS")
@@ -601,6 +687,38 @@ public class AdaptiveCognitiveService {
             sb.append("- Thao tác **Phê duyệt xuất quỹ** và **Khóa công nợ** chỉ dành riêng cho tài khoản có vai trò **ADMIN (Quản trị viên)**, **MANAGER (Quản lý)** hoặc **ACCOUNTANT (Kế toán)**.\n");
             sb.append("- Các tài khoản nhân viên khác (Sales, Kho, User thông thường) **chỉ có quyền XEM (Read-only)** để bảo vệ an toàn dòng tiền doanh nghiệp!");
 
+        } else if (containsAny(unaccented, "mua hang", "nha cung cap", "ncc", "don po", "grn", "gia von", "mac", "binh quan gia quyen", "srm")) {
+            sb.append("🏭 **QUY TRÌNH MUA HÀNG, SRM & GIÁ VỐN BÌNH QUÂN GIA QUYỀN (MAC)** 🌿\n\n");
+            sb.append("Phân hệ **Mua hàng & Quản trị Nhà Cung Cấp (Procurement & SRM)** vận hành theo quy trình chuẩn khép kín 4 bước:\n\n");
+            sb.append("1. 📋 **Bước 1 - Lập & Phê Duyệt Đơn Đặt Mua (Purchase Order - PO)**:\n");
+            sb.append("   - Chọn Nhà cung cấp/Xưởng, ngày hẹn giao và danh mục sản phẩm kèm đơn giá nhập dự kiến.\n");
+            sb.append("   - Quản lý phê duyệt để đơn PO chuyển sang trạng thái `APPROVED` (Sẵn sàng nhập kho).\n\n");
+            sb.append("2. 📦 **Bước 2 - Nhập Kho Kiểm Nhận (Goods Receipt Note - GRN)**:\n");
+            sb.append("   - Thủ kho kiểm đếm thực tế đối chiếu với đơn PO gốc; ghi nhận hàng thực nhận, thừa/thiếu.\n");
+            sb.append("   - Xác nhận nhập kho để cập nhật tồn kho vật lý (`physical_stock`).\n\n");
+            sb.append("3. ⚖️ **Bước 3 - Tự Động Định Giá Vốn Bình Quân Gia Quyền (MAC)**:\n");
+            sb.append("   - Hệ thống tự động tính toán tức thời theo công thức:\n");
+            sb.append("     *Giá vốn mới = [(Tồn kho cũ × Giá vốn cũ) + (SL nhập mới × Đơn giá nhập mới)] / (Tồn kho cũ + SL nhập mới)*\n");
+            sb.append("   - Cập nhật tự động trường `moving_avg_cost` của sản phẩm làm cơ sở tính lãi gộp chính xác.\n\n");
+            sb.append("4. 💳 **Bước 4 - Ghi Nhận Công Nợ Phải Trả NCC (AP) & Thanh Toán**:\n");
+            sb.append("   - Tự động cộng nợ NCC, theo dõi hạn mức tín dụng và lập Phiếu chi từ Sổ quỹ để đối trừ công nợ khi thanh toán.\n");
+
+        } else if (containsAny(unaccented, "khuyen mai", "voucher", "coupon", "giam gia", "tich diem", "loyalty", "hang the", "hoi vien", "gia si")) {
+            sb.append("🎁 **ĐỘNG CƠ KHUYẾN MẠI, VOUCHER & TÍCH ĐIỂM HỘI VIÊN (LOYALTY)** 🌿\n\n");
+            sb.append("Phân hệ Khuyến mại mang đến 3 chiến lược thúc đẩy doanh số & chăm sóc khách hàng thân thiết:\n\n");
+            sb.append("1. 🎟️ **Mã Giảm Giá & Voucher Đa Năng**:\n");
+            sb.append("   - Hỗ trợ Giảm theo % (có chặn mức giảm tối đa) hoặc Giảm tiền mặt cố định (VNĐ).\n");
+            sb.append("   - Điều kiện kiểm soát: Giá trị đơn tối thiểu, tổng số lượt dùng toàn sàn & số lượt tối đa cho mỗi khách.\n\n");
+            sb.append("2. 🏷️ **Bảng Giá Sỉ & Chiết Khấu Theo Số Lượng (Tiered Pricing)**:\n");
+            sb.append("   - Tự động hạ đơn giá khi khách mua số lượng lớn (ví dụ: mua từ 10 cái giảm 10%, mua từ 50 cái giảm 20%).\n");
+            sb.append("   - Tự động áp dụng chiết khấu trực tiếp trên giỏ hàng POS mà không cần nhập mã.\n\n");
+            sb.append("3. 👑 **Hệ Thống Tích Điểm Hội Viên 4 Cấp Độ**:\n");
+            sb.append("   - 🥉 **Đồng (Bronze)**: Hệ số `1.0x` (Mặc định khi đăng ký hội viên).\n");
+            sb.append("   - 🥈 **Bạc (Silver)**: Hệ số `1.2x` (Tự động thăng hạng khi tích lũy đạt 5.000.000 VNĐ).\n");
+            sb.append("   - 🥇 **Vàng (Gold)**: Hệ số `1.5x` (Tự động thăng hạng khi tích lũy đạt 20.000.000 VNĐ).\n");
+            sb.append("   - 💎 **Kim Cương (Diamond)**: Hệ số `2.0x` (Tự động thăng hạng khi tích lũy đạt 50.000.000 VNĐ).\n");
+            sb.append("   - Quy đổi điểm: `1 điểm = 1.000 VNĐ` cấn trừ trực tiếp vào hóa đơn thanh toán!\n");
+
         } else if (containsAny(unaccented, "hoa don", "pdf", "in don")) {
             sb.append("📄 **QUY TRÌNH XUẤT HÓA ĐƠN ĐỎ PDF A4 CHUẨN KẾ TOÁN**:\n\n");
             sb.append("1. **Bước 1**: Vào menu **Bán hàng & Đơn hàng** (icon giỏ hàng).\n");
@@ -617,6 +735,8 @@ public class AdaptiveCognitiveService {
             sb.append("📖 **HỆ THỐNG TRỢ GIÚP VẬN HÀNH ERP CLOUD**:\n\n");
             sb.append("- Để **Xem báo cáo doanh số**: Mày chỉ cần gõ *\"Doanh thu hôm nay\"* hoặc *\"Xuất file Excel doanh thu tuần này\"*.\n");
             sb.append("- Để **Kiểm tra kho**: Gõ *\"Kiểm tra tồn kho Áo Polo\"* hoặc *\"Quét các mặt hàng sắp hết\"*.\n");
+            sb.append("- Để **Mua hàng & SRM**: Gõ *\"Có đơn PO nào chờ duyệt không?\"* hoặc *\"Tình hình công nợ NCC\"*.\n");
+            sb.append("- Để **Khuyến mại & Loyalty**: Gõ *\"Xem danh sách voucher đang chạy\"* hoặc *\"Tra cứu điểm tích lũy của anh Nam\"*.\n");
             sb.append("- Để **Quản lý công nợ**: Gõ *\"Khách hàng nào đang nợ nhiều nhất\"* hoặc *\"Giải thích tính năng tài chính & công nợ\"*.\n");
             sb.append("- Để **Soạn phiếu chi**: Gõ *\"Soạn phiếu chi tiền mặt bằng 5 triệu\"*.\n");
             sb.append("- Để **Tra cứu giao vận**: Gõ *\"Kiểm tra vận đơn ORD-...\"*.\n");
@@ -701,9 +821,12 @@ public class AdaptiveCognitiveService {
     }
 
     private boolean isIdentityQuery(String unaccented) {
+        if (containsAny(unaccented, "tinh nang", "chuc nang", "khuyen mai", "mua hang", "tai chinh", "cong no", "ban hang", "kho", "don hang", "voucher", "loyalty", "quy trinh", "mac", "po", "grn")) {
+            return false;
+        }
         return matchesAny(unaccented,
                 "may la ai", "ban la ai", "gioi thieu", "gioi thieu ban than",
-                "may lam duoc gi", "ban lam duoc gi", "nang luc", "chuc nang", "huong dan tong quan"
+                "may lam duoc gi", "ban lam duoc gi", "nang luc", "huong dan tong quan"
         );
     }
 
@@ -818,9 +941,11 @@ public class AdaptiveCognitiveService {
         sb.append("2. 📊 **Xuất file báo cáo đa định dạng**: *\"Xuất file Excel doanh thu tuần này\"* hoặc *\"Tải file CSV dự báo cạn kho\"*.\n");
         sb.append("3. 💰 **Phân tích kinh doanh & Lãi gộp**: *\"Hôm nay ấm no không mày?\"* hoặc *\"Doanh thu tháng này\"*.\n");
         sb.append("4. 📦 **Kiểm tra kho & Cảnh báo cạn hàng**: *\"Kho còn cái áo Polo đen không?\"* hoặc *\"Nó giá bao nhiêu?\"* (Nhớ ngữ cảnh đa lượt).\n");
-        sb.append("5. 🛡️ **Quản trị công nợ & Thu hồi vốn**: *\"Khách nào nợ dai nhất?\"* hoặc *\"Khóa xuất hàng công nợ xấu\"*.\n");
-        sb.append("6. 🚚 **Theo dõi hành trình giao vận**: *\"Ship đơn ORD-... tới đâu rồi?\"*.\n");
-        sb.append("7. 📝 **Soạn thảo duyệt chi**: *\"Lập phiếu chi tiền mặt bằng 5 triệu\"*.\n\n");
+        sb.append("5. 🏭 **Mua hàng & Quản trị SRM**: *\"Có đơn PO nào chờ duyệt không?\"* hoặc *\"Tình hình công nợ NCC\"*.\n");
+        sb.append("6. 🎟️ **Khuyến mại & Loyalty**: *\"Hệ thống có voucher nào đang chạy?\"* hoặc *\"Tra cứu điểm tích lũy của anh Nam\"*.\n");
+        sb.append("7. 🛡️ **Quản trị công nợ & Thu hồi vốn**: *\"Khách nào nợ dai nhất?\"* hoặc *\"Khóa xuất hàng công nợ xấu\"*.\n");
+        sb.append("8. 🚚 **Theo dõi hành trình giao vận**: *\"Ship đơn ORD-... tới đâu rồi?\"*.\n");
+        sb.append("9. 📝 **Soạn thảo duyệt chi**: *\"Lập phiếu chi tiền mặt bằng 5 triệu\"*.\n\n");
         sb.append("👉 Mày có thể gõ phím hoặc bấm nút **Micro 🎙️** để ra lệnh giọng nói tiếng Việt rảnh tay bất cứ lúc nào nhé!");
 
         return CopilotResponseDto.builder()
@@ -836,6 +961,9 @@ public class AdaptiveCognitiveService {
                 + "- 🛒 **Lên đơn hàng nhanh** (*\"Lên đơn cho chị Lan 0988123456: 2 áo Polo đen, chuyển khoản\"*)\n"
                 + "- 📊 **Soi doanh thu & lãi gộp** (*\"Hôm nay ấm no không mày?\"*)\n"
                 + "- 📦 **Kiểm tra tồn kho** (*\"Kho còn cái áo Polo đen không?\"*)\n"
+                + "- 🏭 **Mua hàng & Đơn PO** (*\"Có đơn mua PO nào đang chờ duyệt không?\"*)\n"
+                + "- 🎟️ **Mã giảm giá & Voucher** (*\"Xem danh sách voucher đang chạy\"*)\n"
+                + "- 👑 **Điểm tích lũy hội viên** (*\"Tra cứu điểm tích lũy của anh Nam\"*)\n"
                 + "- 🚨 **Quét hàng cạn kho AI** (*\"Quét các mặt hàng sắp hết\"*)\n"
                 + "- 📑 **Xuất file báo cáo** (*\"Xuất file Excel doanh thu tuần này\"*)\n"
                 + "- 🚚 **Theo dõi vận đơn** (*\"Ship đơn ORD-... tới đâu rồi?\"*)\n\n"

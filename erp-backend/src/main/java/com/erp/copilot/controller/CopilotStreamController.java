@@ -204,18 +204,22 @@ public class CopilotStreamController {
 
         if (now.isBefore(LocalTime.of(12, 0))) {
             list.add(new QuickSuggestionDto("s1", "Ấm no không mày?", "Hôm nay ấm no không mày?", "SALES", "💰"));
-            list.add(new QuickSuggestionDto("s2", "Xuất file doanh thu", "Xuất cho tao file Excel doanh thu tuần này", "EXPORT", "📊"));
-            list.add(new QuickSuggestionDto("s3", "Mặt hàng sắp hết", "Quét các mặt hàng có nguy cơ cạn kho AI", "INVENTORY", "🚨"));
-            list.add(new QuickSuggestionDto("s4", "Ai nợ dai nhất?", "Thằng nào nợ dai nhất?", "DEBT", "🛡️"));
-            list.add(new QuickSuggestionDto("s5", "Hành trình đơn hàng", "Ship đơn ông Tuấn tới đâu rồi?", "LOGISTICS", "🚚"));
-            list.add(new QuickSuggestionDto("s6", "Cách xuất hóa đơn đỏ", "Làm sao để xuất hóa đơn đỏ PDF?", "GENERAL", "❓"));
+            list.add(new QuickSuggestionDto("s2", "PO chờ duyệt", "Có đơn đặt mua PO nào đang chờ duyệt không?", "PROCUREMENT", "🏭"));
+            list.add(new QuickSuggestionDto("s3", "Voucher đang chạy", "Hệ thống có voucher nào đang kích hoạt không?", "PROMOTION", "🎟️"));
+            list.add(new QuickSuggestionDto("s4", "Xuất file doanh thu", "Xuất cho tao file Excel doanh thu tuần này", "EXPORT", "📊"));
+            list.add(new QuickSuggestionDto("s5", "Mặt hàng sắp hết", "Quét các mặt hàng có nguy cơ cạn kho AI", "INVENTORY", "🚨"));
+            list.add(new QuickSuggestionDto("s6", "Ai nợ dai nhất?", "Thằng nào nợ dai nhất?", "DEBT", "🛡️"));
+            list.add(new QuickSuggestionDto("s7", "Hành trình đơn hàng", "Ship đơn ông Tuấn tới đâu rồi?", "LOGISTICS", "🚚"));
+            list.add(new QuickSuggestionDto("s8", "Cách xuất hóa đơn đỏ", "Làm sao để xuất hóa đơn đỏ PDF?", "GENERAL", "❓"));
         } else {
             list.add(new QuickSuggestionDto("s1", "Doanh thu tuần này", "Báo cáo doanh số và lãi gộp tuần này", "SALES", "📈"));
-            list.add(new QuickSuggestionDto("s2", "Xuất báo cáo cạn kho", "Xuất file Excel dự báo cạn kho", "EXPORT", "📑"));
-            list.add(new QuickSuggestionDto("s3", "Tồn kho áo Polo", "Kho còn cái áo cổ bẻ màu đen không mày?", "INVENTORY", "👕"));
-            list.add(new QuickSuggestionDto("s4", "Soạn phiếu chi mặt bằng", "Soạn phiếu chi tiền thuê mặt bằng 15 triệu", "FINANCE", "📝"));
-            list.add(new QuickSuggestionDto("s5", "Kiểm tra công nợ đại lý", "Khách hàng nào đang nợ nhiều nhất?", "DEBT", "⚠️"));
-            list.add(new QuickSuggestionDto("s6", "Tư vấn nhập hàng tháng sau", "Tháng sau tao tính nhập thêm 100 cái áo Polo, mày thấy nên nhập không?", "ADVISORY", "💡"));
+            list.add(new QuickSuggestionDto("s2", "Công nợ NCC (AP)", "Tình hình công nợ phải trả nhà cung cấp thế nào?", "PROCUREMENT", "🏭"));
+            list.add(new QuickSuggestionDto("s3", "Voucher & Điểm thưởng", "Xem danh sách voucher đang chạy và điểm hội viên", "PROMOTION", "🎁"));
+            list.add(new QuickSuggestionDto("s4", "Xuất báo cáo cạn kho", "Xuất file Excel dự báo cạn kho", "EXPORT", "📑"));
+            list.add(new QuickSuggestionDto("s5", "Tồn kho áo Polo", "Kho còn cái áo cổ bẻ màu đen không mày?", "INVENTORY", "👕"));
+            list.add(new QuickSuggestionDto("s6", "Soạn phiếu chi mặt bằng", "Soạn phiếu chi tiền thuê mặt bằng 15 triệu", "FINANCE", "📝"));
+            list.add(new QuickSuggestionDto("s7", "Kiểm tra công nợ đại lý", "Khách hàng nào đang nợ nhiều nhất?", "DEBT", "⚠️"));
+            list.add(new QuickSuggestionDto("s8", "Quy trình giá vốn MAC", "Giải thích quy trình mua hàng và tính giá vốn bình quân gia quyền", "HELP", "💡"));
         }
 
         return ResponseEntity.ok(list);
