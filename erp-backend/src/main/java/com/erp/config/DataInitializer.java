@@ -2,6 +2,8 @@ package com.erp.config;
 
 import com.erp.branch.model.*;
 import com.erp.branch.repository.*;
+import com.erp.inventory.model.*;
+import com.erp.inventory.repository.*;
 import com.erp.finance.model.*;
 import com.erp.finance.repository.BankStatementItemRepository;
 import com.erp.finance.repository.FinanceVoucherRepository;
@@ -54,6 +56,9 @@ public class DataInitializer implements CommandLineRunner {
     private final WarehouseRepository warehouseRepository;
     private final WarehouseStockRepository warehouseStockRepository;
     private final InternalTransferRepository internalTransferRepository;
+    private final ProductBatchRepository productBatchRepository;
+    private final ProductSerialRepository productSerialRepository;
+    private final StocktakeAuditRepository stocktakeAuditRepository;
 
     @Override
     public void run(String... args) {
@@ -722,6 +727,192 @@ public class DataInitializer implements CommandLineRunner {
 
                 internalTransferRepository.save(sampleTransfer);
                 log.info("Initialized sample in-transit Internal Transfer: ITN-20261125-001");
+            }
+        }
+
+        // Khởi tạo Dữ liệu Giai đoạn 3: Lô Hàng, Radar Cận Date, Serial / IMEI & Kiểm Kê Kho
+        var allProds = productRepository.findAll();
+        var allWhs = warehouseRepository.findAll();
+        if (!allProds.isEmpty() && !allWhs.isEmpty()) {
+            var firstP = allProds.get(0);
+            var firstWh = allWhs.get(0);
+
+            // 1. Khởi tạo Lô hàng mẫu (Batch/Lot & Expiry Radar)
+            if (productBatchRepository.count() == 0) {
+                java.time.LocalDate today = java.time.LocalDate.now();
+
+                ProductBatch bSafe = new ProductBatch();
+                bSafe.setBatchCode("LOT-202611-SAFE01");
+                bSafe.setProductId(firstP.getId());
+                bSafe.setProductSku(firstP.getSku());
+                bSafe.setProductName(firstP.getName());
+                bSafe.setWarehouseId(firstWh.getId());
+                bSafe.setWarehouseName(firstWh.getName());
+                bSafe.setManufacturingDate(today.minusDays(30));
+                bSafe.setExpiryDate(today.plusDays(150)); // > 90 ngày: Vùng Xanh
+                bSafe.setInitialQuantity(50);
+                bSafe.setRemainingQuantity(50);
+                bSafe.setCostPrice(firstP.getMovingAvgCost());
+                bSafe.setSupplierName("Công ty Dệt May Sài Gòn");
+                bSafe.setNotes("Lô hàng nhập mới chất lượng cao");
+                bSafe.refreshStatus();
+
+                ProductBatch bWarn = new ProductBatch();
+                bWarn.setBatchCode("LOT-202611-WARN02");
+                bWarn.setProductId(firstP.getId());
+                bWarn.setProductSku(firstP.getSku());
+                bWarn.setProductName(firstP.getName());
+                bWarn.setWarehouseId(firstWh.getId());
+                bWarn.setWarehouseName(firstWh.getName());
+                bWarn.setManufacturingDate(today.minusDays(120));
+                bWarn.setExpiryDate(today.plusDays(45)); // 30-90 ngày: Vùng Vàng (Cần lưu ý)
+                bWarn.setInitialQuantity(30);
+                bWarn.setRemainingQuantity(25);
+                bWarn.setCostPrice(firstP.getMovingAvgCost());
+                bWarn.setSupplierName("Xưởng May Tân Bình");
+                bWarn.setNotes("Lô hàng cần đẩy mạnh bán khuyến mại");
+                bWarn.refreshStatus();
+
+                ProductBatch bDanger = new ProductBatch();
+                bDanger.setBatchCode("LOT-202611-DANGER03");
+                bDanger.setProductId(firstP.getId());
+                bDanger.setProductSku(firstP.getSku());
+                bDanger.setProductName(firstP.getName());
+                bDanger.setWarehouseId(firstWh.getId());
+                bDanger.setWarehouseName(firstWh.getName());
+                bDanger.setManufacturingDate(today.minusDays(170));
+                bDanger.setExpiryDate(today.plusDays(12)); // < 30 ngày: Vùng Đỏ (Nguy cấp)
+                bDanger.setInitialQuantity(20);
+                bDanger.setRemainingQuantity(15);
+                bDanger.setCostPrice(firstP.getMovingAvgCost());
+                bDanger.setSupplierName("Xưởng May Tân Bình");
+                bDanger.setNotes("Lô hàng cận date dưới 15 ngày, xả hàng gấp");
+                bDanger.refreshStatus();
+
+                ProductBatch bExpired = new ProductBatch();
+                bExpired.setBatchCode("LOT-202610-EXP04");
+                bExpired.setProductId(firstP.getId());
+                bExpired.setProductSku(firstP.getSku());
+                bExpired.setProductName(firstP.getName());
+                bExpired.setWarehouseId(firstWh.getId());
+                bExpired.setWarehouseName(firstWh.getName());
+                bExpired.setManufacturingDate(today.minusDays(200));
+                bExpired.setExpiryDate(today.minusDays(5)); // Đã quá hạn
+                bExpired.setInitialQuantity(10);
+                bExpired.setRemainingQuantity(5);
+                bExpired.setCostPrice(firstP.getMovingAvgCost());
+                bExpired.setSupplierName("Đối tác Nhập khẩu");
+                bExpired.setNotes("Hàng hết hạn, cách ly chuyển vào kho hủy");
+                bExpired.refreshStatus();
+
+                productBatchRepository.saveAll(java.util.List.of(bSafe, bWarn, bDanger, bExpired));
+                log.info("Initialized 4 sample Product Batches across 3 Risk Zones for Expiry Radar");
+            }
+
+            // 2. Khởi tạo Định danh Serial / IMEI mẫu & Bảo hành điện tử
+            if (productSerialRepository.count() == 0) {
+                java.time.LocalDate today = java.time.LocalDate.now();
+
+                ProductSerial s1 = new ProductSerial();
+                s1.setSerialNumber("SN-IP15P-VN001");
+                s1.setProductId(firstP.getId());
+                s1.setProductSku(firstP.getSku());
+                s1.setProductName(firstP.getName());
+                s1.setWarehouseId(firstWh.getId());
+                s1.setWarehouseName(firstWh.getName());
+                s1.setStatus(SerialStatus.IN_STOCK);
+                s1.setWarrantyMonths(12);
+                s1.setNotes("Mã Serial mới nhập kho");
+
+                ProductSerial s2 = new ProductSerial();
+                s2.setSerialNumber("SN-IP15P-VN002");
+                s2.setProductId(firstP.getId());
+                s2.setProductSku(firstP.getSku());
+                s2.setProductName(firstP.getName());
+                s2.setWarehouseId(firstWh.getId());
+                s2.setWarehouseName(firstWh.getName());
+                s2.setStatus(SerialStatus.IN_STOCK);
+                s2.setWarrantyMonths(12);
+
+                ProductSerial s3 = new ProductSerial();
+                s3.setSerialNumber("SN-IP15P-VN003");
+                s3.setProductId(firstP.getId());
+                s3.setProductSku(firstP.getSku());
+                s3.setProductName(firstP.getName());
+                s3.setWarehouseId(firstWh.getId());
+                s3.setWarehouseName(firstWh.getName());
+                s3.setStatus(SerialStatus.ACTIVE_WARRANTY);
+                s3.setCustomerId(1L);
+                s3.setCustomerName("Nguyễn Văn An");
+                s3.setCustomerPhone("0909888777");
+                s3.setOrderId(1L);
+                s3.setOrderCode("ORD-20261120-001");
+                s3.setWarrantyStartDate(today.minusMonths(2));
+                s3.setWarrantyMonths(12);
+                s3.setWarrantyEndDate(today.minusMonths(2).plusMonths(12));
+                s3.setNotes("Kích hoạt bảo hành điện tử chính hãng");
+
+                ProductSerial s4 = new ProductSerial();
+                s4.setSerialNumber("SN-IP15P-VN004");
+                s4.setProductId(firstP.getId());
+                s4.setProductSku(firstP.getSku());
+                s4.setProductName(firstP.getName());
+                s4.setWarehouseId(firstWh.getId());
+                s4.setWarehouseName(firstWh.getName());
+                s4.setStatus(SerialStatus.UNDER_REPAIR);
+                s4.setCustomerId(2L);
+                s4.setCustomerName("Trần Thị Bích");
+                s4.setCustomerPhone("0912345678");
+                s4.setWarrantyStartDate(today.minusMonths(5));
+                s4.setWarrantyMonths(12);
+                s4.setWarrantyEndDate(today.minusMonths(5).plusMonths(12));
+                s4.setNotes("Tiếp nhận sửa chữa bảo hành lỗi nguồn");
+
+                productSerialRepository.saveAll(java.util.List.of(s1, s2, s3, s4));
+                log.info("Initialized 4 sample Product Serials with warranty tracking");
+            }
+
+            // 3. Khởi tạo Phiếu Kiểm Kê Kho mẫu (Stocktake Audit)
+            if (stocktakeAuditRepository.count() == 0) {
+                StocktakeAudit audit = new StocktakeAudit();
+                audit.setAuditCode("AUDIT-20261125-001");
+                audit.setTitle("Kiểm kê định kỳ Kho Tổng Miền Bắc Tháng 11");
+                audit.setWarehouseId(firstWh.getId());
+                audit.setWarehouseName(firstWh.getName());
+                audit.setAuditType("PERIODIC");
+                audit.setStatus(StocktakeStatus.IN_PROGRESS);
+                audit.setCreatedBy("admin");
+                audit.setStartedAt(java.time.LocalDateTime.now().minusHours(3));
+                audit.setNotes("Kiểm kê đợt 1 các mặt hàng bán chạy chuẩn bị quyết toán quý");
+
+                StocktakeItem item1 = new StocktakeItem();
+                item1.setProductId(firstP.getId());
+                item1.setProductSku(firstP.getSku());
+                item1.setProductName(firstP.getName());
+                item1.setSystemStock(120);
+                item1.setCountedStock(118); // Thiếu 2 cái
+                item1.calculateDifference();
+                item1.setReason("Hao hụt rách 2 bao bì trong quá trình bốc xếp");
+                audit.addItem(item1);
+
+                if (allProds.size() > 1) {
+                    var secondP = allProds.get(1);
+                    StocktakeItem item2 = new StocktakeItem();
+                    item2.setProductId(secondP.getId());
+                    item2.setProductSku(secondP.getSku());
+                    item2.setProductName(secondP.getName());
+                    item2.setSystemStock(80);
+                    item2.setCountedStock(81); // Thừa 1 cái
+                    item2.calculateDifference();
+                    item2.setReason("Nhà cung cấp giao dư 1 cái khuyến mại");
+                    audit.addItem(item2);
+                }
+
+                audit.setTotalItems(audit.getItems().size());
+                audit.setTotalDiscrepancyQty(3);
+
+                stocktakeAuditRepository.save(audit);
+                log.info("Initialized sample Stocktake Audit in progress: AUDIT-20261125-001");
             }
         }
     }

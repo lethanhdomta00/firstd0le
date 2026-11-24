@@ -62,6 +62,12 @@ const routes = [
         meta: { permission: 'BRANCH_VIEW' }
       },
       {
+        path: 'inventory-audit',
+        name: 'InventoryAudit',
+        component: () => import('../views/InventoryAudit.vue'),
+        meta: { permission: 'PRODUCT_VIEW' }
+      },
+      {
         path: 'users',
         name: 'Users',
         component: () => import('../views/Users.vue'),

@@ -152,6 +152,13 @@
           </template>
         </el-menu-item>
 
+        <el-menu-item v-if="authStore.hasPermission('PRODUCT_VIEW') || authStore.isAdmin || authStore.user?.role === 'WAREHOUSE'" index="/inventory-audit">
+          <el-icon><Box /></el-icon>
+          <template #title>
+            <span class="menu-title-text">Lô hàng & Kiểm kê</span>
+          </template>
+        </el-menu-item>
+
         <el-menu-item v-if="authStore.isAdmin" index="/settings">
           <el-icon><Setting /></el-icon>
           <template #title>
@@ -269,6 +276,10 @@
         <el-menu-item v-if="authStore.hasPermission('BRANCH_VIEW') || authStore.isAdmin || authStore.user?.role === 'WAREHOUSE' || authStore.user?.role === 'MANAGER'" index="/branches">
           <el-icon><OfficeBuilding /></el-icon>
           <template #title>Đa Chi nhánh & Kho</template>
+        </el-menu-item>
+        <el-menu-item v-if="authStore.hasPermission('PRODUCT_VIEW') || authStore.isAdmin || authStore.user?.role === 'WAREHOUSE'" index="/inventory-audit">
+          <el-icon><Box /></el-icon>
+          <template #title>Lô hàng & Kiểm kê</template>
         </el-menu-item>
         <el-menu-item v-if="authStore.isAdmin" index="/settings">
           <el-icon><Setting /></el-icon>
@@ -566,7 +577,8 @@ import {
   Money,
   Van,
   Present,
-  OfficeBuilding
+  OfficeBuilding,
+  Box
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
