@@ -49,10 +49,12 @@
       <el-menu 
         :default-active="$route.path" 
         router 
+        unique-opened
         :collapse="isCollapse"
         background-color="transparent" 
         class="custom-enterprise-menu"
       >
+        <!-- 1. Tổng quan Dashboard -->
         <el-menu-item index="/">
           <el-icon><Monitor /></el-icon>
           <template #title>
@@ -60,111 +62,149 @@
           </template>
         </el-menu-item>
 
-        <el-menu-item v-if="authStore.hasPermission('PRODUCT_VIEW')" index="/products">
-          <el-icon><Goods /></el-icon>
+        <!-- 2. Cụm: Bán hàng & Khách hàng -->
+        <el-sub-menu 
+          v-if="authStore.hasPermission('ORDER_VIEW') || authStore.isAdmin || authStore.user?.role === 'ACCOUNTANT'" 
+          index="group-sales"
+        >
           <template #title>
-            <span class="menu-title-text">Quản lý Sản phẩm</span>
+            <el-icon><Tickets /></el-icon>
+            <span class="menu-title-text">Bán hàng & Đơn hàng</span>
           </template>
-        </el-menu-item>
+          <el-menu-item v-if="authStore.hasPermission('ORDER_VIEW')" index="/orders">
+            <el-icon><Tickets /></el-icon>
+            <template #title>
+              <span class="menu-title-text">Quản lý Đơn hàng</span>
+            </template>
+          </el-menu-item>
+          <el-menu-item v-if="authStore.hasPermission('ORDER_VIEW') || authStore.isAdmin || authStore.user?.role === 'ACCOUNTANT'" index="/promotions">
+            <el-icon><Present /></el-icon>
+            <template #title>
+              <span class="menu-title-text">Khuyến mại & Loyalty</span>
+            </template>
+          </el-menu-item>
+        </el-sub-menu>
 
-        <el-menu-item v-if="authStore.hasPermission('ORDER_VIEW')" index="/orders">
-          <el-icon><Tickets /></el-icon>
+        <!-- 3. Cụm: Kho vận & Chuỗi cung ứng -->
+        <el-sub-menu 
+          v-if="authStore.hasPermission('PRODUCT_VIEW') || authStore.hasPermission('BRANCH_VIEW') || authStore.hasPermission('PROCUREMENT_VIEW') || authStore.isAdmin || authStore.user?.role === 'WAREHOUSE'" 
+          index="group-inventory"
+        >
           <template #title>
-            <span class="menu-title-text">Quản lý Đơn hàng</span>
+            <el-icon><Box /></el-icon>
+            <span class="menu-title-text">Kho vận & Sản phẩm</span>
           </template>
-        </el-menu-item>
+          <el-menu-item v-if="authStore.hasPermission('PRODUCT_VIEW')" index="/products">
+            <el-icon><Goods /></el-icon>
+            <template #title>
+              <span class="menu-title-text">Quản lý Sản phẩm</span>
+            </template>
+          </el-menu-item>
+          <el-menu-item v-if="authStore.hasPermission('BRANCH_VIEW') || authStore.isAdmin || authStore.user?.role === 'WAREHOUSE' || authStore.user?.role === 'MANAGER'" index="/branches">
+            <el-icon><OfficeBuilding /></el-icon>
+            <template #title>
+              <span class="menu-title-text">Đa Chi nhánh & Kho</span>
+            </template>
+          </el-menu-item>
+          <el-menu-item v-if="authStore.hasPermission('PRODUCT_VIEW') || authStore.isAdmin || authStore.user?.role === 'WAREHOUSE'" index="/inventory-audit">
+            <el-icon><Box /></el-icon>
+            <template #title>
+              <span class="menu-title-text">Lô hàng & Kiểm kê</span>
+            </template>
+          </el-menu-item>
+          <el-menu-item v-if="authStore.hasPermission('PROCUREMENT_VIEW') || authStore.isAdmin || authStore.user?.role === 'WAREHOUSE' || authStore.user?.role === 'ACCOUNTANT'" index="/procurement">
+            <el-icon><Van /></el-icon>
+            <template #title>
+              <span class="menu-title-text">Mua hàng & SRM</span>
+            </template>
+          </el-menu-item>
+        </el-sub-menu>
 
-        <el-menu-item v-if="authStore.hasPermission('USER_VIEW')" index="/users">
-          <el-icon><User /></el-icon>
+        <!-- 4. Cụm: Tài chính & Báo cáo -->
+        <el-sub-menu 
+          v-if="authStore.hasPermission('ANALYTICS_VIEW') || authStore.isAdmin || authStore.user?.role === 'ACCOUNTANT'" 
+          index="group-finance"
+        >
           <template #title>
-            <span class="menu-title-text">Quản lý Tài khoản</span>
+            <el-icon><Money /></el-icon>
+            <span class="menu-title-text">Tài chính & Báo cáo</span>
           </template>
-        </el-menu-item>
+          <el-menu-item v-if="authStore.hasPermission('ANALYTICS_VIEW') || authStore.isAdmin || authStore.user?.role === 'ACCOUNTANT'" index="/finance">
+            <el-icon><Money /></el-icon>
+            <template #title>
+              <span class="menu-title-text">Tài chính & Sổ Quỹ</span>
+            </template>
+          </el-menu-item>
+          <el-menu-item v-if="authStore.hasPermission('ANALYTICS_VIEW')" index="/analytics">
+            <el-icon><DataAnalysis /></el-icon>
+            <template #title>
+              <span class="menu-title-text">Báo cáo & Phân tích</span>
+            </template>
+          </el-menu-item>
+        </el-sub-menu>
 
-        <el-menu-item v-if="authStore.hasPermission('CHAT_USE')" index="/chat">
-          <el-icon><ChatDotRound /></el-icon>
+        <!-- 5. Cụm: Hợp tác & Tiện ích nội bộ -->
+        <el-sub-menu index="group-collab">
           <template #title>
-            <div class="menu-item-with-badge">
-              <span class="menu-title-text">Trò chuyện nội bộ</span>
-              <span v-if="chatStore.totalUnreadCount > 0" class="sidebar-unread-badge">
-                {{ chatStore.totalUnreadCount > 99 ? '99+' : chatStore.totalUnreadCount }}
-              </span>
-            </div>
+            <el-icon><ChatDotRound /></el-icon>
+            <span class="menu-title-text">Hợp tác & Tiện ích</span>
           </template>
-        </el-menu-item>
+          <el-menu-item v-if="authStore.hasPermission('CHAT_USE')" index="/chat">
+            <el-icon><ChatDotRound /></el-icon>
+            <template #title>
+              <div class="menu-item-with-badge">
+                <span class="menu-title-text">Trò chuyện nội bộ</span>
+                <span v-if="chatStore.totalUnreadCount > 0" class="sidebar-unread-badge">
+                  {{ chatStore.totalUnreadCount > 99 ? '99+' : chatStore.totalUnreadCount }}
+                </span>
+              </div>
+            </template>
+          </el-menu-item>
+          <el-menu-item index="/calendar">
+            <el-icon><Calendar /></el-icon>
+            <template #title>
+              <span class="menu-title-text">Lịch biểu & Công việc</span>
+            </template>
+          </el-menu-item>
+          <el-menu-item v-if="authStore.hasPermission('AI_COPILOT')" index="/ai-copilot" @click.prevent="openChatWidget">
+            <el-icon class="ai-sparkle-icon"><Cpu /></el-icon>
+            <template #title>
+              <div class="ai-menu-item-row">
+                <span class="menu-title-text">Trợ lý AI Copilot</span>
+                <span class="ai-pill-tag">LIVE</span>
+              </div>
+            </template>
+          </el-menu-item>
+        </el-sub-menu>
 
-        <el-menu-item index="/calendar">
-          <el-icon><Calendar /></el-icon>
+        <!-- 6. Cụm: Quản trị Hệ thống -->
+        <el-sub-menu 
+          v-if="authStore.isAdmin || authStore.hasPermission('USER_VIEW')" 
+          index="group-system"
+        >
           <template #title>
-            <span class="menu-title-text">Lịch biểu & Công việc</span>
+            <el-icon><Setting /></el-icon>
+            <span class="menu-title-text">Quản trị Hệ thống</span>
           </template>
-        </el-menu-item>
-
-        <el-menu-item v-if="authStore.hasPermission('AI_COPILOT')" index="/ai-copilot" @click.prevent="openChatWidget">
-          <el-icon class="ai-sparkle-icon"><Cpu /></el-icon>
-          <template #title>
-            <div class="ai-menu-item-row">
-              <span class="menu-title-text">Trợ lý AI Copilot</span>
-              <span class="ai-pill-tag">LIVE</span>
-            </div>
-          </template>
-        </el-menu-item>
-
-        <el-menu-item v-if="authStore.isAdmin" index="/announcements">
-          <el-icon><BellFilled /></el-icon>
-          <template #title>
-            <span class="menu-title-text">Quản lý Thông báo</span>
-          </template>
-        </el-menu-item>
-
-        <el-menu-item v-if="authStore.hasPermission('ANALYTICS_VIEW')" index="/analytics">
-          <el-icon><DataAnalysis /></el-icon>
-          <template #title>
-            <span class="menu-title-text">Báo cáo & Phân tích</span>
-          </template>
-        </el-menu-item>
-
-        <el-menu-item v-if="authStore.hasPermission('ANALYTICS_VIEW') || authStore.isAdmin || authStore.user?.role === 'ACCOUNTANT'" index="/finance">
-          <el-icon><Money /></el-icon>
-          <template #title>
-            <span class="menu-title-text">Tài chính & Sổ Quỹ</span>
-          </template>
-        </el-menu-item>
-
-        <el-menu-item v-if="authStore.hasPermission('PROCUREMENT_VIEW') || authStore.isAdmin || authStore.user?.role === 'WAREHOUSE' || authStore.user?.role === 'ACCOUNTANT'" index="/procurement">
-          <el-icon><Van /></el-icon>
-          <template #title>
-            <span class="menu-title-text">Mua hàng & SRM</span>
-          </template>
-        </el-menu-item>
-
-        <el-menu-item v-if="authStore.hasPermission('ORDER_VIEW') || authStore.isAdmin || authStore.user?.role === 'ACCOUNTANT'" index="/promotions">
-          <el-icon><Present /></el-icon>
-          <template #title>
-            <span class="menu-title-text">Khuyến mại & Loyalty</span>
-          </template>
-        </el-menu-item>
-
-        <el-menu-item v-if="authStore.hasPermission('BRANCH_VIEW') || authStore.isAdmin || authStore.user?.role === 'WAREHOUSE' || authStore.user?.role === 'MANAGER'" index="/branches">
-          <el-icon><OfficeBuilding /></el-icon>
-          <template #title>
-            <span class="menu-title-text">Đa Chi nhánh & Kho</span>
-          </template>
-        </el-menu-item>
-
-        <el-menu-item v-if="authStore.hasPermission('PRODUCT_VIEW') || authStore.isAdmin || authStore.user?.role === 'WAREHOUSE'" index="/inventory-audit">
-          <el-icon><Box /></el-icon>
-          <template #title>
-            <span class="menu-title-text">Lô hàng & Kiểm kê</span>
-          </template>
-        </el-menu-item>
-
-        <el-menu-item v-if="authStore.isAdmin" index="/settings">
-          <el-icon><Setting /></el-icon>
-          <template #title>
-            <span class="menu-title-text">Cài đặt hệ thống</span>
-          </template>
-        </el-menu-item>
+          <el-menu-item v-if="authStore.hasPermission('USER_VIEW')" index="/users">
+            <el-icon><User /></el-icon>
+            <template #title>
+              <span class="menu-title-text">Quản lý Tài khoản</span>
+            </template>
+          </el-menu-item>
+          <el-menu-item v-if="authStore.isAdmin" index="/announcements">
+            <el-icon><BellFilled /></el-icon>
+            <template #title>
+              <span class="menu-title-text">Quản lý Thông báo</span>
+            </template>
+          </el-menu-item>
+          <el-menu-item v-if="authStore.isAdmin" index="/settings">
+            <el-icon><Setting /></el-icon>
+            <template #title>
+              <span class="menu-title-text">Cài đặt hệ thống</span>
+            </template>
+          </el-menu-item>
+        </el-sub-menu>
       </el-menu>
 
       <!-- Bottom Info Card (Figma Match) -->
@@ -207,84 +247,135 @@
       <el-menu 
         :default-active="$route.path" 
         router 
+        unique-opened
         class="custom-enterprise-menu"
         @select="mobileDrawerVisible = false"
       >
+        <!-- 1. Tổng quan Dashboard -->
         <el-menu-item index="/">
           <el-icon><Monitor /></el-icon>
-          <template #title>Dashboard</template>
-        </el-menu-item>
-        <el-menu-item v-if="authStore.hasPermission('PRODUCT_VIEW')" index="/products">
-          <el-icon><Goods /></el-icon>
-          <template #title>Quản lý Sản phẩm</template>
-        </el-menu-item>
-        <el-menu-item v-if="authStore.hasPermission('ORDER_VIEW')" index="/orders">
-          <el-icon><Tickets /></el-icon>
-          <template #title>Quản lý Đơn hàng</template>
-        </el-menu-item>
-        <el-menu-item v-if="authStore.hasPermission('USER_VIEW')" index="/users">
-          <el-icon><User /></el-icon>
-          <template #title>Quản lý Tài khoản</template>
-        </el-menu-item>
-        <el-menu-item v-if="authStore.hasPermission('CHAT_USE')" index="/chat">
-          <el-icon><ChatDotRound /></el-icon>
-          <template #title>
-            <div class="menu-item-with-badge">
-              <span class="menu-title-text">Trò chuyện nội bộ</span>
-              <span v-if="chatStore.totalUnreadCount > 0" class="sidebar-unread-badge">
-                {{ chatStore.totalUnreadCount > 99 ? '99+' : chatStore.totalUnreadCount }}
-              </span>
-            </div>
-          </template>
+          <template #title>Tổng quan Dashboard</template>
         </el-menu-item>
 
-        <el-menu-item index="/calendar">
-          <el-icon><Calendar /></el-icon>
+        <!-- 2. Bán hàng & Khách hàng -->
+        <el-sub-menu 
+          v-if="authStore.hasPermission('ORDER_VIEW') || authStore.isAdmin || authStore.user?.role === 'ACCOUNTANT'" 
+          index="m-group-sales"
+        >
           <template #title>
-            <span class="menu-title-text">Lịch biểu & Công việc</span>
+            <el-icon><Tickets /></el-icon>
+            <span>Bán hàng & Đơn hàng</span>
           </template>
-        </el-menu-item>
-        <el-menu-item v-if="authStore.hasPermission('AI_COPILOT')" index="/ai-copilot" @click.prevent="openChatWidget">
-          <el-icon class="ai-sparkle-icon"><Cpu /></el-icon>
+          <el-menu-item v-if="authStore.hasPermission('ORDER_VIEW')" index="/orders">
+            <el-icon><Tickets /></el-icon>
+            <template #title>Quản lý Đơn hàng</template>
+          </el-menu-item>
+          <el-menu-item v-if="authStore.hasPermission('ORDER_VIEW') || authStore.isAdmin || authStore.user?.role === 'ACCOUNTANT'" index="/promotions">
+            <el-icon><Present /></el-icon>
+            <template #title>Khuyến mại & Loyalty</template>
+          </el-menu-item>
+        </el-sub-menu>
+
+        <!-- 3. Kho vận & Chuỗi cung ứng -->
+        <el-sub-menu 
+          v-if="authStore.hasPermission('PRODUCT_VIEW') || authStore.hasPermission('BRANCH_VIEW') || authStore.hasPermission('PROCUREMENT_VIEW') || authStore.isAdmin || authStore.user?.role === 'WAREHOUSE'" 
+          index="m-group-inventory"
+        >
           <template #title>
-            <div class="ai-menu-item-row">
-              <span class="menu-title-text">Trợ lý AI Copilot</span>
-              <span class="ai-pill-tag">LIVE</span>
-            </div>
+            <el-icon><Box /></el-icon>
+            <span>Kho vận & Sản phẩm</span>
           </template>
-        </el-menu-item>
-        <el-menu-item v-if="authStore.isAdmin" index="/announcements">
-          <el-icon><BellFilled /></el-icon>
-          <template #title>Quản lý Thông báo</template>
-        </el-menu-item>
-        <el-menu-item v-if="authStore.hasPermission('ANALYTICS_VIEW')" index="/analytics">
-          <el-icon><DataAnalysis /></el-icon>
-          <template #title>Báo cáo & Phân tích</template>
-        </el-menu-item>
-        <el-menu-item v-if="authStore.hasPermission('ANALYTICS_VIEW') || authStore.isAdmin || authStore.user?.role === 'ACCOUNTANT'" index="/finance">
-          <el-icon><Money /></el-icon>
-          <template #title>Tài chính & Sổ Quỹ</template>
-        </el-menu-item>
-        <el-menu-item v-if="authStore.hasPermission('PROCUREMENT_VIEW') || authStore.isAdmin || authStore.user?.role === 'WAREHOUSE' || authStore.user?.role === 'ACCOUNTANT'" index="/procurement">
-          <el-icon><Van /></el-icon>
-          <template #title>Mua hàng & SRM</template>
-        </el-menu-item>
-        <el-menu-item v-if="authStore.hasPermission('ORDER_VIEW') || authStore.isAdmin || authStore.user?.role === 'ACCOUNTANT'" index="/promotions">
-          <el-icon><Present /></el-icon>
-          <template #title>Khuyến mại & Loyalty</template>
-        </el-menu-item>
-        <el-menu-item v-if="authStore.hasPermission('BRANCH_VIEW') || authStore.isAdmin || authStore.user?.role === 'WAREHOUSE' || authStore.user?.role === 'MANAGER'" index="/branches">
-          <el-icon><OfficeBuilding /></el-icon>
-          <template #title>Đa Chi nhánh & Kho</template>
-        </el-menu-item>
-        <el-menu-item v-if="authStore.hasPermission('PRODUCT_VIEW') || authStore.isAdmin || authStore.user?.role === 'WAREHOUSE'" index="/inventory-audit">
-          <el-icon><Box /></el-icon>
-          <template #title>Lô hàng & Kiểm kê</template>
-        </el-menu-item>
-        <el-menu-item v-if="authStore.isAdmin" index="/settings">
-          <el-icon><Setting /></el-icon>
-          <template #title>Cài đặt hệ thống</template>
-        </el-menu-item>
+          <el-menu-item v-if="authStore.hasPermission('PRODUCT_VIEW')" index="/products">
+            <el-icon><Goods /></el-icon>
+            <template #title>Quản lý Sản phẩm</template>
+          </el-menu-item>
+          <el-menu-item v-if="authStore.hasPermission('BRANCH_VIEW') || authStore.isAdmin || authStore.user?.role === 'WAREHOUSE' || authStore.user?.role === 'MANAGER'" index="/branches">
+            <el-icon><OfficeBuilding /></el-icon>
+            <template #title>Đa Chi nhánh & Kho</template>
+          </el-menu-item>
+          <el-menu-item v-if="authStore.hasPermission('PRODUCT_VIEW') || authStore.isAdmin || authStore.user?.role === 'WAREHOUSE'" index="/inventory-audit">
+            <el-icon><Box /></el-icon>
+            <template #title>Lô hàng & Kiểm kê</template>
+          </el-menu-item>
+          <el-menu-item v-if="authStore.hasPermission('PROCUREMENT_VIEW') || authStore.isAdmin || authStore.user?.role === 'WAREHOUSE' || authStore.user?.role === 'ACCOUNTANT'" index="/procurement">
+            <el-icon><Van /></el-icon>
+            <template #title>Mua hàng & SRM</template>
+          </el-menu-item>
+        </el-sub-menu>
+
+        <!-- 4. Tài chính & Báo cáo -->
+        <el-sub-menu 
+          v-if="authStore.hasPermission('ANALYTICS_VIEW') || authStore.isAdmin || authStore.user?.role === 'ACCOUNTANT'" 
+          index="m-group-finance"
+        >
+          <template #title>
+            <el-icon><Money /></el-icon>
+            <span>Tài chính & Báo cáo</span>
+          </template>
+          <el-menu-item v-if="authStore.hasPermission('ANALYTICS_VIEW') || authStore.isAdmin || authStore.user?.role === 'ACCOUNTANT'" index="/finance">
+            <el-icon><Money /></el-icon>
+            <template #title>Tài chính & Sổ Quỹ</template>
+          </el-menu-item>
+          <el-menu-item v-if="authStore.hasPermission('ANALYTICS_VIEW')" index="/analytics">
+            <el-icon><DataAnalysis /></el-icon>
+            <template #title>Báo cáo & Phân tích</template>
+          </el-menu-item>
+        </el-sub-menu>
+
+        <!-- 5. Hợp tác & Tiện ích -->
+        <el-sub-menu index="m-group-collab">
+          <template #title>
+            <el-icon><ChatDotRound /></el-icon>
+            <span>Hợp tác & Tiện ích</span>
+          </template>
+          <el-menu-item v-if="authStore.hasPermission('CHAT_USE')" index="/chat">
+            <el-icon><ChatDotRound /></el-icon>
+            <template #title>
+              <div class="menu-item-with-badge">
+                <span class="menu-title-text">Trò chuyện nội bộ</span>
+                <span v-if="chatStore.totalUnreadCount > 0" class="sidebar-unread-badge">
+                  {{ chatStore.totalUnreadCount > 99 ? '99+' : chatStore.totalUnreadCount }}
+                </span>
+              </div>
+            </template>
+          </el-menu-item>
+          <el-menu-item index="/calendar">
+            <el-icon><Calendar /></el-icon>
+            <template #title>Lịch biểu & Công việc</template>
+          </el-menu-item>
+          <el-menu-item v-if="authStore.hasPermission('AI_COPILOT')" index="/ai-copilot" @click.prevent="openChatWidget">
+            <el-icon class="ai-sparkle-icon"><Cpu /></el-icon>
+            <template #title>
+              <div class="ai-menu-item-row">
+                <span class="menu-title-text">Trợ lý AI Copilot</span>
+                <span class="ai-pill-tag">LIVE</span>
+              </div>
+            </template>
+          </el-menu-item>
+        </el-sub-menu>
+
+        <!-- 6. Quản trị Hệ thống -->
+        <el-sub-menu 
+          v-if="authStore.isAdmin || authStore.hasPermission('USER_VIEW')" 
+          index="m-group-system"
+        >
+          <template #title>
+            <el-icon><Setting /></el-icon>
+            <span>Quản trị Hệ thống</span>
+          </template>
+          <el-menu-item v-if="authStore.hasPermission('USER_VIEW')" index="/users">
+            <el-icon><User /></el-icon>
+            <template #title>Quản lý Tài khoản</template>
+          </el-menu-item>
+          <el-menu-item v-if="authStore.isAdmin" index="/announcements">
+            <el-icon><BellFilled /></el-icon>
+            <template #title>Quản lý Thông báo</template>
+          </el-menu-item>
+          <el-menu-item v-if="authStore.isAdmin" index="/settings">
+            <el-icon><Setting /></el-icon>
+            <template #title>Cài đặt hệ thống</template>
+          </el-menu-item>
+        </el-sub-menu>
       </el-menu>
     </el-drawer>
 
@@ -941,7 +1032,8 @@ onBeforeUnmount(() => {
   align-items: center;
 }
 
-.desktop-sidebar.is-collapsed :deep(.el-menu-item) {
+.desktop-sidebar.is-collapsed :deep(.el-menu-item),
+.desktop-sidebar.is-collapsed :deep(.el-sub-menu__title) {
   padding: 0 !important;
   justify-content: center !important;
   margin: 4px auto;
@@ -951,13 +1043,16 @@ onBeforeUnmount(() => {
   border-radius: 12px;
 }
 
-.desktop-sidebar.is-collapsed :deep(.el-menu-item .el-icon) {
+.desktop-sidebar.is-collapsed :deep(.el-menu-item .el-icon),
+.desktop-sidebar.is-collapsed :deep(.el-sub-menu__title .el-icon) {
   margin-right: 0 !important;
   font-size: 20px;
 }
 
 .desktop-sidebar.is-collapsed :deep(.el-menu-item .menu-title-text),
-.desktop-sidebar.is-collapsed :deep(.el-menu-item .ai-pill-tag) {
+.desktop-sidebar.is-collapsed :deep(.el-menu-item .ai-pill-tag),
+.desktop-sidebar.is-collapsed :deep(.el-sub-menu__title .menu-title-text),
+.desktop-sidebar.is-collapsed :deep(.el-sub-menu__title .el-sub-menu__icon-arrow) {
   display: none !important;
 }
 
@@ -995,6 +1090,106 @@ onBeforeUnmount(() => {
 }
 
 :deep(.el-menu-item.is-active .el-icon) {
+  color: #ffffff !important;
+}
+
+/* Sub-menu Accordion Cluster Styling */
+:deep(.el-sub-menu) {
+  margin-bottom: 4px;
+}
+
+:deep(.el-sub-menu__title) {
+  height: 44px;
+  line-height: 44px;
+  border-radius: 10px;
+  margin-bottom: 2px;
+  color: #475569;
+  font-weight: 600;
+  font-size: 13.5px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  padding: 0 12px !important;
+}
+
+:deep(.el-sub-menu__title .el-icon) {
+  font-size: 18px;
+  color: #64748b;
+  margin-right: 12px;
+  transition: color 0.2s;
+}
+
+:deep(.el-sub-menu__title:hover) {
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
+
+:deep(.el-sub-menu__title:hover .el-icon) {
+  color: #2563eb;
+}
+
+:deep(.el-sub-menu.is-active > .el-sub-menu__title) {
+  color: #2563eb;
+  font-weight: 700;
+}
+
+:deep(.el-sub-menu.is-active > .el-sub-menu__title .el-icon) {
+  color: #2563eb;
+}
+
+:deep(.el-sub-menu__icon-arrow) {
+  right: 14px !important;
+  font-size: 12px;
+  color: #94a3b8;
+  font-weight: 700;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+:deep(.el-sub-menu.is-opened > .el-sub-menu__title .el-sub-menu__icon-arrow) {
+  transform: rotateZ(180deg);
+  color: #2563eb;
+}
+
+/* Nested Submenu Child Items */
+:deep(.el-sub-menu .el-menu) {
+  background-color: transparent !important;
+  padding: 2px 0 4px 6px;
+}
+
+:deep(.el-sub-menu .el-menu-item) {
+  height: 38px;
+  line-height: 38px;
+  border-radius: 8px;
+  margin-bottom: 2px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #64748b;
+  padding-left: 36px !important;
+}
+
+:deep(.el-sub-menu .el-menu-item .el-icon) {
+  font-size: 16px;
+  color: #94a3b8;
+  margin-right: 10px;
+}
+
+:deep(.el-sub-menu .el-menu-item:hover) {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+:deep(.el-sub-menu .el-menu-item:hover .el-icon) {
+  color: #2563eb;
+}
+
+:deep(.el-sub-menu .el-menu-item.is-active) {
+  background-color: #2563eb !important;
+  color: #ffffff !important;
+  font-weight: 600;
+  box-shadow: 0 3px 10px rgba(37, 99, 235, 0.22);
+}
+
+:deep(.el-sub-menu .el-menu-item.is-active .el-icon) {
   color: #ffffff !important;
 }
 
