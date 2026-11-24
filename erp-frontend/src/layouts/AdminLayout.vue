@@ -3,7 +3,7 @@
     <!-- DESKTOP SIDEBAR (Visible on >= 992px) - FIGMA IMAGES 3 & 4 -->
     <el-aside 
       v-if="!isMobile" 
-      :width="isCollapse ? '72px' : '248px'" 
+      :width="isCollapse ? '72px' : '264px'" 
       class="desktop-sidebar"
       :class="{ 'is-collapsed': isCollapse }"
     >
@@ -1019,10 +1019,28 @@ onBeforeUnmount(() => {
 /* Custom Enterprise Menu */
 .custom-enterprise-menu {
   border-right: none;
-  padding: 6px 10px;
+  padding: 6px 8px;
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
+  scrollbar-gutter: stable;
+}
+
+.custom-enterprise-menu::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-enterprise-menu::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-enterprise-menu::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.custom-enterprise-menu::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 .desktop-sidebar.is-collapsed .custom-enterprise-menu {
@@ -1056,6 +1074,16 @@ onBeforeUnmount(() => {
   display: none !important;
 }
 
+:deep(.menu-title-text) {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
+  line-height: normal;
+}
+
 :deep(.el-menu-item) {
   height: 44px;
   line-height: 44px;
@@ -1064,17 +1092,19 @@ onBeforeUnmount(() => {
   color: #475569;
   font-weight: 500;
   font-size: 13.5px;
-  transition: all 0.2s;
+  transition: color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
   display: flex;
   align-items: center;
   padding: 0 12px !important;
+  position: relative;
 }
 
 :deep(.el-menu-item .el-icon) {
   font-size: 18px;
   color: #64748b;
   margin-right: 12px;
-  transition: color 0.2s;
+  flex-shrink: 0;
+  transition: color 0.15s ease;
 }
 
 :deep(.el-menu-item:hover) {
@@ -1106,17 +1136,20 @@ onBeforeUnmount(() => {
   color: #475569;
   font-weight: 600;
   font-size: 13.5px;
-  transition: all 0.2s;
+  transition: color 0.15s ease, background-color 0.15s ease;
   display: flex;
   align-items: center;
-  padding: 0 12px !important;
+  padding: 0 36px 0 12px !important;
+  position: relative;
+  cursor: pointer;
 }
 
 :deep(.el-sub-menu__title .el-icon) {
   font-size: 18px;
   color: #64748b;
   margin-right: 12px;
-  transition: color 0.2s;
+  flex-shrink: 0;
+  transition: color 0.15s ease;
 }
 
 :deep(.el-sub-menu__title:hover) {
@@ -1138,22 +1171,26 @@ onBeforeUnmount(() => {
 }
 
 :deep(.el-sub-menu__icon-arrow) {
-  right: 14px !important;
-  font-size: 12px;
+  position: absolute !important;
+  right: 12px !important;
+  top: 50% !important;
+  margin-top: -6px !important;
+  font-size: 13px !important;
   color: #94a3b8;
   font-weight: 700;
-  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
 :deep(.el-sub-menu.is-opened > .el-sub-menu__title .el-sub-menu__icon-arrow) {
-  transform: rotateZ(180deg);
+  transform: rotateZ(180deg) !important;
   color: #2563eb;
 }
 
 /* Nested Submenu Child Items */
 :deep(.el-sub-menu .el-menu) {
   background-color: transparent !important;
-  padding: 2px 0 4px 6px;
+  padding: 2px 0 4px 0;
+  overflow: hidden;
 }
 
 :deep(.el-sub-menu .el-menu-item) {
@@ -1164,13 +1201,16 @@ onBeforeUnmount(() => {
   font-size: 13px;
   font-weight: 500;
   color: #64748b;
-  padding-left: 36px !important;
+  padding-left: 38px !important;
+  padding-right: 12px !important;
+  transition: color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 :deep(.el-sub-menu .el-menu-item .el-icon) {
   font-size: 16px;
   color: #94a3b8;
   margin-right: 10px;
+  flex-shrink: 0;
 }
 
 :deep(.el-sub-menu .el-menu-item:hover) {
