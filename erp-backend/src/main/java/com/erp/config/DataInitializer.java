@@ -1,5 +1,7 @@
 package com.erp.config;
 
+import com.erp.branch.model.*;
+import com.erp.branch.repository.*;
 import com.erp.finance.model.*;
 import com.erp.finance.repository.BankStatementItemRepository;
 import com.erp.finance.repository.FinanceVoucherRepository;
@@ -48,6 +50,10 @@ public class DataInitializer implements CommandLineRunner {
     private final PromotionVoucherRepository promotionVoucherRepository;
     private final TieredPriceRuleRepository tieredPriceRuleRepository;
     private final CustomerRepository customerRepository;
+    private final BranchRepository branchRepository;
+    private final WarehouseRepository warehouseRepository;
+    private final WarehouseStockRepository warehouseStockRepository;
+    private final InternalTransferRepository internalTransferRepository;
 
     @Override
     public void run(String... args) {
@@ -548,6 +554,174 @@ public class DataInitializer implements CommandLineRunner {
             if (updated) {
                 customerRepository.saveAll(customers);
                 log.info("Initialized sample loyalty points and member tiers for existing customers");
+            }
+        }
+
+        // Khởi tạo Chi nhánh & Kho hàng mặc định (Giai đoạn 2 - Multi-Branch & Multi-Warehouse)
+        if (branchRepository.count() == 0) {
+            Branch b1 = new Branch();
+            b1.setCode("BR-HN-HQ");
+            b1.setName("Trụ sở chính & Chi nhánh Hà Nội");
+            b1.setAddress("Tòa nhà Keangnam Landmark 72, Mễ Trì, Nam Từ Liêm, Hà Nội");
+            b1.setPhone("024-37899999");
+            b1.setStatus("ACTIVE");
+            b1.setIsHeadquarter(true);
+
+            Branch b2 = new Branch();
+            b2.setCode("BR-HCM-01");
+            b2.setName("Chi nhánh Quận 1 - TP. Hồ Chí Minh");
+            b2.setAddress("Số 45 Lê Lợi, Bến Nghé, Quận 1, TP. Hồ Chí Minh");
+            b2.setPhone("028-38221234");
+            b2.setStatus("ACTIVE");
+            b2.setIsHeadquarter(false);
+
+            Branch b3 = new Branch();
+            b3.setCode("BR-DN-01");
+            b3.setName("Chi nhánh Hải Châu - Đà Nẵng");
+            b3.setAddress("Số 120 Bạch Đằng, Hải Châu, Đà Nẵng");
+            b3.setPhone("0236-3888999");
+            b3.setStatus("ACTIVE");
+            b3.setIsHeadquarter(false);
+
+            branchRepository.saveAll(java.util.List.of(b1, b2, b3));
+            log.info("Initialized default 3 Branches: HN-HQ, HCM-01, DN-01");
+
+            Warehouse wh1 = new Warehouse();
+            wh1.setBranchId(b1.getId());
+            wh1.setBranchName(b1.getName());
+            wh1.setCode("WH-TONG-MB");
+            wh1.setName("Kho Tổng Miền Bắc (Hà Nội)");
+            wh1.setWarehouseType(WarehouseType.CENTRAL_HUB);
+            wh1.setAddress("KCN Quang Minh, Mê Linh, Hà Nội");
+            wh1.setActive(true);
+
+            Warehouse wh2 = new Warehouse();
+            wh2.setBranchId(b1.getId());
+            wh2.setBranchName(b1.getName());
+            wh2.setCode("WH-HN-RETAIL");
+            wh2.setName("Kho Bán lẻ Cầu Giấy (Hà Nội)");
+            wh2.setWarehouseType(WarehouseType.RETAIL_STORE);
+            wh2.setAddress("123 Cầu Giấy, Quan Hoa, Cầu Giấy, Hà Nội");
+            wh2.setActive(true);
+
+            Warehouse wh3 = new Warehouse();
+            wh3.setBranchId(b2.getId());
+            wh3.setBranchName(b2.getName());
+            wh3.setCode("WH-HCM-RETAIL");
+            wh3.setName("Kho Bán lẻ Quận 1 (TP.HCM)");
+            wh3.setWarehouseType(WarehouseType.RETAIL_STORE);
+            wh3.setAddress("Số 45 Lê Lợi, Bến Nghé, Quận 1, TP.HCM");
+            wh3.setActive(true);
+
+            Warehouse wh4 = new Warehouse();
+            wh4.setBranchId(b1.getId());
+            wh4.setBranchName(b1.getName());
+            wh4.setCode("WH-DEFECT-01");
+            wh4.setName("Kho Hàng Lỗi & Chờ Xử Lý");
+            wh4.setWarehouseType(WarehouseType.DAMAGED_GOODS);
+            wh4.setAddress("KCN Quang Minh, Mê Linh, Hà Nội");
+            wh4.setActive(true);
+
+            warehouseRepository.saveAll(java.util.List.of(wh1, wh2, wh3, wh4));
+            log.info("Initialized default 4 Warehouses: WH-TONG-MB, WH-HN-RETAIL, WH-HCM-RETAIL, WH-DEFECT-01");
+
+            // Phân bổ tồn kho đa điểm cho các sản phẩm hiện có
+            var products = productRepository.findAll();
+            if (!products.isEmpty()) {
+                java.util.List<WarehouseStock> stockList = new java.util.ArrayList<>();
+                for (var prod : products) {
+                    WarehouseStock s1 = new WarehouseStock();
+                    s1.setWarehouseId(wh1.getId());
+                    s1.setWarehouseName(wh1.getName());
+                    s1.setBranchId(b1.getId());
+                    s1.setProductId(prod.getId());
+                    s1.setProductSku(prod.getSku());
+                    s1.setProductName(prod.getName());
+                    s1.setPhysicalStock(120);
+                    s1.setAvailableStock(120);
+                    s1.setReservedStock(0);
+                    s1.setInTransitStock(10);
+                    s1.setMinStockAlert(15);
+                    stockList.add(s1);
+
+                    WarehouseStock s2 = new WarehouseStock();
+                    s2.setWarehouseId(wh2.getId());
+                    s2.setWarehouseName(wh2.getName());
+                    s2.setBranchId(b1.getId());
+                    s2.setProductId(prod.getId());
+                    s2.setProductSku(prod.getSku());
+                    s2.setProductName(prod.getName());
+                    s2.setPhysicalStock(25);
+                    s2.setAvailableStock(25);
+                    s2.setReservedStock(0);
+                    s2.setInTransitStock(0);
+                    s2.setMinStockAlert(10);
+                    stockList.add(s2);
+
+                    WarehouseStock s3 = new WarehouseStock();
+                    s3.setWarehouseId(wh3.getId());
+                    s3.setWarehouseName(wh3.getName());
+                    s3.setBranchId(b2.getId());
+                    s3.setProductId(prod.getId());
+                    s3.setProductSku(prod.getSku());
+                    s3.setProductName(prod.getName());
+                    s3.setPhysicalStock(30);
+                    s3.setAvailableStock(30);
+                    s3.setReservedStock(0);
+                    s3.setInTransitStock(10);
+                    s3.setMinStockAlert(10);
+                    stockList.add(s3);
+
+                    WarehouseStock s4 = new WarehouseStock();
+                    s4.setWarehouseId(wh4.getId());
+                    s4.setWarehouseName(wh4.getName());
+                    s4.setBranchId(b1.getId());
+                    s4.setProductId(prod.getId());
+                    s4.setProductSku(prod.getSku());
+                    s4.setProductName(prod.getName());
+                    s4.setPhysicalStock(2);
+                    s4.setAvailableStock(0);
+                    s4.setReservedStock(0);
+                    s4.setInTransitStock(0);
+                    s4.setMinStockAlert(0);
+                    stockList.add(s4);
+
+                    // Cập nhật tổng tồn trên Product
+                    prod.setPhysicalStock(177);
+                    prod.setStock(175);
+                }
+                warehouseStockRepository.saveAll(stockList);
+                productRepository.saveAll(products);
+                log.info("Distributed multi-warehouse stocks for {} products across 4 warehouses", products.size());
+
+                // Khởi tạo 1 Phiếu điều chuyển kho mẫu đang đi đường (IN_TRANSIT)
+                var pFirst = products.get(0);
+                InternalTransfer sampleTransfer = new InternalTransfer();
+                sampleTransfer.setTransferCode("ITN-20261125-001");
+                sampleTransfer.setFromWarehouseId(wh1.getId());
+                sampleTransfer.setFromWarehouseName(wh1.getName());
+                sampleTransfer.setToWarehouseId(wh3.getId());
+                sampleTransfer.setToWarehouseName(wh3.getName());
+                sampleTransfer.setStatus(TransferStatus.IN_TRANSIT);
+                sampleTransfer.setTotalQuantity(10);
+                sampleTransfer.setCreatedBy("admin");
+                sampleTransfer.setTransferredBy("admin");
+                sampleTransfer.setDepartureDate(java.time.LocalDateTime.now().minusHours(4));
+                sampleTransfer.setNote("Điều chuyển bổ sung hàng hot từ Kho Tổng Miền Bắc vào Chi nhánh Quận 1 TP.HCM");
+
+                InternalTransferItem sampleItem = new InternalTransferItem();
+                sampleItem.setProductId(pFirst.getId());
+                sampleItem.setProductSku(pFirst.getSku());
+                sampleItem.setProductName(pFirst.getName());
+                sampleItem.setRequestedQuantity(10);
+                sampleItem.setTransferredQuantity(10);
+                sampleItem.setReceivedQuantity(0);
+                sampleItem.setDamagedQuantity(0);
+                sampleItem.setItemNote("Kiện nguyên đai nguyên kiện");
+                sampleTransfer.addItem(sampleItem);
+
+                internalTransferRepository.save(sampleTransfer);
+                log.info("Initialized sample in-transit Internal Transfer: ITN-20261125-001");
             }
         }
     }

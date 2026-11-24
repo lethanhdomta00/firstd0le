@@ -279,6 +279,15 @@
                   <span :class="{'text-amber': (row.reservedStock ?? 0) > 0}" title="Hàng đang giữ chỗ trong đơn chờ xuất">
                     Giữ: <strong>{{ row.reservedStock ?? 0 }}</strong>
                   </span>
+                  <span class="dot-sep">•</span>
+                  <button 
+                    type="button" 
+                    class="btn-multi-wh-inspect" 
+                    title="Tra cứu tồn kho đa điểm tại các chi nhánh & kho" 
+                    @click="inspectMultiWarehouseStock(row)"
+                  >
+                    Kho 📍
+                  </button>
                 </div>
               </div>
             </template>
@@ -647,6 +656,86 @@
         </div>
       </div>
     </Teleport>
+
+    <!-- MODAL TRA CỨU TỒN KHO ĐA ĐIỂM -->
+    <el-dialog
+      v-model="multiWarehouseDialogVisible"
+      title="Phân Bổ Tồn Kho Đa Điểm & Chi Nhánh"
+      width="720px"
+      destroy-on-close
+    >
+      <div v-if="currentMultiStock" v-loading="loadingMultiWarehouse" class="multi-wh-dialog-body">
+        <div class="multi-wh-header-summary">
+          <div>
+            <span class="code-badge">{{ currentMultiStock.productSku }}</span>
+            <h3 class="font-bold text-dark mt-1">{{ currentMultiStock.productName }}</h3>
+          </div>
+          <div class="multi-wh-total-pills">
+            <div class="wh-sum-pill">
+              <span class="wh-sum-lbl">Tổng Tồn Kệ</span>
+              <span class="wh-sum-val">{{ (currentMultiStock.totalPhysicalStock ?? 0).toLocaleString() }}</span>
+            </div>
+            <div class="wh-sum-pill text-emerald">
+              <span class="wh-sum-lbl">Khả Dụng Bán</span>
+              <span class="wh-sum-val">{{ (currentMultiStock.totalAvailableStock ?? 0).toLocaleString() }}</span>
+            </div>
+            <div class="wh-sum-pill text-amber">
+              <span class="wh-sum-lbl">Đang Đi Đường</span>
+              <span class="wh-sum-val">+{{ (currentMultiStock.totalInTransitStock ?? 0).toLocaleString() }}</span>
+            </div>
+          </div>
+        </div>
+
+        <el-table :data="currentMultiStock.breakdown" stripe class="enterprise-table mt-3">
+          <el-table-column prop="warehouseName" label="Kho Hàng & Chi Nhánh" min-width="180">
+            <template #default="{ row }">
+              <div class="name-cell">
+                <span class="font-bold text-dark">{{ row.warehouseName }}</span>
+                <span class="sub-text">{{ row.branchName }}</span>
+              </div>
+            </template>
+          </el-table-column>
+
+          <el-table-column prop="warehouseType" label="Loại Kho" width="120">
+            <template #default="{ row }">
+              <el-tag size="small" :type="row.warehouseType === 'CENTRAL_HUB' ? 'danger' : (row.warehouseType === 'RETAIL_STORE' ? 'primary' : 'warning')">
+                {{ row.warehouseType === 'CENTRAL_HUB' ? 'Kho Tổng' : (row.warehouseType === 'RETAIL_STORE' ? 'Bán Lẻ' : 'Hàng Lỗi') }}
+              </el-tag>
+            </template>
+          </el-table-column>
+
+          <el-table-column prop="physicalStock" label="Tồn Trên Kệ" width="110" align="right">
+            <template #default="{ row }">
+              <span class="font-bold">{{ (row.physicalStock ?? 0).toLocaleString() }}</span>
+            </template>
+          </el-table-column>
+
+          <el-table-column prop="availableStock" label="Khả Dụng" width="110" align="right">
+            <template #default="{ row }">
+              <span class="font-bold" :class="row.isLowStock ? 'text-rose' : 'text-emerald'">
+                {{ (row.availableStock ?? 0).toLocaleString() }}
+              </span>
+            </template>
+          </el-table-column>
+
+          <el-table-column prop="inTransitStock" label="Đang Chuyển" width="110" align="right">
+            <template #default="{ row }">
+              <span v-if="(row.inTransitStock ?? 0) > 0" class="text-amber font-bold">
+                +{{ (row.inTransitStock ?? 0).toLocaleString() }}
+              </span>
+              <span v-else class="text-muted">0</span>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+      <div v-else-if="loadingMultiWarehouse" class="p-4 text-center">
+        <el-icon class="is-loading" :size="24"><Loading /></el-icon>
+        <p class="mt-2 text-secondary">Đang nạp phân bổ tồn kho...</p>
+      </div>
+      <template #footer>
+        <el-button @click="multiWarehouseDialogVisible = false">Đóng</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -758,6 +847,25 @@ const batchDeleting = ref(false)
 const dialogVisible = ref(false)
 const selectedProductIds = ref([])
 const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1280)
+
+// Multi-Warehouse Stock Lookup Modal
+const multiWarehouseDialogVisible = ref(false)
+const loadingMultiWarehouse = ref(false)
+const currentMultiStock = ref(null)
+
+const inspectMultiWarehouseStock = async (product) => {
+  multiWarehouseDialogVisible.value = true
+  loadingMultiWarehouse.value = true
+  currentMultiStock.value = null
+  try {
+    const res = await api.get(`/warehouses/multi-stock/${product.id}`)
+    currentMultiStock.value = res.data
+  } catch (err) {
+    ElMessage.error(err.response?.data?.message || 'Không thể tải phân bổ tồn kho đa điểm')
+  } finally {
+    loadingMultiWarehouse.value = false
+  }
+}
 
 const filters = reactive({
   keyword: '',
@@ -2253,5 +2361,62 @@ onBeforeUnmount(() => {
 
 .text-amber {
   color: #d97706 !important;
+}
+
+.btn-multi-wh-inspect {
+  background: none;
+  border: 1px solid #bfdbfe;
+  color: #2563eb;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-multi-wh-inspect:hover {
+  background: #eff6ff;
+  border-color: #2563eb;
+}
+
+.multi-wh-header-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 14px 18px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.multi-wh-total-pills {
+  display: flex;
+  gap: 12px;
+}
+
+.wh-sum-pill {
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 6px 12px;
+  align-items: center;
+}
+
+.wh-sum-lbl {
+  font-size: 10px;
+  color: #64748b;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.wh-sum-val {
+  font-size: 14px;
+  font-weight: 800;
+  color: #0f172a;
 }
 </style>

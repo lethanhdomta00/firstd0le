@@ -56,6 +56,12 @@ const routes = [
         meta: { permission: 'ORDER_VIEW' }
       },
       {
+        path: 'branches',
+        name: 'BranchWarehouse',
+        component: () => import('../views/BranchWarehouse.vue'),
+        meta: { permission: 'BRANCH_VIEW' }
+      },
+      {
         path: 'users',
         name: 'Users',
         component: () => import('../views/Users.vue'),

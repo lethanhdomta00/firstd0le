@@ -4,6 +4,8 @@ public enum InventoryMovementType {
     EXPORT_ORDER("Xuất kho đơn hàng"),
     IMPORT_CANCEL("Hoàn kho hủy/sửa đơn"),
     IMPORT_PURCHASE("Nhập kho mua hàng từ NCC"),
+    TRANSFER_OUT("Xuất điều chuyển kho"),
+    TRANSFER_IN("Nhập điều chuyển kho"),
     MANUAL_ADJUST("Điều chỉnh tồn kho");
 
     private final String label;

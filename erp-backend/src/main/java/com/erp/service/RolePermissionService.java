@@ -63,7 +63,13 @@ public class RolePermissionService {
             // Module 7: Mua hàng & Nhà cung cấp SRM (Giai đoạn 3)
             Map.of("code", "PROCUREMENT_VIEW", "name", "Xem phân hệ mua hàng & NCC", "module", "Mua hàng & NCC (SRM)"),
             Map.of("code", "PROCUREMENT_MANAGE", "name", "Quản lý NCC & Duyệt đơn PO", "module", "Mua hàng & NCC (SRM)"),
-            Map.of("code", "PROCUREMENT_RECEIVE", "name", "Nhập kho kiểm nhận GRN & Giá vốn", "module", "Mua hàng & NCC (SRM)")
+            Map.of("code", "PROCUREMENT_RECEIVE", "name", "Nhập kho kiểm nhận GRN & Giá vốn", "module", "Mua hàng & NCC (SRM)"),
+
+            // Module 8: Quản trị Đa Chi nhánh & Kho hàng (Giai đoạn 2)
+            Map.of("code", "BRANCH_VIEW", "name", "Xem danh sách chi nhánh & kho", "module", "Đa Chi nhánh & Kho hàng"),
+            Map.of("code", "BRANCH_MANAGE", "name", "Quản lý chi nhánh & cấu hình kho", "module", "Đa Chi nhánh & Kho hàng"),
+            Map.of("code", "TRANSFER_VIEW", "name", "Xem phiếu điều chuyển kho", "module", "Đa Chi nhánh & Kho hàng"),
+            Map.of("code", "TRANSFER_MANAGE", "name", "Xuất/Nhập điều chuyển kho ITN", "module", "Đa Chi nhánh & Kho hàng")
     );
 
     @PostConstruct
@@ -199,7 +205,8 @@ public class RolePermissionService {
                     "USER_VIEW", "PRODUCT_VIEW", "PRODUCT_CREATE", "PRODUCT_EDIT", "PRODUCT_STOCK",
                     "ORDER_VIEW", "ORDER_CREATE", "ORDER_STATUS", "ORDER_PAY", "ORDER_EXPORT", "ORDER_CANCEL",
                     "ANALYTICS_VIEW", "ANALYTICS_EXPORT", "JOB_VIEW", "CHAT_USE", "COPILOT_USE",
-                    "PROCUREMENT_VIEW", "PROCUREMENT_MANAGE", "PROCUREMENT_RECEIVE"
+                    "PROCUREMENT_VIEW", "PROCUREMENT_MANAGE", "PROCUREMENT_RECEIVE",
+                    "BRANCH_VIEW", "BRANCH_MANAGE", "TRANSFER_VIEW", "TRANSFER_MANAGE"
             ));
             case ACCOUNTANT -> set.addAll(List.of(
                     "ORDER_VIEW", "ORDER_PAY", "ORDER_EXPORT",
@@ -209,7 +216,8 @@ public class RolePermissionService {
             case WAREHOUSE -> set.addAll(List.of(
                     "PRODUCT_VIEW", "PRODUCT_CREATE", "PRODUCT_EDIT", "PRODUCT_STOCK",
                     "ORDER_VIEW", "CHAT_USE", "COPILOT_USE",
-                    "PROCUREMENT_VIEW", "PROCUREMENT_RECEIVE"
+                    "PROCUREMENT_VIEW", "PROCUREMENT_RECEIVE",
+                    "BRANCH_VIEW", "TRANSFER_VIEW", "TRANSFER_MANAGE"
             ));
             case SALES -> set.addAll(List.of(
                     "PRODUCT_VIEW", "ORDER_VIEW", "ORDER_CREATE", "ORDER_STATUS", "ORDER_EXPORT",
