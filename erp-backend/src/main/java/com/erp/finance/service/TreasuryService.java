@@ -1,5 +1,6 @@
 package com.erp.finance.service;
 
+import com.erp.config.CacheConfig;
 import com.erp.finance.dto.CreateTreasuryAccountRequest;
 import com.erp.finance.dto.FinanceVoucherDto;
 import com.erp.finance.dto.InternalTransferRequest;
@@ -7,8 +8,11 @@ import com.erp.finance.dto.TreasuryAccountDto;
 import com.erp.finance.model.*;
 import com.erp.finance.repository.FinanceVoucherRepository;
 import com.erp.finance.repository.TreasuryAccountRepository;
+import com.erp.service.RealtimeStateSyncService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,11 +30,13 @@ public class TreasuryService {
 
     private final TreasuryAccountRepository accountRepository;
     private final FinanceVoucherRepository voucherRepository;
+    private final RealtimeStateSyncService realtimeSyncService;
 
     /**
      * Lấy danh sách toàn bộ tài khoản quỹ đang hoạt động
      */
     @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.CACHE_TREASURY_STATS)
     public List<TreasuryAccountDto> getAllActiveAccounts() {
         return accountRepository.findByActiveTrueOrderByAccountTypeAscAccountNameAsc().stream()
                 .map(TreasuryAccountDto::fromEntity)
@@ -48,6 +54,7 @@ public class TreasuryService {
      * Tạo mới tài khoản quỹ tiền mặt hoặc ngân hàng
      */
     @Transactional
+    @CacheEvict(value = CacheConfig.CACHE_TREASURY_STATS, allEntries = true)
     public TreasuryAccountDto createAccount(CreateTreasuryAccountRequest req) {
         if (accountRepository.findByAccountCode(req.getAccountCode().trim().toUpperCase()).isPresent()) {
             throw new IllegalArgumentException("Mã tài khoản quỹ '" + req.getAccountCode() + "' đã tồn tại!");
@@ -121,16 +128,19 @@ public class TreasuryService {
                 .build();
 
         FinanceVoucher savedVoucher = voucherRepository.save(voucher);
+        FinanceVoucherDto dto = FinanceVoucherDto.fromEntity(savedVoucher);
+        realtimeSyncService.publishFinanceEvent("TRANSFER_COMPLETED", dto);
         log.info("Chuyển quỹ nội bộ thành công: Mã [{}] - Số tiền: {} từ [{}] sang [{}]",
                 code, amount, source.getAccountCode(), target.getAccountCode());
 
-        return FinanceVoucherDto.fromEntity(savedVoucher);
+        return dto;
     }
 
     /**
      * Điều chỉnh số dư tài khoản quỹ (hàm nội bộ khi duyệt phiếu)
      */
     @Transactional(isolation = Isolation.REPEATABLE_READ)
+    @CacheEvict(value = CacheConfig.CACHE_TREASURY_STATS, allEntries = true)
     public void adjustAccountBalance(Long accountId, BigDecimal amount, boolean isCredit) {
         TreasuryAccount acc = accountRepository.findById(accountId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy tài khoản quỹ ID: " + accountId));

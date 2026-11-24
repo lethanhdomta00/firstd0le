@@ -8,8 +8,11 @@ import com.erp.order.repository.InventoryLogRepository;
 import com.erp.order.repository.OrderRepository;
 import com.erp.order.service.OrderExportService;
 import com.erp.order.service.OrderService;
+import com.erp.promotion.service.LoyaltyService;
+import com.erp.promotion.service.PromotionVoucherService;
 import com.erp.repository.CustomerRepository;
 import com.erp.repository.ProductRepository;
+import com.erp.service.RealtimeStateSyncService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -42,6 +45,15 @@ class OrderServiceTest {
 
     @Mock
     private CustomerRepository customerRepository;
+
+    @Mock
+    private PromotionVoucherService voucherService;
+
+    @Mock
+    private LoyaltyService loyaltyService;
+
+    @Mock
+    private RealtimeStateSyncService realtimeSyncService;
 
     @InjectMocks
     private OrderService orderService;

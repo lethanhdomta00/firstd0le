@@ -299,6 +299,39 @@ export const useRealtimeChatStore = defineStore('realtimeChat', {
         }
       })
       this.subscriptions.push(reminderSub)
+
+      // 10. Kênh đồng bộ trạng thái đơn hàng thời gian thực (ERP Realtime Orders State Sync)
+      const ordersSub = this.client.subscribe('/topic/orders', (message) => {
+        try {
+          const payload = JSON.parse(message.body)
+          window.dispatchEvent(new CustomEvent('erp:order-sync', { detail: payload }))
+        } catch (e) {
+          console.error('Lỗi parse realtime order sync:', e)
+        }
+      })
+      this.subscriptions.push(ordersSub)
+
+      // 11. Kênh đồng bộ biến động tồn kho thời gian thực (ERP Realtime Inventory Sync)
+      const inventorySub = this.client.subscribe('/topic/inventory', (message) => {
+        try {
+          const payload = JSON.parse(message.body)
+          window.dispatchEvent(new CustomEvent('erp:inventory-sync', { detail: payload }))
+        } catch (e) {
+          console.error('Lỗi parse realtime inventory sync:', e)
+        }
+      })
+      this.subscriptions.push(inventorySub)
+
+      // 12. Kênh đồng bộ quỹ tiền & giao dịch tài chính thời gian thực (ERP Realtime Finance Sync)
+      const financeSub = this.client.subscribe('/topic/finance', (message) => {
+        try {
+          const payload = JSON.parse(message.body)
+          window.dispatchEvent(new CustomEvent('erp:finance-sync', { detail: payload }))
+        } catch (e) {
+          console.error('Lỗi parse realtime finance sync:', e)
+        }
+      })
+      this.subscriptions.push(financeSub)
     },
 
     /**

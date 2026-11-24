@@ -1,5 +1,6 @@
 package com.erp.service;
 
+import com.erp.config.CacheConfig;
 import com.erp.dto.RoleMatrixDto;
 import com.erp.model.Role;
 import com.erp.model.RolePermission;
@@ -7,6 +8,8 @@ import com.erp.repository.RolePermissionRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -99,6 +102,7 @@ public class RolePermissionService {
      * Cập nhật Ma trận phân quyền mới do Admin tùy chỉnh trên giao diện
      */
     @Transactional
+    @CacheEvict(value = CacheConfig.CACHE_ROLE_PERMISSIONS, allEntries = true)
     public List<RoleMatrixDto> updateRolesMatrix(Map<String, Set<String>> matrixUpdate) {
         log.info("Cập nhật ma trận phân quyền động cho {} vai trò", matrixUpdate.size());
 
@@ -134,6 +138,7 @@ public class RolePermissionService {
      * Khôi phục toàn bộ Ma trận phân quyền về chuẩn mặc định
      */
     @Transactional
+    @CacheEvict(value = CacheConfig.CACHE_ROLE_PERMISSIONS, allEntries = true)
     public List<RoleMatrixDto> resetToDefault() {
         rolePermissionRepository.deleteAll();
 
@@ -159,6 +164,7 @@ public class RolePermissionService {
     /**
      * Lấy danh sách mã quyền hạn động của một vai trò cụ thể từ cơ sở dữ liệu
      */
+    @Cacheable(value = CacheConfig.CACHE_ROLE_PERMISSIONS, key = "#roleName != null ? #roleName.toUpperCase() : 'EMPTY'")
     public Set<String> getPermissionsForRole(String roleName) {
         if (roleName == null) return Collections.emptySet();
 

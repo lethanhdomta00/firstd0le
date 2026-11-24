@@ -77,6 +77,15 @@
 			<artifactId>cloudinary-http44</artifactId>
 			<version>1.36.0</version>
 		</dependency>
+		<!-- Spring Boot Cache & High-Performance Caffeine In-Memory Cache -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-cache</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.github.ben-manes.caffeine</groupId>
+			<artifactId>caffeine</artifactId>
+		</dependency>
 		<!-- Apache POI Streaming for Enterprise High-Scale Excel Export -->
 		<dependency>
 			<groupId>org.apache.poi</groupId>

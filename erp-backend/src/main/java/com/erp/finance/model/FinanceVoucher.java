@@ -15,7 +15,9 @@ import java.time.LocalDateTime;
         @Index(name = "idx_finance_voucher_status", columnList = "status"),
         @Index(name = "idx_finance_voucher_cost_center", columnList = "costCenter"),
         @Index(name = "idx_finance_voucher_ref_order", columnList = "referenceOrderCode"),
-        @Index(name = "idx_finance_voucher_created_at", columnList = "createdAt")
+        @Index(name = "idx_finance_voucher_created_at", columnList = "createdAt"),
+        @Index(name = "idx_finance_voucher_type_status", columnList = "voucherType, status"),
+        @Index(name = "idx_finance_voucher_type_created", columnList = "voucherType, createdAt")
 })
 @Getter
 @Setter

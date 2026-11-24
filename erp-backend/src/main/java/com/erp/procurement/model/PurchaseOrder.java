@@ -18,7 +18,9 @@ import java.util.List;
         @Index(name = "idx_po_supplier_id", columnList = "supplier_id"),
         @Index(name = "idx_po_status", columnList = "status"),
         @Index(name = "idx_po_order_date", columnList = "orderDate"),
-        @Index(name = "idx_po_created_at", columnList = "createdAt")
+        @Index(name = "idx_po_created_at", columnList = "createdAt"),
+        @Index(name = "idx_po_status_order_date", columnList = "status, orderDate"),
+        @Index(name = "idx_po_supplier_status", columnList = "supplier_id, status")
 })
 @Getter
 @Setter

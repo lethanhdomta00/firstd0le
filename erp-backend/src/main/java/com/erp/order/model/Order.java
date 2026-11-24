@@ -22,7 +22,10 @@ import java.util.List;
     @Index(name = "idx_orders_payment_status", columnList = "payment_status"),
     @Index(name = "idx_orders_order_code", columnList = "order_code"),
     @Index(name = "idx_orders_customer_phone", columnList = "customer_phone"),
-    @Index(name = "idx_orders_tracking_code", columnList = "tracking_code")
+    @Index(name = "idx_orders_tracking_code", columnList = "tracking_code"),
+    @Index(name = "idx_orders_status_created_at", columnList = "status, created_at"),
+    @Index(name = "idx_orders_payment_status_created_at", columnList = "payment_status, created_at"),
+    @Index(name = "idx_orders_customer_phone_status", columnList = "customer_phone, status")
 })
 public class Order {
 
@@ -66,6 +69,18 @@ public class Order {
      */
     @Column(name = "price_tier", length = 32)
     private String priceTier = "RETAIL";
+
+    @Column(name = "branch_id")
+    private Long branchId;
+
+    @Column(name = "branch_name", length = 150)
+    private String branchName;
+
+    @Column(name = "warehouse_id")
+    private Long warehouseId;
+
+    @Column(name = "warehouse_name", length = 150)
+    private String warehouseName;
 
     @Column(nullable = false, precision = 18, scale = 2)
     private BigDecimal subtotal = BigDecimal.ZERO;

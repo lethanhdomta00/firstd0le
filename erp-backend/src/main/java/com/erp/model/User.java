@@ -38,6 +38,12 @@ public class User {
     @Column(length = 30, nullable = false)
     private Role role = Role.USER;
 
+    @Column(name = "branch_id")
+    private Long branchId;
+
+    @Column(name = "branch_name", length = 150)
+    private String branchName;
+
     @Column(length = 20, nullable = false)
     private String status = "ACTIVE"; // ACTIVE, LOCKED
 

@@ -1,5 +1,6 @@
 package com.erp.promotion.service;
 
+import com.erp.config.CacheConfig;
 import com.erp.model.Product;
 import com.erp.promotion.dto.CreateTieredPriceRuleRequest;
 import com.erp.promotion.dto.TieredPriceRuleDto;
@@ -11,6 +12,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -34,6 +37,7 @@ public class TieredPricingService {
     }
 
     @Transactional
+    @CacheEvict(value = CacheConfig.CACHE_TIERED_PRICING, allEntries = true)
     public TieredPriceRuleDto createRule(CreateTieredPriceRuleRequest request) {
         Product product = null;
         if (request.getProductId() != null) {
@@ -57,6 +61,7 @@ public class TieredPricingService {
     }
 
     @Transactional
+    @CacheEvict(value = CacheConfig.CACHE_TIERED_PRICING, allEntries = true)
     public TieredPriceRuleDto updateRule(Long id, CreateTieredPriceRuleRequest request) {
         TieredPriceRule rule = ruleRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy quy tắc giá sỉ ID: " + id));
@@ -84,6 +89,7 @@ public class TieredPricingService {
     }
 
     @Transactional
+    @CacheEvict(value = CacheConfig.CACHE_TIERED_PRICING, allEntries = true)
     public void deleteRule(Long id) {
         TieredPriceRule rule = ruleRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy quy tắc giá sỉ ID: " + id));
@@ -95,6 +101,7 @@ public class TieredPricingService {
      * Tính toán đơn giá thực tế sau khi áp dụng bảng giá sỉ bậc thang
      */
     @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.CACHE_TIERED_PRICING, key = "(#product != null ? #product.id : 0) + '_' + #quantity")
     public TieredPricingResult calculateEffectivePrice(Product product, int quantity) {
         if (product == null || quantity <= 0) {
             return TieredPricingResult.builder()

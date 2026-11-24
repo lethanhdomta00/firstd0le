@@ -10,6 +10,7 @@ import com.erp.promotion.service.LoyaltyService;
 import com.erp.promotion.service.PromotionVoucherService;
 import com.erp.repository.CustomerRepository;
 import com.erp.repository.ProductRepository;
+import com.erp.service.RealtimeStateSyncService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -38,6 +39,7 @@ public class OrderService {
     private final CustomerRepository customerRepository;
     private final PromotionVoucherService voucherService;
     private final LoyaltyService loyaltyService;
+    private final RealtimeStateSyncService realtimeSyncService;
 
     private static final DateTimeFormatter DATE_CODE_FMT = DateTimeFormatter.ofPattern("yyyyMMdd");
 
@@ -168,7 +170,9 @@ public class OrderService {
                     saved.getVoucherDiscount());
         }
 
-        return toOrderDto(saved);
+        OrderDto dto = toOrderDto(saved);
+        realtimeSyncService.publishOrderEvent("CREATED", dto);
+        return dto;
     }
 
     @Transactional
@@ -197,7 +201,9 @@ public class OrderService {
         checkAndApplyCustomerCreditLimit(order);
 
         Order saved = orderRepository.save(order);
-        return toOrderDto(saved);
+        OrderDto dto = toOrderDto(saved);
+        realtimeSyncService.publishOrderEvent("UPDATED", dto);
+        return dto;
     }
 
     /**
@@ -281,7 +287,10 @@ public class OrderService {
             order.setNote(existingNote.isEmpty() ? appended : existingNote + "\n" + appended);
         }
 
-        return toOrderDto(orderRepository.save(order));
+        Order saved = orderRepository.save(order);
+        OrderDto dto = toOrderDto(saved);
+        realtimeSyncService.publishOrderEvent("STATUS_CHANGED", dto);
+        return dto;
     }
 
     /**

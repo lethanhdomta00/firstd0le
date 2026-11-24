@@ -1,5 +1,6 @@
 package com.erp.promotion.service;
 
+import com.erp.config.CacheConfig;
 import com.erp.promotion.dto.CreateVoucherRequest;
 import com.erp.promotion.dto.ValidateVoucherRequest;
 import com.erp.promotion.dto.VoucherDto;
@@ -11,6 +12,8 @@ import com.erp.promotion.repository.PromotionVoucherRepository;
 import com.erp.promotion.repository.VoucherUsageHistoryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -37,6 +40,7 @@ public class PromotionVoucherService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.CACHE_ACTIVE_VOUCHERS)
     public List<VoucherDto> getActiveVouchers() {
         return voucherRepository.findActiveVouchers(LocalDateTime.now())
                 .stream().map(this::mapToDto).toList();
@@ -50,6 +54,7 @@ public class PromotionVoucherService {
     }
 
     @Transactional
+    @CacheEvict(value = CacheConfig.CACHE_ACTIVE_VOUCHERS, allEntries = true)
     public VoucherDto createVoucher(CreateVoucherRequest request) {
         String code = request.getCode().trim().toUpperCase();
         if (voucherRepository.existsByCodeIgnoreCase(code)) {
@@ -67,6 +72,7 @@ public class PromotionVoucherService {
     }
 
     @Transactional
+    @CacheEvict(value = CacheConfig.CACHE_ACTIVE_VOUCHERS, allEntries = true)
     public VoucherDto updateVoucher(Long id, CreateVoucherRequest request) {
         PromotionVoucher v = voucherRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy Voucher có ID: " + id));
@@ -84,6 +90,7 @@ public class PromotionVoucherService {
     }
 
     @Transactional
+    @CacheEvict(value = CacheConfig.CACHE_ACTIVE_VOUCHERS, allEntries = true)
     public void deleteVoucher(Long id) {
         PromotionVoucher v = voucherRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy Voucher có ID: " + id));
@@ -92,6 +99,7 @@ public class PromotionVoucherService {
     }
 
     @Transactional
+    @CacheEvict(value = CacheConfig.CACHE_ACTIVE_VOUCHERS, allEntries = true)
     public void toggleActive(Long id) {
         PromotionVoucher v = voucherRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy Voucher có ID: " + id));
@@ -213,6 +221,7 @@ public class PromotionVoucherService {
      * Ghi nhận lịch sử dùng voucher khi hoàn tất tạo đơn
      */
     @Transactional
+    @CacheEvict(value = CacheConfig.CACHE_ACTIVE_VOUCHERS, allEntries = true)
     public void recordVoucherUsage(String code, Long orderId, String orderCode, Long customerId, 
                                    String phone, BigDecimal subtotal, BigDecimal discount) {
         if (code == null || code.trim().isEmpty() || discount.compareTo(BigDecimal.ZERO) <= 0) {
@@ -242,6 +251,7 @@ public class PromotionVoucherService {
      * Hoàn lại lượt dùng voucher khi đơn hàng bị hủy
      */
     @Transactional
+    @CacheEvict(value = CacheConfig.CACHE_ACTIVE_VOUCHERS, allEntries = true)
     public void revertVoucherUsage(Long orderId) {
         usageHistoryRepository.findByOrderId(orderId).ifPresent(history -> {
             voucherRepository.findByCodeIgnoreCase(history.getVoucherCode()).ifPresent(v -> {

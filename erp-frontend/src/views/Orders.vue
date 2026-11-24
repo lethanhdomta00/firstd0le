@@ -2079,7 +2079,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 import api from '../api'
 import { useAuthStore } from '../store/auth'
 
@@ -2558,8 +2558,10 @@ async function fetchOrderStats() {
   }
 }
 
-async function fetchOrders() {
-  loadingOrders.value = true
+async function fetchOrders(silent = false) {
+  if (!silent) {
+    loadingOrders.value = true
+  }
   try {
     const params = {
       page: orderPage.value,
@@ -2576,9 +2578,13 @@ async function fetchOrders() {
     orderTotalElements.value = res.data?.totalElements ?? 0
     orderTotalPages.value = res.data?.totalPages ?? 1
   } catch (err) {
-    ElMessage.error(err.response?.data?.message || 'Không thể tải danh sách đơn hàng!')
+    if (!silent) {
+      ElMessage.error(err.response?.data?.message || 'Không thể tải danh sách đơn hàng!')
+    }
   } finally {
-    loadingOrders.value = false
+    if (!silent) {
+      loadingOrders.value = false
+    }
   }
 }
 
@@ -3853,18 +3859,43 @@ function printShippingLabel(order) {
 }
 
 // =========================================================================
+// REALTIME WEBSOCKET STATE SYNCHRONIZATION
+// =========================================================================
+function handleRealtimeOrderSync(event) {
+  const payload = event?.detail
+  if (!payload) return
+
+  if (payload.action === 'CREATED') {
+    ElNotification({
+      title: '🛒 Đơn hàng mới realtime',
+      message: `Đơn ${payload.entityId || 'mới'} vừa tạo bởi @${payload.operator || 'system'}. Đang tự động làm mới...`,
+      type: 'success',
+      duration: 3500,
+      position: 'bottom-right'
+    })
+    fetchOrders(true)
+    fetchOrderStats()
+  } else if (payload.action === 'STATUS_CHANGED' || payload.action === 'UPDATED') {
+    fetchOrders(true)
+    fetchOrderStats()
+  }
+}
+
+// =========================================================================
 // LIFECYCLE
 // =========================================================================
 onMounted(() => {
   fetchOrders()
   fetchOrderStats()
   fetchInventoryLogs()
+  window.addEventListener('erp:order-sync', handleRealtimeOrderSync)
 })
 
 onBeforeUnmount(() => {
   clearTimeout(orderSearchTimer)
   clearTimeout(logSearchTimer)
   clearTimeout(agingSearchTimer)
+  window.removeEventListener('erp:order-sync', handleRealtimeOrderSync)
 })
 </script>
 
