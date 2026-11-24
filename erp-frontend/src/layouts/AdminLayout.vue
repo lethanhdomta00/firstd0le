@@ -68,7 +68,7 @@
           index="group-sales"
         >
           <template #title>
-            <el-icon><Tickets /></el-icon>
+            <el-icon class="menu-cluster-icon"><Tickets /></el-icon>
             <span class="menu-title-text">Bán hàng & Đơn hàng</span>
           </template>
           <el-menu-item v-if="authStore.hasPermission('ORDER_VIEW')" index="/orders">
@@ -91,7 +91,7 @@
           index="group-inventory"
         >
           <template #title>
-            <el-icon><Box /></el-icon>
+            <el-icon class="menu-cluster-icon"><Box /></el-icon>
             <span class="menu-title-text">Kho vận & Sản phẩm</span>
           </template>
           <el-menu-item v-if="authStore.hasPermission('PRODUCT_VIEW')" index="/products">
@@ -126,7 +126,7 @@
           index="group-finance"
         >
           <template #title>
-            <el-icon><Money /></el-icon>
+            <el-icon class="menu-cluster-icon"><Money /></el-icon>
             <span class="menu-title-text">Tài chính & Báo cáo</span>
           </template>
           <el-menu-item v-if="authStore.hasPermission('ANALYTICS_VIEW') || authStore.isAdmin || authStore.user?.role === 'ACCOUNTANT'" index="/finance">
@@ -146,7 +146,7 @@
         <!-- 5. Cụm: Hợp tác & Tiện ích nội bộ -->
         <el-sub-menu index="group-collab">
           <template #title>
-            <el-icon><ChatDotRound /></el-icon>
+            <el-icon class="menu-cluster-icon"><ChatDotRound /></el-icon>
             <span class="menu-title-text">Hợp tác & Tiện ích</span>
           </template>
           <el-menu-item v-if="authStore.hasPermission('CHAT_USE')" index="/chat">
@@ -183,7 +183,7 @@
           index="group-system"
         >
           <template #title>
-            <el-icon><Setting /></el-icon>
+            <el-icon class="menu-cluster-icon"><Operation /></el-icon>
             <span class="menu-title-text">Quản trị Hệ thống</span>
           </template>
           <el-menu-item v-if="authStore.hasPermission('USER_VIEW')" index="/users">
@@ -263,7 +263,7 @@
           index="m-group-sales"
         >
           <template #title>
-            <el-icon><Tickets /></el-icon>
+            <el-icon class="menu-cluster-icon"><Tickets /></el-icon>
             <span>Bán hàng & Đơn hàng</span>
           </template>
           <el-menu-item v-if="authStore.hasPermission('ORDER_VIEW')" index="/orders">
@@ -282,7 +282,7 @@
           index="m-group-inventory"
         >
           <template #title>
-            <el-icon><Box /></el-icon>
+            <el-icon class="menu-cluster-icon"><Box /></el-icon>
             <span>Kho vận & Sản phẩm</span>
           </template>
           <el-menu-item v-if="authStore.hasPermission('PRODUCT_VIEW')" index="/products">
@@ -309,7 +309,7 @@
           index="m-group-finance"
         >
           <template #title>
-            <el-icon><Money /></el-icon>
+            <el-icon class="menu-cluster-icon"><Money /></el-icon>
             <span>Tài chính & Báo cáo</span>
           </template>
           <el-menu-item v-if="authStore.hasPermission('ANALYTICS_VIEW') || authStore.isAdmin || authStore.user?.role === 'ACCOUNTANT'" index="/finance">
@@ -325,7 +325,7 @@
         <!-- 5. Hợp tác & Tiện ích -->
         <el-sub-menu index="m-group-collab">
           <template #title>
-            <el-icon><ChatDotRound /></el-icon>
+            <el-icon class="menu-cluster-icon"><ChatDotRound /></el-icon>
             <span>Hợp tác & Tiện ích</span>
           </template>
           <el-menu-item v-if="authStore.hasPermission('CHAT_USE')" index="/chat">
@@ -360,7 +360,7 @@
           index="m-group-system"
         >
           <template #title>
-            <el-icon><Setting /></el-icon>
+            <el-icon class="menu-cluster-icon"><Operation /></el-icon>
             <span>Quản trị Hệ thống</span>
           </template>
           <el-menu-item v-if="authStore.hasPermission('USER_VIEW')" index="/users">
@@ -669,7 +669,8 @@ import {
   Van,
   Present,
   OfficeBuilding,
-  Box
+  Box,
+  Operation
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -1062,9 +1063,17 @@ onBeforeUnmount(() => {
 }
 
 .desktop-sidebar.is-collapsed :deep(.el-menu-item .el-icon),
-.desktop-sidebar.is-collapsed :deep(.el-sub-menu__title .el-icon) {
+.desktop-sidebar.is-collapsed :deep(.el-sub-menu__title .el-icon),
+.desktop-sidebar.is-collapsed :deep(.menu-cluster-icon) {
   margin-right: 0 !important;
-  font-size: 20px;
+  font-size: 20px !important;
+  width: 20px !important;
+  height: 20px !important;
+}
+
+.desktop-sidebar.is-collapsed :deep(.menu-cluster-icon svg) {
+  width: 20px !important;
+  height: 20px !important;
 }
 
 .desktop-sidebar.is-collapsed :deep(.el-menu-item .menu-title-text),
@@ -1144,12 +1153,27 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 
-:deep(.el-sub-menu__title .el-icon) {
-  font-size: 18px;
+:deep(.el-sub-menu__title .el-icon),
+:deep(.menu-cluster-icon) {
+  font-size: 18px !important;
+  width: 18px !important;
+  height: 18px !important;
   color: #64748b;
-  margin-right: 12px;
-  flex-shrink: 0;
+  margin-right: 12px !important;
+  flex-shrink: 0 !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  visibility: visible !important;
+  opacity: 1 !important;
   transition: color 0.15s ease;
+}
+
+:deep(.menu-cluster-icon svg) {
+  width: 18px !important;
+  height: 18px !important;
+  display: block !important;
+  fill: currentColor !important;
 }
 
 :deep(.el-sub-menu__title:hover) {
