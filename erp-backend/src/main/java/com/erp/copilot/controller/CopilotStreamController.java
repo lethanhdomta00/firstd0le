@@ -58,6 +58,9 @@ public class CopilotStreamController {
     private final ObjectMapper objectMapper;
     private final FinanceVoucherService financeVoucherService;
     private final TreasuryAccountRepository treasuryAccountRepository;
+    private final com.erp.copilot.service.CopilotProactiveService proactiveService;
+    private final com.erp.copilot.service.SmartOcrVisionService ocrVisionService;
+    private final com.erp.copilot.service.ActionChainingService actionChainingService;
 
     private User getCurrentUser() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -387,5 +390,88 @@ public class CopilotStreamController {
         headers.setContentLength(report.getContentBytes().length);
 
         return new ResponseEntity<>(report.getContentBytes(), headers, HttpStatus.OK);
+    }
+
+    /**
+     * GET /api/copilot/morning-briefing -> Bản tin điểm báo điều hành sáng kèm giọng nói AI
+     */
+    @GetMapping("/morning-briefing")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<com.erp.copilot.dto.MorningBriefingDto> getMorningBriefing() {
+        User currentUser = getCurrentUser();
+        String username = currentUser != null ? currentUser.getUsername() : "admin";
+        return ResponseEntity.ok(proactiveService.generateMorningBriefing(username));
+    }
+
+    /**
+     * POST /api/copilot/ocr-scan -> Quét và bóc tách thông tin hóa đơn chứng từ từ ảnh chụp
+     */
+    @PostMapping(value = "/ocr-scan", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<com.erp.copilot.dto.OcrInvoiceResultDto> scanInvoiceFile(
+            @RequestParam(value = "file", required = false) org.springframework.web.multipart.MultipartFile file,
+            @RequestParam(value = "typeHint", required = false, defaultValue = "PURCHASE_ORDER") String typeHint) {
+        return ResponseEntity.ok(ocrVisionService.parseInvoice(file, typeHint));
+    }
+
+    /**
+     * POST /api/copilot/ocr-scan-base64 -> Quét hóa đơn qua chuỗi Base64
+     */
+    @PostMapping("/ocr-scan-base64")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<com.erp.copilot.dto.OcrInvoiceResultDto> scanInvoiceBase64(
+            @RequestBody Map<String, String> payload) {
+        String base64 = payload.get("base64");
+        String filename = payload.getOrDefault("filename", "invoice.jpg");
+        String typeHint = payload.getOrDefault("typeHint", "PURCHASE_ORDER");
+        return ResponseEntity.ok(ocrVisionService.parseInvoiceBase64(base64, filename, typeHint));
+    }
+
+    /**
+     * GET /api/copilot/anomaly-detection -> Động cơ phát hiện bất thường & Rủi ro gian lận
+     */
+    @GetMapping("/anomaly-detection")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<com.erp.copilot.dto.AnomalyDetectionDto> getAnomalyDetection() {
+        return ResponseEntity.ok(proactiveService.detectAnomalies());
+    }
+
+    /**
+     * POST /api/copilot/chain/parse -> Phân rã câu lệnh thành chuỗi hành động liên hoàn
+     */
+    @PostMapping("/chain/parse")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<com.erp.copilot.dto.ActionChainDto> parseActionChain(
+            @RequestBody Map<String, String> payload) {
+        String prompt = payload.getOrDefault("prompt", "");
+        return ResponseEntity.ok(actionChainingService.parsePromptToChain(prompt));
+    }
+
+    /**
+     * POST /api/copilot/chain/execute -> Thực thi toàn bộ chuỗi hành động đa phân hệ
+     */
+    @PostMapping("/chain/execute")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<com.erp.copilot.dto.ActionChainDto> executeActionChain(
+            @RequestBody com.erp.copilot.dto.ActionChainDto chain) {
+        User currentUser = getCurrentUser();
+        String username = currentUser != null ? currentUser.getUsername() : "admin";
+        return ResponseEntity.ok(actionChainingService.executeChain(chain, username));
+    }
+
+    /**
+     * POST /api/copilot/trigger-proactive -> Kích hoạt cảnh báo tự hành chủ động
+     */
+    @PostMapping("/trigger-proactive")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Map<String, Object>> triggerProactiveAlert() {
+        User currentUser = getCurrentUser();
+        String username = currentUser != null ? currentUser.getUsername() : "admin";
+        ChatMessage msg = proactiveService.triggerAutonomousProactiveStockAlert(username);
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Đã gửi cảnh báo tự hành tới người dùng",
+                "chatMessageId", msg != null ? msg.getId() : 0
+        ));
     }
 }

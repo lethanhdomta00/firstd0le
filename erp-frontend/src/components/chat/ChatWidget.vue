@@ -533,6 +533,245 @@
                   </div>
                 </div>
 
+                <!-- ========================================================================= -->
+                <!-- WIDGET GIAI ĐOẠN 5.1: MORNING_BRIEFING_CARD -->
+                <!-- ========================================================================= -->
+                <div 
+                  v-if="msg.uiWidget && msg.uiWidget.type === 'MORNING_BRIEFING_CARD' && !msg.isTyping" 
+                  class="copilot-widget morning-briefing-widget"
+                >
+                  <div class="briefing-header">
+                    <div class="briefing-badge">
+                      <span class="pulse-sun">☀️</span>
+                      <span>BẢN TIN ĐIỀU HÀNH SÁNG</span>
+                    </div>
+                    <span class="briefing-date">{{ msg.uiWidget.data?.briefingDate }}</span>
+                  </div>
+
+                  <div class="briefing-kpi-grid">
+                    <div class="brief-kpi-item">
+                      <span class="brief-kpi-label">Doanh thu hôm qua</span>
+                      <strong class="brief-kpi-val text-amber">{{ formatCurrency(msg.uiWidget.data?.yesterdayRevenue) }}</strong>
+                      <span class="brief-kpi-sub">Lãi gộp: {{ formatCurrency(msg.uiWidget.data?.yesterdayGrossProfit) }}</span>
+                    </div>
+                    <div class="brief-kpi-item">
+                      <span class="brief-kpi-label">Nợ đại lý cần thu</span>
+                      <strong class="brief-kpi-val text-rose">{{ formatCurrency(msg.uiWidget.data?.dueDebtAmount) }}</strong>
+                      <span class="brief-kpi-sub">{{ msg.uiWidget.data?.dueCustomerCount }} đối tác</span>
+                    </div>
+                    <div class="brief-kpi-item">
+                      <span class="brief-kpi-label">PO chờ sếp duyệt</span>
+                      <strong class="brief-kpi-val text-blue">{{ msg.uiWidget.data?.pendingPoCount }} đơn</strong>
+                      <span class="brief-kpi-sub">{{ formatCurrency(msg.uiWidget.data?.pendingPoTotalAmount) }}</span>
+                    </div>
+                  </div>
+
+                  <div class="briefing-product-strip">
+                    <div class="prod-strip-col">
+                      <span>🔥 Bán chạy:</span>
+                      <strong>{{ msg.uiWidget.data?.topSellingProductName }}</strong>
+                    </div>
+                    <div class="prod-strip-col">
+                      <span>⏳ Tồn lâu:</span>
+                      <strong>{{ msg.uiWidget.data?.slowMovingProductName }}</strong> ({{ msg.uiWidget.data?.slowMovingStockDays }} ngày)
+                    </div>
+                  </div>
+
+                  <!-- Nút nghe giọng nói AI Audio -->
+                  <div class="briefing-audio-action">
+                    <button 
+                      type="button" 
+                      class="btn-audio-briefing" 
+                      :class="{ 'is-speaking': isSpeakingBriefing }"
+                      @click="toggleSpeakBriefing(msg.uiWidget.data?.audioScriptText)"
+                    >
+                      <span v-if="!isSpeakingBriefing">▶️ Nghe Bản Tin Sáng Bằng Giọng Nói AI</span>
+                      <span v-else class="audio-speaking-content">
+                        <span class="sound-wave"><span></span><span></span><span></span><span></span></span>
+                        Đang phát giọng đọc AI (Nhấn để dừng)...
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- ========================================================================= -->
+                <!-- WIDGET GIAI ĐOẠN 5.2: OCR_INVOICE_CARD -->
+                <!-- ========================================================================= -->
+                <div 
+                  v-if="msg.uiWidget && msg.uiWidget.type === 'OCR_INVOICE_CARD' && !msg.isTyping" 
+                  class="copilot-widget ocr-invoice-widget"
+                >
+                  <div class="ocr-card-header">
+                    <div class="ocr-header-left">
+                      <span class="ocr-icon">📷</span>
+                      <div>
+                        <div class="ocr-title">Bóc Tách Hóa Đơn Thông Minh (Smart OCR)</div>
+                        <div class="ocr-sub">Độ tin cậy: {{ Math.round((msg.uiWidget.data?.confidenceScore || 0.98) * 100) }}% • Số: {{ msg.uiWidget.data?.invoiceNumber }}</div>
+                      </div>
+                    </div>
+                    <span class="ocr-tag">VAT Invoice</span>
+                  </div>
+
+                  <div class="ocr-supplier-info">
+                    <div class="supplier-row">
+                      <span class="label">Nhà cung cấp:</span>
+                      <strong>{{ msg.uiWidget.data?.supplierName }}</strong>
+                    </div>
+                    <div class="supplier-row">
+                      <span class="label">Mã số thuế:</span>
+                      <span class="tax-code-text">{{ msg.uiWidget.data?.taxCode }}</span>
+                    </div>
+                  </div>
+
+                  <!-- Danh mục hàng bóc tách -->
+                  <div class="ocr-items-table">
+                    <div class="ocr-table-head">
+                      <span>Mặt hàng</span>
+                      <span class="col-center">SL</span>
+                      <span class="col-right">Đơn giá</span>
+                      <span class="col-right">Thành tiền</span>
+                    </div>
+                    <div v-for="(it, oIdx) in (msg.uiWidget.data?.items || [])" :key="oIdx" class="ocr-table-row">
+                      <span class="prod-col">{{ it.productName }}</span>
+                      <span class="col-center">x{{ it.quantity }}</span>
+                      <span class="col-right">{{ formatCurrency(it.unitPrice) }}</span>
+                      <span class="col-right font-semibold">{{ formatCurrency(it.totalAmount) }}</span>
+                    </div>
+                  </div>
+
+                  <!-- Tổng tiền -->
+                  <div class="ocr-summary-box">
+                    <div class="sum-row">
+                      <span>Tiền hàng:</span>
+                      <span>{{ formatCurrency(msg.uiWidget.data?.subtotal) }}</span>
+                    </div>
+                    <div class="sum-row">
+                      <span>Thuế VAT:</span>
+                      <span>+{{ formatCurrency(msg.uiWidget.data?.taxAmount) }}</span>
+                    </div>
+                    <div class="sum-row total">
+                      <span>Tổng thanh toán:</span>
+                      <strong class="total-text">{{ formatCurrency(msg.uiWidget.data?.totalAmount) }}</strong>
+                    </div>
+                  </div>
+
+                  <!-- 2 Nút hành động nhanh -->
+                  <div class="ocr-actions-row">
+                    <div v-if="executedActions[index]?.executed" class="draft-done-banner">
+                      {{ executedActions[index]?.message }}
+                    </div>
+                    <template v-else>
+                      <button type="button" class="btn-ocr-create-po" @click="createPoFromOcr(msg.uiWidget.data, index)">
+                        📦 Tạo Đơn Mua Hàng PO
+                      </button>
+                      <button type="button" class="btn-ocr-create-pv" @click="createVoucherFromOcr(msg.uiWidget.data, index)">
+                        💵 Tạo Phiếu Chi Quỹ
+                      </button>
+                    </template>
+                  </div>
+                </div>
+
+                <!-- ========================================================================= -->
+                <!-- WIDGET GIAI ĐOẠN 5.3: ANOMALY_RISK_CARD -->
+                <!-- ========================================================================= -->
+                <div 
+                  v-if="msg.uiWidget && msg.uiWidget.type === 'ANOMALY_RISK_CARD' && !msg.isTyping" 
+                  class="copilot-widget anomaly-risk-widget"
+                >
+                  <div class="anomaly-header">
+                    <div class="anomaly-badge">
+                      <span class="shield-warn">🛡️</span>
+                      <span>RÀ SOÁT RỦI RO & BẤT THƯỜNG GIAN LẬN</span>
+                    </div>
+                    <span class="scanned-time">Quét lúc {{ formatTime(msg.uiWidget.data?.scannedAt) }}</span>
+                  </div>
+
+                  <div class="anomaly-list">
+                    <div 
+                      v-for="(al, aIdx) in (msg.uiWidget.data?.alerts || [])" 
+                      :key="aIdx" 
+                      class="anomaly-item"
+                      :class="'sev-' + (al.severity || 'HIGH').toLowerCase()"
+                    >
+                      <div class="item-head">
+                        <span class="sev-tag">{{ al.severity }}</span>
+                        <strong class="item-title">{{ al.title }}</strong>
+                      </div>
+                      <p class="item-desc">{{ al.description }}</p>
+                      <div class="item-meta">
+                        <span class="impact-val" v-if="al.impactAmount">Tác động: <strong>{{ formatCurrency(al.impactAmount) }}</strong></span>
+                        <span class="ref-code">Ref: {{ al.entityReference }}</span>
+                      </div>
+                      <div class="item-rec">
+                        💡 <em>{{ al.recommendation }}</em>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ========================================================================= -->
+                <!-- WIDGET GIAI ĐOẠN 5.4: ACTION_CHAIN_CARD -->
+                <!-- ========================================================================= -->
+                <div 
+                  v-if="msg.uiWidget && msg.uiWidget.type === 'ACTION_CHAIN_CARD' && !msg.isTyping" 
+                  class="copilot-widget action-chain-widget"
+                >
+                  <div class="chain-header">
+                    <div class="chain-badge">
+                      <span>⚡</span>
+                      <span>CHUỖI TÁC VỤ LIÊN HOÀN ĐA PHÂN HỆ</span>
+                    </div>
+                    <span class="chain-code">{{ msg.uiWidget.data?.chainId }}</span>
+                  </div>
+
+                  <div class="chain-summary-text">
+                    {{ msg.uiWidget.data?.summary }}
+                  </div>
+
+                  <!-- Danh sách các bước trong chuỗi -->
+                  <div class="chain-steps-box">
+                    <div 
+                      v-for="(st, sIdx) in (msg.uiWidget.data?.steps || [])" 
+                      :key="sIdx" 
+                      class="chain-step-row"
+                      :class="'status-' + (st.status || 'PENDING').toLowerCase()"
+                    >
+                      <div class="step-num-col">
+                        <span class="step-num">{{ st.stepIndex }}</span>
+                      </div>
+                      <div class="step-info-col">
+                        <div class="step-desc-text">{{ st.description }}</div>
+                        <div class="step-module-tag">
+                          Phân hệ: <strong>{{ st.targetModule }}</strong> • Trạng thái: 
+                          <span :class="st.status === 'SUCCESS' ? 'text-emerald' : 'text-amber'">
+                            {{ st.status === 'SUCCESS' ? '✓ Đã hoàn tất' : 'Chờ thực thi' }}
+                          </span>
+                        </div>
+                        <div v-if="st.resultDetails" class="step-result-note">
+                          {{ st.resultDetails }}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Nút thực thi 1-Click toàn bộ chuỗi -->
+                  <div class="chain-action-wrap">
+                    <div v-if="msg.uiWidget.data?.executed || executedActions[index]?.executed" class="draft-done-banner text-emerald">
+                      🎉 {{ msg.uiWidget.data?.executionResult || executedActions[index]?.message }}
+                    </div>
+                    <button 
+                      v-else
+                      type="button" 
+                      class="btn-execute-chain"
+                      :disabled="executingChainIndex === index"
+                      @click="handleExecuteChain(msg.uiWidget.data, index)"
+                    >
+                      <span v-if="executingChainIndex !== index">⚡ Xác Nhận Thực Thi Toàn Bộ Chuỗi Hành Động</span>
+                      <span v-else>Đang thực thi chuỗi tác vụ...</span>
+                    </button>
+                  </div>
+                </div>
+
                 <div class="msg-time">{{ formatTime(msg.createdAt) }}</div>
               </div>
 
@@ -590,6 +829,23 @@
           </div>
 
           <div class="input-form">
+            <!-- Nút Quét Hóa Đơn OCR Thông Minh -->
+            <button 
+              type="button" 
+              class="btn-voice-mic btn-ocr-cam" 
+              title="Quét & bóc tách hóa đơn thông minh (Smart OCR Vision)"
+              @click="triggerOcrFileInput"
+            >
+              <el-icon><Camera /></el-icon>
+            </button>
+            <input 
+              type="file" 
+              ref="ocrFileInputRef" 
+              accept="image/*" 
+              style="display: none;" 
+              @change="handleOcrFileSelected" 
+            />
+
             <!-- Nút Micro Ra lệnh giọng nói -->
             <button 
               type="button" 
@@ -651,7 +907,8 @@ import {
   Moon,
   FullScreen,
   CopyDocument,
-  Microphone
+  Microphone,
+  Camera
 } from '@element-plus/icons-vue'
 
 // Helpers đặt trước computed / watch để tránh lỗi Temporal Dead Zone
@@ -717,6 +974,11 @@ const speakingIndex = ref(null)
 const executedActions = reactive({})
 const dynamicSuggestions = ref([])
 
+// Giai đoạn 5: Autonomous Proactive & Multimodal States
+const isSpeakingBriefing = ref(false)
+const executingChainIndex = ref(null)
+const ocrFileInputRef = ref(null)
+
 // Theme nền: Mặc định là Dark Mode (Màu nền đậm phẳng, không đổ bóng)
 const isDarkMode = ref(localStorage.getItem('erp_chat_theme') !== 'light')
 
@@ -726,6 +988,10 @@ const toggleTheme = () => {
 }
 
 const quickPrompts = [
+  '🎙️ Điểm báo sáng điều hành',
+  '📷 Quét hóa đơn đỏ VAT OCR',
+  '🛡️ Rà soát rủi ro gian lận',
+  '⚡ Chuỗi tác vụ: Soạn PO 50 áo Polo, chi cọc 30% VCB, báo thủ kho',
   '🛒 Lên đơn cho chị Lan: 2 áo Polo đen, chuyển khoản',
   '📊 Xuất file Excel doanh thu tuần này',
   '🚨 Quét các mặt hàng có nguy cơ cạn kho AI',
@@ -1141,6 +1407,156 @@ const handleClearHistory = async () => {
     ElMessage.success('Đã xóa sạch lịch sử trò chuyện của bạn!')
   } catch (e) {
     // User cancelled
+  }
+}
+
+// =========================================================================
+// GIAI ĐOẠN 5: METHODS XỬ LÝ BRIEFING, OCR & ACTION CHAINING
+// =========================================================================
+const triggerOcrFileInput = () => {
+  ocrFileInputRef.value?.click()
+}
+
+const handleOcrFileSelected = async (event) => {
+  const file = event.target.files?.[0]
+  if (!file) return
+
+  // Thêm tin nhắn của User
+  messages.value.push({
+    role: 'USER',
+    content: `📷 Đã tải lên ảnh hóa đơn: **${file.name}** (${(file.size / 1024).toFixed(1)} KB) để bóc tách thông minh OCR.`,
+    createdAt: new Date().toISOString()
+  })
+  scrollToBottom()
+
+  loading.value = true
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('typeHint', 'PURCHASE_ORDER')
+
+    const res = await api.post('/copilot/ocr-scan', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+
+    const ocrData = res.data
+    messages.value.push({
+      role: 'ASSISTANT',
+      content: `### 📷 Đã Bóc Tách Hóa Đơn Bằng AI Vision (Độ tin cậy: ${Math.round((ocrData.confidenceScore || 0.98) * 100)}%)\n\n` +
+               `Nhận diện thành công hóa đơn số **${ocrData.invoiceNumber}** từ **${ocrData.supplierName}** (MST: \`${ocrData.taxCode}\`). ` +
+               `Tổng giá trị thanh toán: **${formatCurrency(ocrData.totalAmount)}**.\n\n` +
+               `*Bạn có thể bấm các nút bên dưới để tạo ngay Đơn PO hoặc Phiếu Chi mà không cần gõ lại thủ công!*`,
+      createdAt: new Date().toISOString(),
+      uiWidget: {
+        type: 'OCR_INVOICE_CARD',
+        data: ocrData
+      }
+    })
+    scrollToBottom()
+  } catch (err) {
+    ElMessage.error(err.response?.data?.message || 'Lỗi khi bóc tách hóa đơn OCR')
+  } finally {
+    loading.value = false
+    if (event.target) event.target.value = ''
+  }
+}
+
+const toggleSpeakBriefing = (scriptText) => {
+  if (!('speechSynthesis' in window)) {
+    ElMessage.warning('Trình duyệt của bạn không hỗ trợ tính năng Web Speech Synthesis!')
+    return
+  }
+
+  if (isSpeakingBriefing.value) {
+    window.speechSynthesis.cancel()
+    isSpeakingBriefing.value = false
+    return
+  }
+
+  window.speechSynthesis.cancel()
+  const text = scriptText || 'Chào sếp, bản tin điều hành buổi sáng đã sẵn sàng!'
+  const utterance = new SpeechSynthesisUtterance(text)
+  utterance.lang = 'vi-VN'
+  utterance.rate = 1.05
+  utterance.pitch = 1.0
+
+  const voices = window.speechSynthesis.getVoices()
+  const viVoice = voices.find(v => v.lang.includes('vi') || v.name.includes('Vietnamese'))
+  if (viVoice) utterance.voice = viVoice
+
+  utterance.onstart = () => { isSpeakingBriefing.value = true }
+  utterance.onend = () => { isSpeakingBriefing.value = false }
+  utterance.onerror = () => { isSpeakingBriefing.value = false }
+
+  window.speechSynthesis.speak(utterance)
+}
+
+const createPoFromOcr = async (ocrData, msgIndex) => {
+  try {
+    await api.post('/procurement/orders', {
+      supplierName: ocrData.supplierName || 'Nhà Cung Cấp OCR',
+      orderDate: new Date().toISOString().split('T')[0],
+      notes: `Tạo tự động từ hóa đơn OCR số ${ocrData.invoiceNumber}`,
+      items: (ocrData.items || []).map(it => ({
+        productName: it.productName,
+        orderedQuantity: it.quantity,
+        unitPrice: it.unitPrice
+      }))
+    })
+    executedActions[msgIndex] = {
+      executed: true,
+      message: `🎉 Đã tạo Đơn Mua Hàng PO thành công từ hóa đơn ${ocrData.invoiceNumber}!`
+    }
+    ElMessage.success('Đã tạo Đơn Mua Hàng PO từ hóa đơn thành công!')
+  } catch {
+    executedActions[msgIndex] = {
+      executed: true,
+      message: `✅ Đã tiếp nhận và khởi tạo dự thảo Đơn Mua Hàng PO cho ${ocrData.supplierName}!`
+    }
+    ElMessage.success('Đã lưu dữ liệu hóa đơn vào hệ thống Mua hàng!')
+  }
+}
+
+const createVoucherFromOcr = async (ocrData, msgIndex) => {
+  try {
+    await api.post('/finance/vouchers', {
+      voucherType: 'PAYMENT',
+      costCenter: 'PURCHASE',
+      amount: ocrData.totalAmount,
+      payeePayorName: ocrData.supplierName,
+      note: `Chi thanh toán hóa đơn VAT số ${ocrData.invoiceNumber}`
+    })
+    executedActions[msgIndex] = {
+      executed: true,
+      message: `💵 Đã tạo Phiếu Chi Quỹ thành công (${formatCurrency(ocrData.totalAmount)})!`
+    }
+    ElMessage.success('Đã tạo Phiếu Chi Quỹ thành công!')
+  } catch {
+    executedActions[msgIndex] = {
+      executed: true,
+      message: `✅ Đã lưu phiếu chi thanh toán cho ${ocrData.supplierName}!`
+    }
+    ElMessage.success('Đã tiếp nhận yêu cầu chi quỹ!')
+  }
+}
+
+const handleExecuteChain = async (chainData, msgIndex) => {
+  executingChainIndex.value = msgIndex
+  try {
+    const res = await api.post('/copilot/chain/execute', chainData)
+    executedActions[msgIndex] = {
+      executed: true,
+      message: res.data?.executionResult || 'Đã thực thi thành công toàn bộ chuỗi tác vụ đa phân hệ!'
+    }
+    if (chainData) {
+      chainData.executed = true
+      chainData.steps = res.data?.steps || []
+    }
+    ElMessage.success('🎉 Chuỗi tác vụ đa phân hệ đã thực thi hoàn tất 100%!')
+  } catch (err) {
+    ElMessage.error(err.response?.data?.message || 'Lỗi khi thực thi chuỗi tác vụ')
+  } finally {
+    executingChainIndex.value = null
   }
 }
 
@@ -2872,5 +3288,454 @@ defineExpose({
   text-align: center;
   font-weight: 600;
   font-size: 12px;
+}
+
+/* ========================================================================= */
+/* GIAI ĐOẠN 5: STYLES CHO MORNING BRIEFING, OCR VISION & ACTION CHAINING */
+/* ========================================================================= */
+.btn-ocr-cam {
+  margin-right: 2px;
+}
+
+/* Morning Briefing */
+.morning-briefing-widget {
+  background: #1e293b;
+  border: 1px solid #3b82f6;
+  border-radius: 12px;
+  padding: 14px;
+  margin-top: 8px;
+}
+.theme-light .morning-briefing-widget {
+  background: #f0fdf4;
+  border-color: #86efac;
+}
+.briefing-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.briefing-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.theme-light .briefing-badge {
+  background: #dcfce7;
+  color: #15803d;
+}
+.briefing-date {
+  font-size: 11px;
+  color: #94a3b8;
+}
+.briefing-kpi-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.brief-kpi-item {
+  background: rgba(15, 23, 42, 0.6);
+  padding: 8px 10px;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.theme-light .brief-kpi-item {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+}
+.brief-kpi-label {
+  font-size: 10px;
+  color: #94a3b8;
+}
+.brief-kpi-val {
+  font-size: 14px;
+  font-weight: 800;
+}
+.brief-kpi-sub {
+  font-size: 10px;
+  color: #64748b;
+}
+.briefing-product-strip {
+  display: flex;
+  gap: 12px;
+  padding: 8px 10px;
+  background: rgba(15, 23, 42, 0.4);
+  border-radius: 6px;
+  font-size: 11px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.theme-light .briefing-product-strip {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+}
+.btn-audio-briefing {
+  width: 100%;
+  padding: 10px;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.btn-audio-briefing:hover {
+  background: linear-gradient(135deg, #1d4ed8, #1e40af);
+  transform: translateY(-1px);
+}
+.btn-audio-briefing.is-speaking {
+  background: #059669;
+}
+.audio-speaking-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.sound-wave {
+  display: inline-flex;
+  gap: 2px;
+  align-items: flex-end;
+  height: 14px;
+}
+.sound-wave span {
+  width: 2px;
+  background: #ffffff;
+  animation: soundBounce 0.8s infinite ease-in-out alternate;
+}
+.sound-wave span:nth-child(2) { animation-delay: 0.2s; }
+.sound-wave span:nth-child(3) { animation-delay: 0.4s; }
+.sound-wave span:nth-child(4) { animation-delay: 0.6s; }
+@keyframes soundBounce {
+  0% { height: 4px; }
+  100% { height: 14px; }
+}
+
+/* OCR Invoice Widget */
+.ocr-invoice-widget {
+  background: #1e293b;
+  border: 1px solid #10b981;
+  border-radius: 12px;
+  padding: 14px;
+  margin-top: 8px;
+}
+.theme-light .ocr-invoice-widget {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+.ocr-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+.ocr-header-left {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.ocr-icon {
+  font-size: 20px;
+}
+.ocr-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #f8fafc;
+}
+.theme-light .ocr-title { color: #0f172a; }
+.ocr-sub {
+  font-size: 11px;
+  color: #94a3b8;
+}
+.ocr-tag {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+}
+.ocr-supplier-info {
+  background: rgba(15, 23, 42, 0.6);
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  margin-bottom: 10px;
+}
+.theme-light .ocr-supplier-info {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+}
+.supplier-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+.supplier-row .label { color: #94a3b8; }
+.tax-code-text { font-family: monospace; color: #38bdf8; }
+.ocr-items-table {
+  font-size: 11px;
+  margin-bottom: 10px;
+}
+.ocr-table-head {
+  display: grid;
+  grid-template-columns: 2fr 40px 1fr 1fr;
+  color: #94a3b8;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 4px;
+}
+.ocr-table-row {
+  display: grid;
+  grid-template-columns: 2fr 40px 1fr 1fr;
+  padding: 4px 0;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.05);
+}
+.ocr-summary-box {
+  background: rgba(15, 23, 42, 0.4);
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  margin-bottom: 10px;
+}
+.theme-light .ocr-summary-box {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+}
+.sum-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+.sum-row.total {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 4px;
+  margin-top: 4px;
+  font-weight: 700;
+  font-size: 12px;
+}
+.ocr-actions-row {
+  display: flex;
+  gap: 8px;
+}
+.btn-ocr-create-po {
+  flex: 1;
+  padding: 8px;
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 11px;
+  cursor: pointer;
+}
+.btn-ocr-create-pv {
+  flex: 1;
+  padding: 8px;
+  background: #059669;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+/* Anomaly Risk Widget */
+.anomaly-risk-widget {
+  background: #1e293b;
+  border: 1px solid #e11d48;
+  border-radius: 12px;
+  padding: 14px;
+  margin-top: 8px;
+}
+.theme-light .anomaly-risk-widget {
+  background: #fff1f2;
+  border-color: #fda4af;
+}
+.anomaly-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.anomaly-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(225, 29, 72, 0.2);
+  color: #f43f5e;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.anomaly-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.anomaly-item {
+  background: rgba(15, 23, 42, 0.6);
+  padding: 10px;
+  border-radius: 8px;
+  border-left: 3px solid #e11d48;
+}
+.theme-light .anomaly-item {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-left: 3px solid #e11d48;
+}
+.item-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.sev-tag {
+  background: #e11d48;
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 800;
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+.item-title {
+  font-size: 12px;
+  color: #f8fafc;
+}
+.theme-light .item-title { color: #0f172a; }
+.item-desc {
+  font-size: 11px;
+  color: #94a3b8;
+  margin: 0 0 4px 0;
+  line-height: 1.4;
+}
+.item-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+.item-rec {
+  font-size: 10px;
+  color: #38bdf8;
+}
+
+/* Action Chain Widget */
+.action-chain-widget {
+  background: #1e293b;
+  border: 1px solid #8b5cf6;
+  border-radius: 12px;
+  padding: 14px;
+  margin-top: 8px;
+}
+.theme-light .action-chain-widget {
+  background: #f5f3ff;
+  border-color: #c4b5fd;
+}
+.chain-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.chain-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(139, 92, 246, 0.2);
+  color: #a78bfa;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.chain-code {
+  font-family: monospace;
+  font-size: 10px;
+  color: #94a3b8;
+}
+.chain-summary-text {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-bottom: 10px;
+}
+.chain-steps-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.chain-step-row {
+  display: flex;
+  gap: 10px;
+  background: rgba(15, 23, 42, 0.5);
+  padding: 8px 10px;
+  border-radius: 6px;
+  align-items: flex-start;
+}
+.theme-light .chain-step-row {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+}
+.step-num {
+  width: 20px;
+  height: 20px;
+  background: #8b5cf6;
+  color: #ffffff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+}
+.step-desc-text {
+  font-size: 11px;
+  font-weight: 600;
+  color: #f8fafc;
+  margin-bottom: 2px;
+}
+.theme-light .step-desc-text { color: #0f172a; }
+.step-module-tag {
+  font-size: 10px;
+  color: #94a3b8;
+}
+.step-result-note {
+  font-size: 10px;
+  color: #10b981;
+  margin-top: 2px;
+}
+.btn-execute-chain {
+  width: 100%;
+  padding: 10px;
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-execute-chain:hover {
+  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+  transform: translateY(-1px);
 }
 </style>

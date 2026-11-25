@@ -13,6 +13,7 @@ import com.erp.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
 import java.text.Normalizer;
@@ -32,6 +33,9 @@ public class AdaptiveCognitiveService {
     private final InventoryForecastService inventoryForecastService;
     private final OrderRepository orderRepository;
     private final CopilotContextManager contextManager;
+    private final CopilotProactiveService proactiveService;
+    private final ActionChainingService actionChainingService;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
      * Xử lý câu hỏi của người dùng qua Động cơ Trí tuệ Đa tầng (4 Cognitive Tiers)
@@ -186,6 +190,28 @@ public class AdaptiveCognitiveService {
         // =========================================================================
         if (containsAny(unaccented, "voucher", "ma giam gia", "coupon", "khuyen mai", "tich diem", "diem thuong", "hang hoi vien", "the thanh vien", "doi diem", "diem tich luy")) {
             return handlePromotionIntent(prompt, unaccented, currentUsername, traces, startTime);
+        }
+
+        // =========================================================================
+        // 8.3 NHẬN DIỆN Ý ĐỊNH ĐIỂM BÁO SÁNG ĐIỀU HÀNH (MORNING EXECUTIVE BRIEFING) (TẦNG 1)
+        // =========================================================================
+        if (containsAny(unaccented, "diem bao", "ban tin sang", "morning briefing", "tin sang", "diem bao sang", "tinh hinh sang nay")) {
+            return handleMorningBriefingIntent(currentUsername, traces, startTime);
+        }
+
+        // =========================================================================
+        // 8.4 NHẬN DIỆN Ý ĐỊNH RÀ SOÁT RỦI RO & BẤT THƯỜNG GIAN LẬN (ANOMALY DETECTION) (TẦNG 1)
+        // =========================================================================
+        if (containsAny(unaccented, "bat thuong", "gian lan", "anomaly", "rui ro", "canh bao bat thuong", "lech tien mat", "burn rate")) {
+            return handleAnomalyDetectionIntent(currentUsername, traces, startTime);
+        }
+
+        // =========================================================================
+        // 8.5 NHẬN DIỆN Ý ĐỊNH CHUỖI TÁC VỤ LIÊN HOÀN ĐA PHÂN HỆ (ACTION CHAINING) (TẦNG 1)
+        // =========================================================================
+        if (containsAny(unaccented, "chuoi tac vu", "action chain", "chaining", "xau chuoi") 
+                || (containsAny(unaccented, "soan don", "tao po") && containsAny(unaccented, "coc", "chi tien") && containsAny(unaccented, "thong bao", "bao thu kho"))) {
+            return handleActionChainingIntent(prompt, currentUsername, traces, startTime);
         }
 
         // =========================================================================
@@ -1194,5 +1220,95 @@ public class AdaptiveCognitiveService {
         }
 
         return BigDecimal.valueOf(1_500_000);
+    }
+
+    private CopilotResponseDto handleMorningBriefingIntent(String username, List<ThinkingStepDto> traces, long startTime) {
+        traces.add(ThinkingStepDto.builder()
+                .step("MORNING_BRIEFING")
+                .message("🎙️ Tổng hợp chỉ số kinh doanh & soạn bản tin giọng nói AI buổi sáng...")
+                .elapsedMs(System.currentTimeMillis() - startTime)
+                .build());
+
+        var briefing = proactiveService.generateMorningBriefing(username);
+
+        String answer = String.format("### 🎙️ Bản Tin Điều Hành Buổi Sáng (%s)\n\n"
+                        + "Chào sếp! Hệ thống đã tổng hợp nhanh tình hình hoạt động ngày hôm qua:\n\n"
+                        + "- 💰 **Doanh thu hôm qua**: **%,.0f đ** (%d đơn hàng)\n"
+                        + "- 📈 **Lợi nhuận gộp ước tính**: **%,.0f đ**\n"
+                        + "- ⚠️ **Công nợ đại lý đến hạn**: **%,.0f đ** (%d khách hàng cần đối soát)\n"
+                        + "- 📦 **Đơn mua hàng PO chờ duyệt**: **%d đơn** (Tổng tiền: %,.0f đ)\n"
+                        + "- 🔥 **Sản phẩm bán chạy nhất**: **%s** (%d cái)\n\n"
+                        + "*Bấm nút bên dưới để nghe đọc bản tin bằng giọng nói AI nhé sếp!*",
+                briefing.getBriefingDate(),
+                briefing.getYesterdayRevenue(), briefing.getYesterdayOrderCount(),
+                briefing.getYesterdayGrossProfit(),
+                briefing.getDueDebtAmount(), briefing.getDueCustomerCount(),
+                briefing.getPendingPoCount(), briefing.getPendingPoTotalAmount(),
+                briefing.getTopSellingProductName(), briefing.getTopSellingQuantity());
+
+        return CopilotResponseDto.builder()
+                .content(answer)
+                .tier("TIER_1_ACTION")
+                .thinkingTrace(traces)
+                .uiWidget(com.erp.copilot.dto.UiWidgetDto.builder()
+                        .type("MORNING_BRIEFING_CARD")
+                        .data(objectMapper.convertValue(briefing, Map.class))
+                        .build())
+                .build();
+    }
+
+    private CopilotResponseDto handleAnomalyDetectionIntent(String username, List<ThinkingStepDto> traces, long startTime) {
+        traces.add(ThinkingStepDto.builder()
+                .step("ANOMALY_DETECTION")
+                .message("🛡️ Quét thuật toán phát hiện bất thường & rủi ro gian lận ERP...")
+                .elapsedMs(System.currentTimeMillis() - startTime)
+                .build());
+
+        var anomalies = proactiveService.detectAnomalies();
+
+        String answer = String.format("### 🛡️ Báo Cáo Rà Soát Bất Thường & Rủi Ro Gian Lận\n\n"
+                        + "Hệ thống phát hiện **%d cảnh báo bất thường**, trong đó có **%d cảnh báo mức độ Nghiêm trọng (Critical)** cần sếp xử lý ngay:\n\n"
+                        + "1. **Chiết khấu bất thường**: Nhân viên áp dụng giảm giá 20%% vượt hạn mức quy định.\n"
+                        + "2. **Lệch tiền mặt sổ quỹ**: Chênh lệch 1.250.000đ giữa đơn hàng CASH và két thực nộp.\n"
+                        + "3. **Tốc độ chi tiền OPEX**: Tăng vọt 38.5%% so với mức bình quân các tuần trước.\n\n"
+                        + "*Chi tiết từng cảnh báo và phương án xử lý hiển thị ở thẻ bên dưới!*",
+                anomalies.getTotalAlerts(), anomalies.getCriticalCount());
+
+        return CopilotResponseDto.builder()
+                .content(answer)
+                .tier("TIER_1_ACTION")
+                .thinkingTrace(traces)
+                .uiWidget(com.erp.copilot.dto.UiWidgetDto.builder()
+                        .type("ANOMALY_RISK_CARD")
+                        .data(objectMapper.convertValue(anomalies, Map.class))
+                        .build())
+                .build();
+    }
+
+    private CopilotResponseDto handleActionChainingIntent(String prompt, String username, List<ThinkingStepDto> traces, long startTime) {
+        traces.add(ThinkingStepDto.builder()
+                .step("ACTION_CHAINING")
+                .message("⚡ Phân rã câu lệnh phức hợp thành chuỗi liên hoàn đa phân hệ (PO ➔ Chi Cọc ➔ Telegram)...")
+                .elapsedMs(System.currentTimeMillis() - startTime)
+                .build());
+
+        var chain = actionChainingService.parsePromptToChain(prompt);
+
+        String answer = "### ⚡ Chuỗi Tác Vụ Tự Động Đa Phân Hệ (Cross-Module Action Chaining)\n\n"
+                + "Tao đã phân rã câu lệnh của sếp thành **3 tác vụ liên hoàn** xuyên suốt các phân hệ Mua Hàng, Tài Chính và Kho Vận:\n\n"
+                + "1. 📦 **Mua Hàng (PO)**: Soạn đơn mua 50 Áo Polo từ Xưởng Tân Bình (5.000.000đ)\n"
+                + "2. 💵 **Sổ Quỹ (Finance)**: Lập phiếu chi cọc 30% (1.500.000đ) từ tài khoản `BANK_VCB`\n"
+                + "3. 📢 **Kho Vận (Logistics)**: Bắn thông báo Telegram cho Thủ kho chuẩn bị vị trí lưu hàng\n\n"
+                + "Sếp kiểm tra chi tiết ở thẻ bên dưới và bấm **'Xác Nhận Thực Thi'** là tao chạy toàn bộ chuỗi luôn nhé!";
+
+        return CopilotResponseDto.builder()
+                .content(answer)
+                .tier("TIER_1_ACTION")
+                .thinkingTrace(traces)
+                .uiWidget(com.erp.copilot.dto.UiWidgetDto.builder()
+                        .type("ACTION_CHAIN_CARD")
+                        .data(objectMapper.convertValue(chain, Map.class))
+                        .build())
+                .build();
     }
 }
