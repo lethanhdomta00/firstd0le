@@ -29,6 +29,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
+import com.erp.workflow.model.*;
+import com.erp.workflow.repository.*;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -59,6 +61,10 @@ public class DataInitializer implements CommandLineRunner {
     private final ProductBatchRepository productBatchRepository;
     private final ProductSerialRepository productSerialRepository;
     private final StocktakeAuditRepository stocktakeAuditRepository;
+    private final ApprovalMatrixRuleRepository approvalMatrixRuleRepository;
+    private final ApprovalRequestRepository approvalRequestRepository;
+    private final ApprovalStepHistoryRepository approvalStepHistoryRepository;
+    private final ImmutableAuditLogRepository immutableAuditLogRepository;
 
     @Override
     public void run(String... args) {
@@ -167,6 +173,9 @@ public class DataInitializer implements CommandLineRunner {
 
         // 7. Khởi tạo Động cơ Khuyến mại, Voucher & Loyalty (Giai đoạn 4)
         initPromotionsAndLoyaltyData();
+
+        // 8. Khởi tạo Động cơ Phê duyệt Đa cấp & Ma trận Quy tắc (Giai đoạn 4)
+        initWorkflowAndApprovalData();
     }
 
     private void initDefaultSchedulerJobs() {
@@ -914,6 +923,220 @@ public class DataInitializer implements CommandLineRunner {
                 stocktakeAuditRepository.save(audit);
                 log.info("Initialized sample Stocktake Audit in progress: AUDIT-20261125-001");
             }
+        }
+    }
+
+    private void initWorkflowAndApprovalData() {
+        if (approvalMatrixRuleRepository.count() == 0) {
+            // 1. Quy tắc PO dưới 20 triệu: Tự động phê duyệt
+            ApprovalMatrixRule rule1 = ApprovalMatrixRule.builder()
+                    .ruleName("PO Dưới 20 Triệu - Tự động duyệt")
+                    .documentType(ApprovalDocumentType.PURCHASE_ORDER)
+                    .minAmount(java.math.BigDecimal.ZERO)
+                    .maxAmount(new java.math.BigDecimal("20000000.00"))
+                    .level(1)
+                    .approverRole("ROLE_MANAGER")
+                    .autoApprove(true)
+                    .priority(1)
+                    .active(true)
+                    .build();
+
+            // 2. Quy tắc PO từ 20 đến 100 triệu: Cấp 1 Trưởng phòng, Cấp 2 Kế toán trưởng
+            ApprovalMatrixRule rule2a = ApprovalMatrixRule.builder()
+                    .ruleName("PO 20Tr - 100Tr [Cấp 1: Trưởng phòng Mua hàng]")
+                    .documentType(ApprovalDocumentType.PURCHASE_ORDER)
+                    .minAmount(new java.math.BigDecimal("20000000.01"))
+                    .maxAmount(new java.math.BigDecimal("100000000.00"))
+                    .level(1)
+                    .approverRole("ROLE_MANAGER")
+                    .autoApprove(false)
+                    .priority(2)
+                    .active(true)
+                    .build();
+
+            ApprovalMatrixRule rule2b = ApprovalMatrixRule.builder()
+                    .ruleName("PO 20Tr - 100Tr [Cấp 2: Kế toán trưởng]")
+                    .documentType(ApprovalDocumentType.PURCHASE_ORDER)
+                    .minAmount(new java.math.BigDecimal("20000000.01"))
+                    .maxAmount(new java.math.BigDecimal("100000000.00"))
+                    .level(2)
+                    .approverRole("ROLE_ACCOUNTANT")
+                    .autoApprove(false)
+                    .priority(2)
+                    .active(true)
+                    .build();
+
+            // 3. Quy tắc PO trên 100 triệu: Cấp 1 Trưởng phòng, Cấp 2 Kế toán trưởng, Cấp 3 Tổng Giám đốc (CEO)
+            ApprovalMatrixRule rule3a = ApprovalMatrixRule.builder()
+                    .ruleName("PO Trên 100Tr [Cấp 1: Trưởng phòng]")
+                    .documentType(ApprovalDocumentType.PURCHASE_ORDER)
+                    .minAmount(new java.math.BigDecimal("100000000.01"))
+                    .maxAmount(null)
+                    .level(1)
+                    .approverRole("ROLE_MANAGER")
+                    .autoApprove(false)
+                    .priority(3)
+                    .active(true)
+                    .build();
+
+            ApprovalMatrixRule rule3b = ApprovalMatrixRule.builder()
+                    .ruleName("PO Trên 100Tr [Cấp 2: Kế toán trưởng]")
+                    .documentType(ApprovalDocumentType.PURCHASE_ORDER)
+                    .minAmount(new java.math.BigDecimal("100000000.01"))
+                    .maxAmount(null)
+                    .level(2)
+                    .approverRole("ROLE_ACCOUNTANT")
+                    .autoApprove(false)
+                    .priority(3)
+                    .active(true)
+                    .build();
+
+            ApprovalMatrixRule rule3c = ApprovalMatrixRule.builder()
+                    .ruleName("PO Trên 100Tr [Cấp 3: Tổng Giám đốc / CEO]")
+                    .documentType(ApprovalDocumentType.PURCHASE_ORDER)
+                    .minAmount(new java.math.BigDecimal("100000000.01"))
+                    .maxAmount(null)
+                    .level(3)
+                    .approverRole("ROLE_ADMIN")
+                    .autoApprove(false)
+                    .priority(3)
+                    .active(true)
+                    .build();
+
+            // 4. Quy tắc Phiếu chi Quỹ trên 50 triệu: Cấp 1 Kế toán trưởng
+            ApprovalMatrixRule rule4 = ApprovalMatrixRule.builder()
+                    .ruleName("Phiếu chi Quỹ > 50Tr [Kế toán trưởng duyệt]")
+                    .documentType(ApprovalDocumentType.PAYMENT_VOUCHER)
+                    .minAmount(new java.math.BigDecimal("50000000.00"))
+                    .maxAmount(null)
+                    .level(1)
+                    .approverRole("ROLE_ACCOUNTANT")
+                    .autoApprove(false)
+                    .priority(1)
+                    .active(true)
+                    .build();
+
+            // 5. Quy tắc Chiết khấu POS đặc biệt > 500k: Giám đốc duyệt
+            ApprovalMatrixRule rule5 = ApprovalMatrixRule.builder()
+                    .ruleName("Chiết khấu POS > 500k [Giám đốc bán hàng duyệt]")
+                    .documentType(ApprovalDocumentType.SPECIAL_DISCOUNT)
+                    .minAmount(new java.math.BigDecimal("500000.00"))
+                    .maxAmount(null)
+                    .level(1)
+                    .approverRole("ROLE_MANAGER")
+                    .autoApprove(false)
+                    .priority(1)
+                    .active(true)
+                    .build();
+
+            approvalMatrixRuleRepository.saveAll(java.util.List.of(rule1, rule2a, rule2b, rule3a, rule3b, rule3c, rule4, rule5));
+            log.info("Initialized default 8 Approval Matrix Rules for PO, Payment Voucher and Special Discount");
+        }
+
+        if (approvalRequestRepository.count() == 0) {
+            // Mẫu 1: Đang chờ duyệt cấp 1 (PO mua hàng 45.000.000đ)
+            ApprovalRequest req1 = ApprovalRequest.builder()
+                    .requestCode("APR-20261125-00001")
+                    .documentType(ApprovalDocumentType.PURCHASE_ORDER)
+                    .documentId(1L)
+                    .documentCode("PO-20261122-001")
+                    .title("Phê duyệt Đơn mua hàng PO-20261122-001 phụ kiện thiết bị công nghệ")
+                    .amount(new java.math.BigDecimal("45000000.00"))
+                    .currency("VND")
+                    .currentLevel(1)
+                    .totalLevels(2)
+                    .status(ApprovalStatus.PENDING)
+                    .currentApproverRole("ROLE_MANAGER")
+                    .requesterUsername("nhanvien")
+                    .requesterFullName("Nguyễn Văn A (Kinh doanh)")
+                    .oneTimeToken(UUID.randomUUID().toString().replace("-", ""))
+                    .tokenExpiresAt(java.time.LocalDateTime.now().plusHours(24))
+                    .payloadSnapshot("{\"supplier\":\"Công ty Công Nghệ Á Châu\",\"items\":2,\"amount\":45000000}")
+                    .build();
+
+            ApprovalStepHistory step0 = ApprovalStepHistory.builder()
+                    .stepLevel(0)
+                    .approverUsername("nhanvien")
+                    .approverFullName("Nguyễn Văn A (Kinh doanh)")
+                    .approverRole("ROLE_SALES")
+                    .action("SUBMIT")
+                    .comment("Trình duyệt đơn mua hàng định kỳ tháng 11 theo kế hoạch kinh doanh")
+                    .build();
+            req1.addStepHistory(step0);
+
+            // Mẫu 2: Đã phê duyệt hoàn tất (Phiếu chi tiền thuê mặt bằng 15.000.000đ)
+            ApprovalRequest req2 = ApprovalRequest.builder()
+                    .requestCode("APR-20261124-00002")
+                    .documentType(ApprovalDocumentType.PAYMENT_VOUCHER)
+                    .documentId(1L)
+                    .documentCode("PV-20261118-001")
+                    .title("Phê duyệt Phiếu chi tiền thuê mặt bằng văn phòng Tháng 11")
+                    .amount(new java.math.BigDecimal("15000000.00"))
+                    .currency("VND")
+                    .currentLevel(1)
+                    .totalLevels(1)
+                    .status(ApprovalStatus.APPROVED)
+                    .currentApproverRole("ROLE_ACCOUNTANT")
+                    .requesterUsername("ketoan")
+                    .requesterFullName("Lê Thị Thu (Kế toán)")
+                    .decisionReason("Đã kiểm tra hợp đồng thuê mặt bằng Keangnam hợp lệ")
+                    .build();
+
+            ApprovalStepHistory step2_0 = ApprovalStepHistory.builder()
+                    .stepLevel(0)
+                    .approverUsername("ketoan")
+                    .approverFullName("Lê Thị Thu (Kế toán)")
+                    .approverRole("ROLE_ACCOUNTANT")
+                    .action("SUBMIT")
+                    .comment("Trình duyệt thanh toán tiền mặt bằng văn phòng theo hợp đồng")
+                    .build();
+            ApprovalStepHistory step2_1 = ApprovalStepHistory.builder()
+                    .stepLevel(1)
+                    .approverUsername("admin")
+                    .approverFullName("Quản trị viên tối cao")
+                    .approverRole("ROLE_ADMIN")
+                    .action("APPROVE")
+                    .comment("Đã duyệt chuyển khoản ngân hàng VCB")
+                    .build();
+            req2.addStepHistory(step2_0);
+            req2.addStepHistory(step2_1);
+
+            approvalRequestRepository.saveAll(java.util.List.of(req1, req2));
+            log.info("Initialized default 2 sample Approval Requests (1 PENDING, 1 APPROVED)");
+
+            // Mẫu Nhật ký kiểm toán bất biến
+            ImmutableAuditLog log1 = ImmutableAuditLog.builder()
+                    .traceId("TRC-INIT-001")
+                    .username("admin")
+                    .userRole("ROLE_ADMIN")
+                    .action("APPROVE")
+                    .entityType("PAYMENT_VOUCHER")
+                    .entityId(1L)
+                    .entityCode("PV-20261118-001")
+                    .oldValueJson("{\"status\":\"PENDING\"}")
+                    .newValueJson("{\"status\":\"APPROVED\"}")
+                    .ipAddress("127.0.0.1")
+                    .userAgent("ERP Cloud Enterprise Desktop")
+                    .reason("Đã duyệt thanh toán tiền mặt bằng văn phòng")
+                    .build();
+
+            ImmutableAuditLog log2 = ImmutableAuditLog.builder()
+                    .traceId("TRC-INIT-002")
+                    .username("nhanvien")
+                    .userRole("ROLE_SALES")
+                    .action("SUBMIT")
+                    .entityType("PURCHASE_ORDER")
+                    .entityId(1L)
+                    .entityCode("PO-20261122-001")
+                    .oldValueJson(null)
+                    .newValueJson("{\"status\":\"PENDING_APPROVAL\",\"amount\":45000000}")
+                    .ipAddress("127.0.0.1")
+                    .userAgent("ERP Cloud Enterprise Desktop")
+                    .reason("Trình duyệt PO phụ kiện công nghệ")
+                    .build();
+
+            immutableAuditLogRepository.saveAll(java.util.List.of(log1, log2));
+            log.info("Initialized default 2 Immutable Audit Logs");
         }
     }
 }

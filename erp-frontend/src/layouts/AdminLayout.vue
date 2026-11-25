@@ -192,6 +192,12 @@
               <span class="menu-title-text">Quản lý Tài khoản</span>
             </template>
           </el-menu-item>
+          <el-menu-item index="/workflow-approvals">
+            <el-icon><Stamp /></el-icon>
+            <template #title>
+              <span class="menu-title-text">Phê duyệt & Kiểm toán</span>
+            </template>
+          </el-menu-item>
           <el-menu-item v-if="authStore.isAdmin" index="/announcements">
             <el-icon><BellFilled /></el-icon>
             <template #title>
@@ -366,6 +372,10 @@
           <el-menu-item v-if="authStore.hasPermission('USER_VIEW')" index="/users">
             <el-icon><User /></el-icon>
             <template #title>Quản lý Tài khoản</template>
+          </el-menu-item>
+          <el-menu-item index="/workflow-approvals">
+            <el-icon><Stamp /></el-icon>
+            <template #title>Phê duyệt & Kiểm toán</template>
           </el-menu-item>
           <el-menu-item v-if="authStore.isAdmin" index="/announcements">
             <el-icon><BellFilled /></el-icon>
@@ -670,7 +680,8 @@ import {
   Present,
   OfficeBuilding,
   Box,
-  Operation
+  Operation,
+  Stamp
 } from '@element-plus/icons-vue'
 
 const router = useRouter()

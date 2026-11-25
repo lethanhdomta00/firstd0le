@@ -68,6 +68,12 @@ const routes = [
         meta: { permission: 'PRODUCT_VIEW' }
       },
       {
+        path: 'workflow-approvals',
+        name: 'WorkflowApproval',
+        component: () => import('../views/WorkflowApproval.vue'),
+        meta: { title: 'Quy trình Phê duyệt & Kiểm toán' }
+      },
+      {
         path: 'users',
         name: 'Users',
         component: () => import('../views/Users.vue'),
