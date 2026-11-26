@@ -53,3 +53,15 @@ gemini:
   # Danh sách API Keys được nạp tự động từ file gemini-keys.yml (hoặc biến môi trường GEMINI_API_KEYS)
   model: ${GEMINI_MODEL:gemini-2.5-flash-lite}
   api-url: https://generativelanguage.googleapis.com/v1beta/models
+
+nso:
+  datasource:
+    url: ${NSO_DATASOURCE_URL:jdbc:mysql://127.0.0.1:3306/nsoz?useSSL=false&serverTimezone=UTC&characterEncoding=UTF-8}
+    username: ${NSO_DATASOURCE_USERNAME:root}
+    password: ${NSO_DATASOURCE_PASSWORD:}
+  game:
+    host: ${NSO_GAME_HOST:127.0.0.1}
+    port: ${NSO_GAME_PORT:14444}
+    java-bin: ${NSO_JAVA_BIN:C:\Program Files\Java\jdk-19\bin\java.exe}
+    server-dir: ${NSO_SERVER_DIR:NSO_SETUP_SERVER_FREE/nso_server}
+    client-dir: ${NSO_CLIENT_DIR:NSO_SETUP_SERVER_FREE/NSO_SETUP_SERVER_FREE}

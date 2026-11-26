@@ -217,6 +217,30 @@
             </template>
           </el-menu-item>
         </el-sub-menu>
+
+        <!-- 7. Cụm: Giải trí & Game -->
+        <el-sub-menu index="group-entertainment">
+          <template #title>
+            <el-icon class="menu-cluster-icon"><VideoPlay /></el-icon>
+            <span class="menu-title-text">Giải trí &amp; Game</span>
+          </template>
+          <li class="el-menu-item" @click="launchGameNsoQuick">
+            <el-icon><VideoPlay /></el-icon>
+            <span class="menu-title-text">Mở Game NSO</span>
+          </li>
+          <el-menu-item index="/game-nso">
+            <el-icon><Management /></el-icon>
+            <template #title>
+              <span class="menu-title-text">Quản trị Game NSO</span>
+            </template>
+          </el-menu-item>
+          <el-menu-item v-if="authStore.isAdmin || authStore.user?.role === 'MANAGER'" index="/game-nso?tab=gm-tools">
+            <el-icon><Operation /></el-icon>
+            <template #title>
+              <span class="menu-title-text">Tiện ích GM &amp; Bang hội</span>
+            </template>
+          </el-menu-item>
+        </el-sub-menu>
       </el-menu>
 
       <!-- Bottom Info Card (Figma Match) -->
@@ -394,6 +418,26 @@
           <el-menu-item v-if="authStore.isAdmin" index="/settings">
             <el-icon><Setting /></el-icon>
             <template #title>Cài đặt hệ thống</template>
+          </el-menu-item>
+        </el-sub-menu>
+
+        <!-- 7. Giải trí & Game -->
+        <el-sub-menu index="m-group-entertainment">
+          <template #title>
+            <el-icon class="menu-cluster-icon"><VideoPlay /></el-icon>
+            <span>Giải trí &amp; Game</span>
+          </template>
+          <li class="el-menu-item" @click="launchGameNsoQuick(); mobileDrawerVisible = false">
+            <el-icon><VideoPlay /></el-icon>
+            <span>Mở Game NSO</span>
+          </li>
+          <el-menu-item index="/game-nso">
+            <el-icon><Management /></el-icon>
+            <template #title>Quản trị Game NSO</template>
+          </el-menu-item>
+          <el-menu-item v-if="authStore.isAdmin || authStore.user?.role === 'MANAGER'" index="/game-nso?tab=gm-tools">
+            <el-icon><Operation /></el-icon>
+            <template #title>Tiện ích GM &amp; Bang hội</template>
           </el-menu-item>
         </el-sub-menu>
       </el-menu>
@@ -692,7 +736,9 @@ import {
   Box,
   Operation,
   Stamp,
-  Document
+  Document,
+  VideoPlay,
+  Management
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -740,6 +786,7 @@ const currentRouteTitle = computed(() => {
   if (route.path.startsWith('/products')) return 'Quản lý Sản phẩm'
   if (route.path.startsWith('/users')) return 'Quản lý Tài khoản'
   if (route.path.startsWith('/activity-logs')) return 'Nhật ký Thao tác'
+  if (route.path.startsWith('/game-nso')) return 'Giải trí & Game NSO'
   if (route.path.startsWith('/announcements')) return 'Quản lý Thông báo'
   if (route.path.startsWith('/jobs')) return 'Tác vụ tự động & Cron Jobs'
   if (route.path.startsWith('/settings')) return 'Cài đặt hệ thống'
@@ -751,6 +798,7 @@ const currentRouteBreadcrumb = computed(() => {
   if (route.path.startsWith('/products')) return 'Kho hàng & Sản phẩm'
   if (route.path.startsWith('/users')) return 'Danh sách nhân sự'
   if (route.path.startsWith('/activity-logs')) return 'Kiểm toán & Truy vết'
+  if (route.path.startsWith('/game-nso')) return 'Trung tâm Giải trí NSO'
   if (route.path.startsWith('/announcements')) return 'Cài đặt truyền thông'
   if (route.path.startsWith('/jobs')) return 'Lập lịch hệ thống'
   if (route.path.startsWith('/settings')) return 'Trung tâm cấu hình & Phân quyền'
@@ -781,6 +829,15 @@ function openChatWidget() {
     // If widget has isOpen
     const widget = document.querySelector('.chat-floating-btn')
     if (widget) widget.click()
+  }
+}
+
+async function launchGameNsoQuick() {
+  try {
+    const res = await api.post('/game-nso/launch-client')
+    ElMessage.success(res?.data?.message || 'Đã mở giả lập Game NSO!')
+  } catch (err) {
+    ElMessage.error(err?.response?.data?.message || 'Không thể mở Game NSO!')
   }
 }
 

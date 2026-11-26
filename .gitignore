@@ -51,4 +51,7 @@ scratch/
 **/gemini-keys.yml
 *.env
 
+# Local Game Server Setup (do not commit large binaries)
+NSO_SETUP_SERVER_FREE/
+
 

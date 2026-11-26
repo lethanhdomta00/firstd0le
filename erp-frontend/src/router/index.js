@@ -80,6 +80,16 @@ const routes = [
         meta: { title: 'Nhật ký Thao tác Hệ thống' }
       },
       {
+        path: 'game-nso',
+        name: 'GameNso',
+        component: () => import('../views/GameNso.vue'),
+        meta: { title: 'Giải trí & Quản trị Game NSO' }
+      },
+      {
+        path: 'game-nso-play',
+        redirect: '/game-nso'
+      },
+      {
         path: 'users',
         name: 'Users',
         component: () => import('../views/Users.vue'),
