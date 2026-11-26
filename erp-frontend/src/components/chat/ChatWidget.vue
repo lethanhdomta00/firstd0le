@@ -710,6 +710,58 @@
                 </div>
 
                 <!-- ========================================================================= -->
+                <!-- WIDGET NHẬT KÝ THAO TÁC (AUDIT_LOG_CARD) -->
+                <!-- ========================================================================= -->
+                <div 
+                  v-if="msg.uiWidget && msg.uiWidget.type === 'AUDIT_LOG_CARD' && !msg.isTyping" 
+                  class="copilot-widget audit-log-widget"
+                >
+                  <div class="audit-widget-header">
+                    <span class="audit-widget-title">📋 NHẬT KÝ THAO TÁC HỆ THỐNG</span>
+                    <span class="audit-widget-badge">Hôm nay</span>
+                  </div>
+
+                  <div class="audit-kpi-strip">
+                    <div class="audit-kpi-pill">
+                      <span class="ak-lbl">Thao tác</span>
+                      <strong class="ak-val text-blue">{{ msg.uiWidget.data?.totalToday ?? 0 }}</strong>
+                    </div>
+                    <div class="audit-kpi-pill">
+                      <span class="ak-lbl">Rủi ro / Lỗi</span>
+                      <strong class="ak-val text-red">{{ msg.uiWidget.data?.riskyToday ?? 0 }}</strong>
+                    </div>
+                    <div class="audit-kpi-pill">
+                      <span class="ak-lbl">Tài khoản</span>
+                      <strong class="ak-val text-green">{{ msg.uiWidget.data?.activeUsersToday ?? 0 }}</strong>
+                    </div>
+                  </div>
+
+                  <div class="audit-recent-list" v-if="(msg.uiWidget.data?.recentLogs || []).length > 0">
+                    <div 
+                      v-for="(item, idx) in msg.uiWidget.data.recentLogs" 
+                      :key="idx" 
+                      class="audit-recent-row"
+                    >
+                      <div class="ar-top">
+                        <span class="ar-user">@{{ item.username }}</span>
+                        <span class="ar-action" :class="['DELETE', 'LOGIN_FAILED', 'REJECT', 'CANCEL', 'LOCK'].includes(item.action) ? 'ar-danger' : 'ar-normal'">
+                          {{ item.action }}
+                        </span>
+                        <span class="ar-entity">{{ item.entityType }}</span>
+                        <span class="ar-time">{{ formatTime(item.timestamp) }}</span>
+                      </div>
+                      <div class="ar-reason">{{ item.reason || '—' }}</div>
+                    </div>
+                  </div>
+
+                  <div class="audit-widget-footer">
+                    <button type="button" class="audit-goto-btn" @click="goToActivityLogs">
+                      Mở Trung tâm Nhật ký Thao tác ➔
+                    </button>
+                  </div>
+                </div>
+
+                <!-- ========================================================================= -->
                 <!-- WIDGET GIAI ĐOẠN 5.4: ACTION_CHAIN_CARD -->
                 <!-- ========================================================================= -->
                 <div 
@@ -890,7 +942,7 @@
 
 <script setup>
 import { ref, reactive, computed, watch, nextTick, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../store/auth'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import api from '../../api'
@@ -921,6 +973,12 @@ const getSparkMax = (values) => {
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms))
 
 const route = useRoute()
+const router = useRouter()
+
+function goToActivityLogs() {
+  isOpen.value = false
+  router.push('/activity-logs')
+}
 const authStore = useAuthStore()
 
 // Nhận diện khi người dùng đang ở trang /chat (Trò chuyện nội bộ) để không che nút gửi
@@ -988,6 +1046,7 @@ const toggleTheme = () => {
 }
 
 const quickPrompts = [
+  '📋 Tổng hợp nhật ký thao tác hôm nay',
   '🎙️ Điểm báo sáng điều hành',
   '📷 Quét hóa đơn đỏ VAT OCR',
   '🛡️ Rà soát rủi ro gian lận',
@@ -3737,5 +3796,153 @@ defineExpose({
 .btn-execute-chain:hover {
   background: linear-gradient(135deg, #7c3aed, #6d28d9);
   transform: translateY(-1px);
+}
+/* Audit Log Widget */
+.audit-log-widget {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 12px;
+  margin-top: 8px;
+}
+
+.audit-widget-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.audit-widget-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.audit-widget-badge {
+  font-size: 11px;
+  font-weight: 600;
+  background: #eff6ff;
+  color: #2563eb;
+  padding: 2px 8px;
+  border-radius: 99px;
+}
+
+.audit-kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.audit-kpi-pill {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ak-lbl {
+  font-size: 10.5px;
+  color: #64748b;
+}
+
+.ak-val {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.ak-val.text-blue { color: #2563eb; }
+.ak-val.text-red { color: #dc2626; }
+.ak-val.text-green { color: #059669; }
+
+.audit-recent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 190px;
+  overflow-y: auto;
+  margin-bottom: 10px;
+}
+
+.audit-recent-row {
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #f8fafc;
+  border-left: 3px solid #3b82f6;
+}
+
+.ar-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 11.5px;
+  margin-bottom: 2px;
+}
+
+.ar-user {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.ar-action {
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.ar-normal {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.ar-danger {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.ar-entity {
+  color: #475569;
+  font-weight: 600;
+}
+
+.ar-time {
+  margin-left: auto;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.ar-reason {
+  font-size: 11.5px;
+  color: #475569;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.audit-widget-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.audit-goto-btn {
+  width: 100%;
+  border: none;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 12px;
+  cursor: pointer;
+}
+
+.audit-goto-btn:hover {
+  background: #1d4ed8;
 }
 </style>

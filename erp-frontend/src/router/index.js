@@ -74,6 +74,12 @@ const routes = [
         meta: { title: 'Quy trình Phê duyệt & Kiểm toán' }
       },
       {
+        path: 'activity-logs',
+        name: 'ActivityLogs',
+        component: () => import('../views/ActivityLogs.vue'),
+        meta: { title: 'Nhật ký Thao tác Hệ thống' }
+      },
+      {
         path: 'users',
         name: 'Users',
         component: () => import('../views/Users.vue'),

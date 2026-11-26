@@ -198,6 +198,12 @@
               <span class="menu-title-text">Phê duyệt & Kiểm toán</span>
             </template>
           </el-menu-item>
+          <el-menu-item v-if="authStore.isAdmin || authStore.user?.role === 'MANAGER' || authStore.user?.role === 'ACCOUNTANT'" index="/activity-logs">
+            <el-icon><Document /></el-icon>
+            <template #title>
+              <span class="menu-title-text">Nhật ký thao tác</span>
+            </template>
+          </el-menu-item>
           <el-menu-item v-if="authStore.isAdmin" index="/announcements">
             <el-icon><BellFilled /></el-icon>
             <template #title>
@@ -376,6 +382,10 @@
           <el-menu-item index="/workflow-approvals">
             <el-icon><Stamp /></el-icon>
             <template #title>Phê duyệt & Kiểm toán</template>
+          </el-menu-item>
+          <el-menu-item v-if="authStore.isAdmin || authStore.user?.role === 'MANAGER' || authStore.user?.role === 'ACCOUNTANT'" index="/activity-logs">
+            <el-icon><Document /></el-icon>
+            <template #title>Nhật ký thao tác</template>
           </el-menu-item>
           <el-menu-item v-if="authStore.isAdmin" index="/announcements">
             <el-icon><BellFilled /></el-icon>
@@ -681,7 +691,8 @@ import {
   OfficeBuilding,
   Box,
   Operation,
-  Stamp
+  Stamp,
+  Document
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -728,6 +739,7 @@ const currentRouteTitle = computed(() => {
   if (route.path === '/') return 'Bảng điều khiển'
   if (route.path.startsWith('/products')) return 'Quản lý Sản phẩm'
   if (route.path.startsWith('/users')) return 'Quản lý Tài khoản'
+  if (route.path.startsWith('/activity-logs')) return 'Nhật ký Thao tác'
   if (route.path.startsWith('/announcements')) return 'Quản lý Thông báo'
   if (route.path.startsWith('/jobs')) return 'Tác vụ tự động & Cron Jobs'
   if (route.path.startsWith('/settings')) return 'Cài đặt hệ thống'
@@ -738,6 +750,7 @@ const currentRouteBreadcrumb = computed(() => {
   if (route.path === '/') return 'Tổng quan Dashboard'
   if (route.path.startsWith('/products')) return 'Kho hàng & Sản phẩm'
   if (route.path.startsWith('/users')) return 'Danh sách nhân sự'
+  if (route.path.startsWith('/activity-logs')) return 'Kiểm toán & Truy vết'
   if (route.path.startsWith('/announcements')) return 'Cài đặt truyền thông'
   if (route.path.startsWith('/jobs')) return 'Lập lịch hệ thống'
   if (route.path.startsWith('/settings')) return 'Trung tâm cấu hình & Phân quyền'

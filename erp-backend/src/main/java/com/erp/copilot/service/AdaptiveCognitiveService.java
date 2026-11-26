@@ -10,14 +10,20 @@ import com.erp.order.repository.OrderRepository;
 import com.erp.order.service.InventoryForecastService;
 import com.erp.repository.CustomerRepository;
 import com.erp.repository.ProductRepository;
+import com.erp.workflow.dto.AuditLogDto;
+import com.erp.workflow.service.AuditLogService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
 import java.text.Normalizer;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -35,6 +41,7 @@ public class AdaptiveCognitiveService {
     private final CopilotContextManager contextManager;
     private final CopilotProactiveService proactiveService;
     private final ActionChainingService actionChainingService;
+    private final AuditLogService auditLogService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
@@ -212,6 +219,13 @@ public class AdaptiveCognitiveService {
         if (containsAny(unaccented, "chuoi tac vu", "action chain", "chaining", "xau chuoi") 
                 || (containsAny(unaccented, "soan don", "tao po") && containsAny(unaccented, "coc", "chi tien") && containsAny(unaccented, "thong bao", "bao thu kho"))) {
             return handleActionChainingIntent(prompt, currentUsername, traces, startTime);
+        }
+
+        // =========================================================================
+        // 8.6 NHẬN DIỆN Ý ĐỊNH TRA CỨU & TỔNG HỢP NHẬT KÝ THAO TÁC (AUDIT LOGS) (TẦNG 1)
+        // =========================================================================
+        if (containsAny(unaccented, "nhat ky", "lich su thao tac", "audit", "truy vet", "ai thao tac", "ai sua", "ai xoa", "dang nhap loi", "thao tac hom nay", "log he thong")) {
+            return handleAuditLogQueryIntent(prompt, unaccented, currentUsername, traces, startTime);
         }
 
         // =========================================================================
@@ -1308,6 +1322,108 @@ public class AdaptiveCognitiveService {
                 .uiWidget(com.erp.copilot.dto.UiWidgetDto.builder()
                         .type("ACTION_CHAIN_CARD")
                         .data(objectMapper.convertValue(chain, Map.class))
+                        .build())
+                .build();
+    }
+
+    private CopilotResponseDto handleAuditLogQueryIntent(String prompt,
+                                                         String unaccented,
+                                                         String currentUsername,
+                                                         List<ThinkingStepDto> traces,
+                                                         long startTime) {
+        traces.add(ThinkingStepDto.builder()
+                .step("AUDIT_LOG_QUERY")
+                .message("📋 Truy xuất dữ liệu Sổ Nhật Ký Kiểm Toán & Phân tích hành vi hệ thống...")
+                .elapsedMs(System.currentTimeMillis() - startTime)
+                .build());
+
+        Map<String, Object> stats = auditLogService.getAuditStatistics();
+
+        String filterEntity = null;
+        if (containsAny(unaccented, "san pham", "product")) filterEntity = "PRODUCT";
+        else if (containsAny(unaccented, "don hang", "order")) filterEntity = "ORDER";
+        else if (containsAny(unaccented, "tai khoan", "user", "nhan vien")) filterEntity = "USER";
+        else if (containsAny(unaccented, "dang nhap", "login", "xac thuc")) filterEntity = "AUTH";
+        else if (containsAny(unaccented, "tai chinh", "so quy", "phieu chi", "finance")) filterEntity = "FINANCE";
+
+        String filterAction = null;
+        if (containsAny(unaccented, "xoa", "delete")) filterAction = "DELETE";
+        else if (containsAny(unaccented, "dang nhap loi", "login failed", "that bai")) filterAction = "LOGIN_FAILED";
+        else if (containsAny(unaccented, "sua", "cap nhat", "update")) filterAction = "UPDATE";
+        else if (containsAny(unaccented, "them", "tao", "create")) filterAction = "CREATE";
+
+        String filterUser = null;
+        Matcher userMatcher = Pattern.compile("@([a-zA-Z0-9_.-]+)").matcher(prompt);
+        if (userMatcher.find()) {
+            filterUser = userMatcher.group(1);
+        }
+
+        LocalDateTime fromToday = LocalDate.now().atStartOfDay();
+        LocalDateTime toNow = LocalDateTime.now();
+
+        Page<AuditLogDto> pageLogs = auditLogService.searchAuditLogsAdvanced(
+                null, filterEntity, filterUser, filterAction, fromToday, toNow, 0, 6);
+
+        List<AuditLogDto> recentLogs = pageLogs.getContent();
+        if (recentLogs.isEmpty()) {
+            // Fallback lấy 6 bản ghi gần nhất nếu hôm nay chưa có theo bộ lọc
+            recentLogs = auditLogService.searchAuditLogsAdvanced(
+                    null, filterEntity, filterUser, filterAction, null, null, 0, 6).getContent();
+        }
+
+        long totalToday = ((Number) stats.getOrDefault("totalToday", 0L)).longValue();
+        long riskyToday = ((Number) stats.getOrDefault("riskyToday", 0L)).longValue();
+        long activeUsers = ((Number) stats.getOrDefault("activeUsersToday", 0L)).longValue();
+        String topEntity = String.valueOf(stats.getOrDefault("topEntity", "N/A"));
+
+        DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("HH:mm:ss");
+        StringBuilder sb = new StringBuilder();
+        sb.append("### 📋 Tổng Hợp Nhật Ký Thao Tác Hệ Thống\n\n");
+        sb.append(String.format("- ⚡ **Tổng thao tác hôm nay**: **%d** lượt (bởi **%d** tài khoản)\n", totalToday, activeUsers));
+        sb.append(String.format("- 🚨 **Thao tác nhạy cảm / rủi ro**: **%d** lượt\n", riskyToday));
+        sb.append(String.format("- 🏆 **Phân hệ tương tác nhiều (7 ngày)**: **%s**\n\n", topEntity));
+
+        if (recentLogs.isEmpty()) {
+            sb.append("_Hiện chưa ghi nhận thao tác nào khớp với điều kiện bạn hỏi._");
+        } else {
+            sb.append("**Các thao tác gần nhất:**\n");
+            for (AuditLogDto item : recentLogs) {
+                String t = item.getTimestamp() != null ? item.getTimestamp().format(timeFmt) : "--:--";
+                sb.append(String.format("- `[%s]` **@%s** • `%s` (%s): %s\n",
+                        t, item.getUsername(), item.getAction(), item.getEntityType(),
+                        item.getReason() != null ? item.getReason() : ""));
+            }
+        }
+
+        List<Map<String, Object>> serializedLogs = new ArrayList<>();
+        for (AuditLogDto item : recentLogs) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", item.getId());
+            m.put("traceId", item.getTraceId());
+            m.put("username", item.getUsername());
+            m.put("action", item.getAction());
+            m.put("entityType", item.getEntityType());
+            m.put("entityCode", item.getEntityCode());
+            m.put("reason", item.getReason());
+            m.put("ipAddress", item.getIpAddress());
+            m.put("timestamp", item.getTimestamp() != null ? item.getTimestamp().toString() : null);
+            serializedLogs.add(m);
+        }
+
+        Map<String, Object> widgetData = new LinkedHashMap<>();
+        widgetData.put("totalToday", totalToday);
+        widgetData.put("riskyToday", riskyToday);
+        widgetData.put("activeUsersToday", activeUsers);
+        widgetData.put("topEntity", topEntity);
+        widgetData.put("recentLogs", serializedLogs);
+
+        return CopilotResponseDto.builder()
+                .content(sb.toString())
+                .tier("TIER_1_ACTION")
+                .thinkingTrace(traces)
+                .uiWidget(com.erp.copilot.dto.UiWidgetDto.builder()
+                        .type("AUDIT_LOG_CARD")
+                        .data(widgetData)
                         .build())
                 .build();
     }

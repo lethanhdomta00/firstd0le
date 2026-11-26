@@ -13,6 +13,8 @@ import com.erp.security.JwtTokenProvider;
 import com.erp.service.EmailService;
 import com.erp.service.RolePermissionService;
 import com.erp.service.TelegramService;
+import com.erp.workflow.service.AuditLogService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -45,6 +47,7 @@ public class AuthController {
     private final EmailService emailService;
     private final TelegramService telegramService;
     private final RolePermissionService rolePermissionService;
+    private final AuditLogService auditLogService;
     private final SecureRandom secureRandom = new SecureRandom();
 
     @GetMapping("/version")
@@ -57,11 +60,18 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> authenticateUser(@RequestBody LoginRequest loginRequest) {
+    public ResponseEntity<?> authenticateUser(@RequestBody LoginRequest loginRequest, HttpServletRequest servletRequest) {
+        String ipAddress = servletRequest != null ? servletRequest.getRemoteAddr() : "127.0.0.1";
+        String userAgent = servletRequest != null ? servletRequest.getHeader("User-Agent") : "Unknown";
+        String attemptUsername = loginRequest.getUsername() != null ? loginRequest.getUsername() : "unknown";
+
         try {
             // Kiểm tra trạng thái tài khoản trước khi cấp token
             Optional<User> userOpt = userRepository.findByUsername(loginRequest.getUsername());
             if (userOpt.isPresent() && "LOCKED".equalsIgnoreCase(userOpt.get().getStatus())) {
+                auditLogService.logActionSafe(attemptUsername, userOpt.get().getRole() != null ? userOpt.get().getRole().name() : "USER",
+                        "LOGIN_FAILED", "AUTH", userOpt.get().getId(), attemptUsername,
+                        null, null, "Đăng nhập thất bại: Tài khoản đang bị khóa", ipAddress, userAgent);
                 return ResponseEntity.status(403).body(Map.of("message", "Tài khoản của bạn đã bị khóa! Vui lòng liên hệ Quản trị viên."));
             }
 
@@ -77,11 +87,19 @@ public class AuthController {
 
             User user = userOpt.orElseGet(() -> userRepository.findByUsername(loginRequest.getUsername()).orElse(null));
             Set<String> permissions = Collections.emptySet();
+            String userRole = "USER";
             if (user != null && user.getRole() != null) {
-                permissions = rolePermissionService.getPermissionsForRole(user.getRole().name());
+                userRole = user.getRole().name();
+                permissions = rolePermissionService.getPermissionsForRole(userRole);
             }
+            auditLogService.logActionSafe(attemptUsername, userRole,
+                    "LOGIN_SUCCESS", "AUTH", user != null ? user.getId() : null, attemptUsername,
+                    null, null, "Đăng nhập hệ thống thành công", ipAddress, userAgent);
             return ResponseEntity.ok(new JwtAuthenticationResponse(jwt, UserResponseDto.fromEntity(user, permissions)));
         } catch (AuthenticationException e) {
+            auditLogService.logActionSafe(attemptUsername, "ANONYMOUS",
+                    "LOGIN_FAILED", "AUTH", null, attemptUsername,
+                    null, null, "Đăng nhập thất bại: Sai tên đăng nhập hoặc mật khẩu", ipAddress, userAgent);
             return ResponseEntity.status(401).body(Map.of("message", "Tên đăng nhập hoặc mật khẩu không chính xác!"));
         }
     }
